@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <limits>
 #include <Eigen\dense>
 #include <sstream>   // ×Ö·ûÁ÷
 #include <iostream>
