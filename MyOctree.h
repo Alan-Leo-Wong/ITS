@@ -8,7 +8,7 @@ inline double dBaseFunction(double x, double width, double node_x);
 struct OctreeNode
 {
 	OctreeNode* parent;
-	vector<OctreeNode*> child;
+	vector<OctreeNode*> childs;
 
 	int depth;   //格子深度
 	V3d width;
@@ -93,7 +93,7 @@ public:
 
 	void cpIntersection();
 
-	void createNode(OctreeNode*& node, const int& depth, const V3d& width, const vector<size_t>& idxOfPoints, const std::pair<V3d, V3d>& boundary);
+	void createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints);
 
 	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 

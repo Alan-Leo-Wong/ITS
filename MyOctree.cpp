@@ -43,19 +43,13 @@ void MyOctree::createOctree(const double& scaleSize)
 	V3d width = V3d((b_end - b_beg)(0), (b_end - b_beg)(1), (b_end - b_beg)(2));
 
 	root = new OctreeNode(0, width, boundary, idxOfPoints);
-	createNode(root, 0, width, idxOfPoints, boundary);
+	createNode(root, 0, width, boundary, idxOfPoints);
 
 	saveNodeCorners2OBJFile("./vis/octree.obj");
 }
 
-void MyOctree::createNode(OctreeNode*& node, const int& depth, const V3d& width, const vector<size_t>& idxOfPoints, const std::pair<V3d, V3d>& boundary)
+void MyOctree::createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints)
 {
-	/*if (depth >= maxDepth || idxOfPoints.empty())
-	{
-		node = nullptr;
-		return;
-	}*/
-
 	vector<vector<size_t>> childPointsIdx(8);
 
 	V3d b_beg = boundary.first;
@@ -81,13 +75,18 @@ void MyOctree::createNode(OctreeNode*& node, const int& depth, const V3d& width,
 	nodeZEdges[depth].emplace_back(std::make_pair(V3d(b_beg.x(), center.y(), b_beg.z()), V3d(b_beg.x(), center.y(), b_end.z())));
 	nodeZEdges[depth].emplace_back(std::make_pair(V3d(b_end.x(), center.y(), b_beg.z()), V3d(b_end.x(), center.y(), b_end.z())));
 
-	if (depth + 1 == maxDepth) return;
+	if (depth + 1 >= maxDepth) return;
 	if (idxOfPoints.empty()) return;
 
-	bool hasChild = false;
+	node->isLeaf = false;
 	for (size_t idx : idxOfPoints)
 	{
 		V3d p = modelVerts[idx];
+
+		if (p.x() == -0.00902034 && p.y() == 0.116522 && p.z() == 0.0395685)
+		{
+			cout << "depth = " << depth << endl;
+		}
 
 		int whichChild = 0;
 		if (p.x() > center.x()) whichChild |= 1;
@@ -95,16 +94,11 @@ void MyOctree::createNode(OctreeNode*& node, const int& depth, const V3d& width,
 		if (p.z() > center.z()) whichChild |= 4;
 
 		childPointsIdx[whichChild].emplace_back(idx);
-		if (!childPointsIdx[whichChild].empty() && !hasChild) hasChild = true;
 	}
-	if (hasChild) node->isLeaf = false;
-	else return;
 
-	node->child.resize(8, nullptr);
+	node->childs.resize(8, nullptr);
 	for (int i = 0; i < 8; i++)
 	{
-		//if (childPointsIdx[i].empty()) continue;
-
 		const int xOffset = i & 1;
 		const int yOffset = (i >> 1) & 1;
 		const int zOffset = (i >> 2) & 1;
@@ -113,15 +107,17 @@ void MyOctree::createNode(OctreeNode*& node, const int& depth, const V3d& width,
 		V3d childEnd = childBeg + childWidth;
 		PV3d childBoundary = { childBeg, childEnd };
 
-		node->child[i] = new OctreeNode(depth + 1, childWidth, childBoundary, childPointsIdx[i]);
-		node->child[i]->parent = node;
+		node->childs[i] = new OctreeNode(depth + 1, childWidth, childBoundary, childPointsIdx[i]);
+		node->childs[i]->parent = node;
 
-		createNode(node->child[i], depth + 1, childWidth, childPointsIdx[i], childBoundary);
+		createNode(node->childs[i], depth + 1, childWidth, childBoundary, childPointsIdx[i]);
 	}
 }
 
 void MyOctree::selectLeafNode(OctreeNode* node)
 {
+	if (!node) return;
+
 	std::queue<OctreeNode*> q;
 	q.push(node);
 
@@ -131,12 +127,13 @@ void MyOctree::selectLeafNode(OctreeNode* node)
 		q.pop();
 
 		if (froNode->isLeaf)
+		{
 			leafNodes.emplace_back(froNode);
+		}
 		else
 		{
-			for (int i = 0; i < 8; ++i)
-				if (froNode->child[i] != nullptr)
-					q.push(froNode->child[i]);
+			for (const auto& child : froNode->childs)
+				if (child != nullptr) q.push(child);
 		}
 	}
 }
@@ -146,9 +143,8 @@ void MyOctree::saveNodeCorners2OBJFile(const string& filename)
 	std::ofstream out(filename);
 	selectLeafNode(root);
 	int count = -8;
-	for (int i = 0; i < leafNodes.size(); i++)
+	for (const auto& leaf : leafNodes)
 	{
-		auto leaf = leafNodes[i];
 		vector<V3d> corners;
 		corners.resize(8);
 		double minX = leaf->boundary.first.x();
@@ -215,7 +211,7 @@ void MyOctree::cpIntersection()
 	vector<V2i> modelEdges = extractEdges();
 
 	cout << "We are begining to select leaves" << endl;
-	selectLeafNode(root);
+	//selectLeafNode(root);
 
 	const double DINF = (std::numeric_limits<double>::max)();
 

@@ -18,7 +18,7 @@ int main()
 	MyOctree octree(8, "bunny");
 	octree.ReadFile("./model/bunny.off");
 	octree.createOctree();
-	octree.cpIntersection();
+	//octree.cpIntersection();
 	
 	return 0;
 }
