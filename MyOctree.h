@@ -68,6 +68,7 @@ protected:
 	vector<vector<PV3d>> nodeZEdges; // 节点Z轴方向的边，只用于求交
 
 	vector<OctreeNode*> leafNodes;
+
 	vector<V3d> intersections;
 
 	string modelName;

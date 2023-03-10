@@ -33,14 +33,14 @@ void MyOctree::createOctree(const double& scaleSize)
 	std::pair<V3d, V3d> boundary;
 	V3d maxV = m_V.colwise().maxCoeff();
 	V3d minV = m_V.colwise().minCoeff();
-	boundary.first = minV;
-	boundary.second = maxV;
 
 	// 保证外围格子是空的
 	// bounding box
 	V3d b_beg = minV - (maxV - minV) * scaleSize;
 	V3d b_end = maxV + (maxV - minV) * scaleSize;
-	V3d width = V3d((b_end - b_beg)(0), (b_end - b_beg)(1), (b_end - b_beg)(2));
+	V3d width = b_end - b_beg;
+	boundary.first = b_beg;
+	boundary.second = b_end;
 
 	root = new OctreeNode(0, width, boundary, idxOfPoints);
 	createNode(root, 0, width, boundary, idxOfPoints);
@@ -82,11 +82,6 @@ void MyOctree::createNode(OctreeNode*& node, const int& depth, const V3d& width,
 	for (size_t idx : idxOfPoints)
 	{
 		V3d p = modelVerts[idx];
-
-		if (p.x() == -0.00902034 && p.y() == 0.116522 && p.z() == 0.0395685)
-		{
-			cout << "depth = " << depth << endl;
-		}
 
 		int whichChild = 0;
 		if (p.x() > center.x()) whichChild |= 1;
@@ -180,19 +175,6 @@ void MyOctree::saveNodeCorners2OBJFile(const string& filename)
 		out << "l " << 5 + count << " " << 7 + count << endl;
 		out << "l " << 6 + count << " " << 8 + count << endl;
 		out << "l " << 7 + count << " " << 8 + count << endl;
-
-		/*out << "f " << 1 + count << " " << 2 + count << " " << 4 + count << endl;
-		out << "f " << 3 + count << " " << 1 + count << " " << 4 + count << endl;
-		out << "f " << 1 + count << " " << 3 + count << " " << 7 + count << endl;
-		out << "f " << 1 + count << " " << 7 + count << " " << 5 + count << endl;
-		out << "f " << 1 + count << " " << 5 + count << " " << 6 + count << endl;
-		out << "f " << 1 + count << " " << 6 + count << " " << 2 + count << endl;
-		out << "f " << 7 + count << " " << 5 + count << " " << 6 + count << endl;
-		out << "f " << 7 + count << " " << 6 + count << " " << 8 + count << endl;
-		out << "f " << 4 + count << " " << 3 + count << " " << 7 + count << endl;
-		out << "f " << 4 + count << " " << 7 + count << " " << 8 + count << endl;
-		out << "f " << 6 + count << " " << 2 + count << " " << 4 + count << endl;
-		out << "f " << 6 + count << " " << 4 + count << " " << 8 + count << endl;*/
 	}
 	out.close();
 }
@@ -210,15 +192,16 @@ void MyOctree::cpIntersection()
 	cout << "We are begining to extract edges" << endl;
 	vector<V2i> modelEdges = extractEdges();
 
-	cout << "We are begining to select leaves" << endl;
+	//cout << "We are begining to select leaves" << endl;
 	//selectLeafNode(root);
-
-	const double DINF = (std::numeric_limits<double>::max)();
 
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 
 	std::cout << "开始求交\n";
 	auto start = std::chrono::system_clock::now();
+
+	cout << "边的数量：" << modelEdges.size() << endl;
+	cout << "叶子节点数量：" << leafNodes.size() << endl;
 	for (int i = 0; i < modelEdges.size(); i++)
 	{
 		Eigen::Vector2i e = modelEdges[i];
@@ -228,28 +211,48 @@ void MyOctree::cpIntersection()
 
 		for (auto node : leafNodes)
 		{
-			V3d leftBottomBackCorner = node->boundary.first;
-			// bottom plane
-			double bottom_t = DINF;
-			if (dir.z() != 0)
-				bottom_t = (leftBottomBackCorner.z() - p1.z()) / dir.z();
-			// left plane
-			double left_t = DINF;
-			if (dir.y() != 0)
-				left_t = (leftBottomBackCorner.y() - p1.y()) / dir.y();
+			V3d lbbCorner = node->boundary.first;
+			V3d width = node->width;
+
 			// back plane
 			double back_t = DINF;
 			if (dir.x() != 0)
-				back_t = (leftBottomBackCorner.x() - p1.x()) / dir.x();
+				back_t = (lbbCorner.x() - p1.x()) / dir.x();
+			// left plane
+			double left_t = DINF;
+			if (dir.y() != 0)
+				left_t = (lbbCorner.y() - p1.y()) / dir.y();
+			// bottom plane
+			double bottom_t = DINF;
+			if (dir.z() != 0)
+				bottom_t = (lbbCorner.z() - p1.z()) / dir.z();
 
-			if (isInRange(.0, 1.0, bottom_t))
-				intersections.emplace_back(p1 + bottom_t * dir);
-			if (isInRange(.0, 1.0, left_t))
-				intersections.emplace_back(p1 + left_t * dir);
-			if (isInRange(.0, 1.0, back_t))
+			if (isInRange(.0, 1.0, back_t) &&
+				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + back_t * dir).y()) &&
+				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + back_t * dir).z()))
+			{
 				intersections.emplace_back(p1 + back_t * dir);
+				node->isIntersectWithMesh = true;
+			}
+			if (isInRange(.0, 1.0, left_t) &&
+				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + left_t * dir).x()) &&
+				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + left_t * dir).z()))
+			{
+				intersections.emplace_back(p1 + left_t * dir);
+				node->isIntersectWithMesh = true;
+			}
+			if (isInRange(.0, 1.0, bottom_t) &&
+				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + bottom_t * dir).x()) &&
+				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + bottom_t * dir).y()))
+			{
+				intersections.emplace_back(p1 + bottom_t * dir);
+				node->isIntersectWithMesh = true;
+			}
 		}
 	}
+	cout << "去重前交点数量：" << intersections.size() << endl;
+	//intersections.erase(std::unique(intersections.begin(), intersections.end()), intersections.end());
+	//cout << "去重后交点数量：" << intersections.size() << endl;
 	auto end = std::chrono::system_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	cout << "花费了"
@@ -260,11 +263,9 @@ void MyOctree::cpIntersection()
 	saveIntersections("./vis/edgeInter.xyz", intersections);
 
 	// 三角形面与node边线交
-	//std::cout << "Continue to compute the intersections for triangle faces..." << endl;
-	/*for (int i = 0; i < modelFaces.size(); i++)
+	std::cout << "Continue to compute the intersections for triangle faces..." << endl;
+	for (int i = 0; i < modelFaces.size(); i++)
 	{
-		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << i * outputf << "%]";
-
 		V3i f = modelFaces[i];
 		V3d p1 = modelVerts[f.x()];
 		V3d p2 = modelVerts[f.y()];
@@ -286,13 +287,13 @@ void MyOctree::cpIntersection()
 				double z = edge.first.z();
 				if (maxElement.x() <= edge.first.x() || minElement.x() >= edge.second.x()) continue;
 				if (minElement.y() >= y || maxElement.y() <= y || minElement.z() >= z || maxElement.z() <= z) continue;
-				V3d coefficient = t.ComputeCoefficientOfTriangle(y, z, 1);
+				V3d coefficient = t.cpCoefficientOfTriangle(y, z, 1);
 				if (coefficient.x() > 0)
 				{
 					double interX = coefficient.x() * p1.x() + coefficient.y() * p2.x() + coefficient.z() * p3.x();
 					if (interX >= edge.first.x() && interX <= edge.second.x())
 					{
-						facetIntersections.emplace_back(V3d(interX, y, z));
+						intersections.emplace_back(V3d(interX, y, z));
 					}
 				}
 			}
@@ -303,13 +304,13 @@ void MyOctree::cpIntersection()
 				double z = edge.first.z();
 				if (maxElement.y() <= edge.first.y() || minElement.y() >= edge.second.y()) continue;
 				if (minElement.x() >= x || maxElement.x() <= x || minElement.z() >= z || maxElement.z() <= z) continue;
-				V3d coefficient = t.ComputeCoefficientOfTriangle(z, x, 2);
+				V3d coefficient = t.cpCoefficientOfTriangle(z, x, 2);
 				if (coefficient.x() > 0)
 				{
 					double interY = coefficient.x() * p1.y() + coefficient.y() * p2.y() + coefficient.z() * p3.y();
 					if (interY >= edge.first.y() && interY <= edge.second.y())
 					{
-						facetIntersections.emplace_back(V3d(x, interY, z));
+						intersections.emplace_back(V3d(x, interY, z));
 					}
 				}
 			}
@@ -320,19 +321,18 @@ void MyOctree::cpIntersection()
 				double y = edge.first.y();
 				if (maxElement.z() <= edge.first.z() || minElement.z() >= edge.second.z()) continue;
 				if (minElement.x() >= x || maxElement.x() <= x || minElement.y() >= y || maxElement.y() <= y) continue;
-				V3d coefficient = t.ComputeCoefficientOfTriangle(x, y, 0);
+				V3d coefficient = t.cpCoefficientOfTriangle(x, y, 0);
 				if (coefficient.x() > 0)
 				{
 					double interZ = coefficient.x() * p1.z() + coefficient.y() * p2.z() + coefficient.z() * p3.z();
 					if (interZ >= edge.first.z() && interZ <= edge.second.z())
 					{
-						facetIntersections.emplace_back(V3d(x, y, interZ));
+						intersections.emplace_back(V3d(x, y, interZ));
 					}
 				}
 			}
 		}
-	}*/
-	//std::cout << "#####################################################################." << endl;
+	}
 }
 
 void MyOctree::saveIntersections(const string& filename, const vector<V3d>& intersections) const

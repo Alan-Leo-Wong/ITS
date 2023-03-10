@@ -15,10 +15,10 @@ int main()
 	CollisionDetection d;
 	d.ExtractIntersectLines(s1, s2, modelName1, modelName2, ".off", ".obj");*/
 
-	MyOctree octree(8, "bunny");
+	MyOctree octree(2, "bunny");
 	octree.ReadFile("./model/bunny.off");
 	octree.createOctree();
-	//octree.cpIntersection();
+	octree.cpIntersection();
 	
 	return 0;
 }
