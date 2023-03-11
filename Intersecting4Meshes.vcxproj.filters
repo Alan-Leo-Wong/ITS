@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="头文件\Utils">
+      <UniqueIdentifier>{3dcc7cb9-8f93-47bd-8bd8-571278bd8828}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -50,11 +53,17 @@
     <ClInclude Include="MyOctree.h">
       <Filter>源文件</Filter>
     </ClInclude>
-    <ClInclude Include="utils.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="CUDACompute.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common.hpp">
+      <Filter>头文件\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="CMDParser.hpp">
+      <Filter>头文件\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Timer.hpp">
+      <Filter>头文件\Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

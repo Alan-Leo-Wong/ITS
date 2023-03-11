@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 
+using UINT = unsigned int;
 using V3d = Eigen::Vector3d;
 using V2i = Eigen::Vector2i;
 using V3i = Eigen::Vector3i;
