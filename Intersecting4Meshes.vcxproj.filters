@@ -13,67 +13,76 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="头文件\Utils">
-      <UniqueIdentifier>{3dcc7cb9-8f93-47bd-8bd8-571278bd8828}</UniqueIdentifier>
+    <Filter Include="头文件\utils">
+      <UniqueIdentifier>{75cd7cdd-39d7-41fc-9817-1282866fefa2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\cuda">
+      <UniqueIdentifier>{f3fcb83d-d715-4237-a6a3-45b2c5e8a93b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\cuda">
+      <UniqueIdentifier>{b7b4f24e-551d-414a-95a7-296c16eebe75}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="MyBaseModel.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="ThinShells.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="CollisionDetection.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="MyOctree.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="SharedPath.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="BasicDataType.h">
+    <ClInclude Include="src\BasicDataType.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="MyBaseModel.h">
+    <ClInclude Include="src\CollisionDetection.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="ThinShells.h">
+    <ClInclude Include="src\MyBaseModel.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="CollisionDetection.h">
+    <ClInclude Include="src\MyOctree.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="MyOctree.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="CUDACompute.h">
+    <ClInclude Include="src\SharedPath.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="common.hpp">
-      <Filter>头文件\Utils</Filter>
+    <ClInclude Include="src\ThinShells.h">
+      <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="CMDParser.hpp">
-      <Filter>头文件\Utils</Filter>
+    <ClInclude Include="src\utils\common.hpp">
+      <Filter>头文件\utils</Filter>
     </ClInclude>
-    <ClInclude Include="Timer.hpp">
-      <Filter>头文件\Utils</Filter>
+    <ClInclude Include="src\utils\CUDACheck.cuh">
+      <Filter>头文件\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\Timer.hpp">
+      <Filter>头文件\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuda\CUDACompute.h">
+      <Filter>头文件\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\CMDParser.hpp">
+      <Filter>头文件\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="CUDACheck.cuh">
-      <Filter>头文件</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="CUDACompute.cu">
-      <Filter>源文件</Filter>
+    <CudaCompile Include="src\cuda\CUDACompute.cu">
+      <Filter>源文件\cuda</Filter>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\CollisionDetection.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\MyBaseModel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\MyOctree.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ThinShells.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\utils\CMDParser.inl">
+      <Filter>头文件\utils</Filter>
+    </None>
   </ItemGroup>
 </Project>

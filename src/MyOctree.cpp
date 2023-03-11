@@ -1,5 +1,5 @@
 #include "MyOctree.h"
-#include "utils.hpp"
+#include "utils/common.hpp"
 #include <queue>
 #include <Eigen\Sparse>
 #include <Windows.h>
