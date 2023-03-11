@@ -109,6 +109,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>E:\3rdParty\libigl\include;E:\3rdParty\eigen-3.4.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -124,6 +125,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>E:\3rdParty\libigl\include;E:\3rdParty\eigen-3.4.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -141,13 +143,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicDataType.h" />
+    <ClInclude Include="CMDParser.hpp" />
     <ClInclude Include="CollisionDetection.h" />
     <ClInclude Include="CUDACompute.h" />
     <ClInclude Include="MyBaseModel.h" />
     <ClInclude Include="MyOctree.h" />
     <ClInclude Include="SharedPath.h" />
     <ClInclude Include="ThinShells.h" />
-    <ClInclude Include="utils.hpp" />
+    <ClInclude Include="common.hpp" />
+    <ClInclude Include="Timer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CUDACheck.cuh" />
