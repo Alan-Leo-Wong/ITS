@@ -18,6 +18,32 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\BasicDataType.h" />
+    <ClInclude Include="src\CollisionDetection.h" />
+    <ClInclude Include="src\cuda\CUDACompute.h" />
+    <ClInclude Include="src\MyBaseModel.h" />
+    <ClInclude Include="src\MyOctree.h" />
+    <ClInclude Include="src\SharedPath.h" />
+    <ClInclude Include="src\ThinShells.h" />
+    <ClInclude Include="src\utils\CMDParser.hpp" />
+    <ClInclude Include="src\utils\common.hpp" />
+    <ClInclude Include="src\utils\CUDACheck.cuh" />
+    <ClInclude Include="src\utils\Timer.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="src\cuda\CUDACompute.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\CollisionDetection.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\MyBaseModel.cpp" />
+    <ClCompile Include="src\MyOctree.cpp" />
+    <ClCompile Include="src\ThinShells.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\utils\CMDParser.inl" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -134,31 +160,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="CollisionDetection.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="MyBaseModel.cpp" />
-    <ClCompile Include="MyOctree.cpp" />
-    <ClCompile Include="ThinShells.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="BasicDataType.h" />
-    <ClInclude Include="CMDParser.hpp" />
-    <ClInclude Include="CollisionDetection.h" />
-    <ClInclude Include="CUDACompute.h" />
-    <ClInclude Include="MyBaseModel.h" />
-    <ClInclude Include="MyOctree.h" />
-    <ClInclude Include="SharedPath.h" />
-    <ClInclude Include="ThinShells.h" />
-    <ClInclude Include="common.hpp" />
-    <ClInclude Include="Timer.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="CUDACheck.cuh" />
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="CUDACompute.cu" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.targets" />
