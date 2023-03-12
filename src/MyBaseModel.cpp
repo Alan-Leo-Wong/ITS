@@ -1,36 +1,42 @@
 #include "MyBaseModel.h"
+#include <sstream>   // 字符流
+#include <iomanip>   // set the precision of output data
+#include <igl/writeOBJ.h>
+#include <igl/read_triangle_mesh.h>
 
-vector<V3d> MyBaseModel::GetVertices()const
+vector<V3d> MyBaseModel::getVertices()const
 {
 	return modelVerts;
 }
 
-void MyBaseModel::SaveVertices(const string& filename, const vector<V3d>& verts)
+void MyBaseModel::saveVertices(const string& filename, const vector<V3d>& verts)
 {
 	std::ofstream out(filename);
 	out << "# " << verts.size() << " vertices " << std::endl;
 
-	for (V3d v : verts)
+	for (const V3d& v : verts)
 	{
 		out << "v " << std::setiosflags(std::ios::fixed) << std::setprecision(10) << v.x() << " " << v.y() << " " << v.z() << std::endl;
 	}
 	out.close();
 }
 
-void MyBaseModel::ReadFile(const string& filename)
+void MyBaseModel::readFile(const string& filename)
 {
 	igl::read_triangle_mesh(filename, m_V, m_F);
 	for (int i = 0; i < m_V.rows(); i++) modelVerts.emplace_back(m_V.row(i));
 	for (int i = 0; i < m_F.rows(); i++) modelFaces.emplace_back(m_F.row(i));
 }
 
-void MyBaseModel::ReadObjFile(const string& filename)
+void MyBaseModel::readObjFile(const string& filename)
 {
 	ifstream in(filename);
-	if (!in.is_open())
+	if (!in)
 	{
-		cout << "Unable to open the file!" << endl;
+		fprintf(stderr, "Unable to open the file!\n");
+		exit(-1);
 	}
+
 	char buf[1024];
 	while (in.getline(buf, sizeof(buf)))   // 读入文件行于buf
 	{
@@ -65,7 +71,7 @@ void MyBaseModel::ReadObjFile(const string& filename)
 	in.close();
 }
 
-void MyBaseModel::ReadOffFile(const string& filename)
+void MyBaseModel::readOffFile(const string& filename)
 {
 	ifstream in(filename);
 	if (!in.is_open())
@@ -108,7 +114,7 @@ void MyBaseModel::ReadOffFile(const string& filename)
 	in.close();
 }
 
-void MyBaseModel::WriteObjFile(const string& filename) const
+void MyBaseModel::writeObjFile(const string& filename) const
 {
 	std::ofstream out(filename);
 	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
@@ -123,7 +129,7 @@ void MyBaseModel::WriteObjFile(const string& filename) const
 	out.close();
 }
 
-void MyBaseModel::WriteObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const
+void MyBaseModel::writeObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const
 {
 	std::ofstream out(filename);
 	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
@@ -162,7 +168,7 @@ vector<V2i> MyBaseModel::extractEdges()
 	return edges;
 }
 
-vector<vector<V3d>> MyBaseModel::ExtractIsoline(const vector<double>& scalarField, const double& val)const
+vector<vector<V3d>> MyBaseModel::extractIsoline(const vector<double>& scalarField, const double& val)const
 {
 	map<PII, V3d > pointsOnEdges;  // 根据边的pair值索引交点的位置
 	map<PII, set<PII>> fromOneEdgePoint2Neighbors;   // key值为边上点，value表示相邻的两个点
@@ -321,7 +327,7 @@ vector<vector<V3d>> MyBaseModel::ExtractIsoline(const vector<double>& scalarFiel
 	return loops;
 }
 
-void MyBaseModel::SaveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const
+void MyBaseModel::saveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const
 {
 	std::ofstream out(filename);
 	out << "g 3d_lines" << endl;
@@ -349,7 +355,7 @@ void MyBaseModel::SaveIsoline(const string& filename, const vector<vector<V3d>>&
 	out.close();
 }
 
-std::pair< MyBaseModel, MyBaseModel>MyBaseModel::SplitModelByIsoline(const vector<double>& scalarField, const double& val)const
+std::pair< MyBaseModel, MyBaseModel> MyBaseModel::splitModelByIsoline(const vector<double>& scalarField, const double& val)const
 {
 	vector<V3i>faceLess;
 	vector<V3i>faceLarger;
@@ -605,7 +611,7 @@ std::pair< MyBaseModel, MyBaseModel>MyBaseModel::SplitModelByIsoline(const vecto
 	return make_pair(MyBaseModel(vertsLarger, faceLarger), MyBaseModel(vertsLess, faceLess));
 }
 
-void MyBaseModel::WriteTexturedObjFile(const string& filename, const vector<PDD>& uvs)const
+void MyBaseModel::writeTexturedObjFile(const string& filename, const vector<PDD>& uvs)const
 {
 	std::ofstream out(filename);
 	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
@@ -627,7 +633,7 @@ void MyBaseModel::WriteTexturedObjFile(const string& filename, const vector<PDD>
 	out.close();
 }
 
-void MyBaseModel::WriteTexturedObjFile(const string& filename, const vector<double>& uvs)const
+void MyBaseModel::writeTexturedObjFile(const string& filename, const vector<double>& uvs)const
 {
 	std::ofstream out(filename);
 	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
