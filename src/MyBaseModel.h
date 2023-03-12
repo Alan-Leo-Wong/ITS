@@ -1,46 +1,51 @@
 #pragma once
-#include <algorithm>
-#include <limits>
-#include <Eigen\dense>
-#include <sstream>   // 字符流
-#include <iostream>
-#include <iomanip>   // set the precision of output data
-#include <igl/read_triangle_mesh.h>
-#include <igl/writeOBJ.h>
 #include "BasicDataType.h"
 #include "SharedPath.h"
 
 class MyBaseModel
 {
 protected:
+	MXd m_V;
+	MXi m_F;
 	vector<V3d> modelVerts;
 	vector<V3i> modelFaces;
-	MXd m_V;   // matrix form
-	MXi m_F;
 
 public:
 	MyBaseModel() {};
 	MyBaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
+
 	// 获取模型顶点接口
-	vector<V3d> GetVertices()const;
-	void SaveVertices(const string& filename, const vector<V3d>& verts);
-	void ReadFile(const string& filename);
+	vector<V3d> getVertices()const;
+
+	void saveVertices(const string& filename, const vector<V3d>& verts);
+
+	void readFile(const string& filename);
+
 	// 读取obj文件
-	void ReadObjFile(const string& filename);
+	void readObjFile(const string& filename);
+
 	// 读取off文件
-	void ReadOffFile(const string& filename);
+	void readOffFile(const string& filename);
+
 	// 写obj文件
-	void WriteObjFile(const string& filename) const;
-	void WriteObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const;
+	void writeObjFile(const string& filename) const;
+
+	void writeObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const;
+
 	// edges of the mesh
 	vector<V2i> extractEdges();
+
 	// 提取等值线
-	vector<vector<V3d>> ExtractIsoline(const vector<double>& scalarField, const double& val)const;
+	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;
+
 	// 保存等值线
-	void SaveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const;
+	void saveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const;
+
 	// 切分模型
-	std::pair< MyBaseModel, MyBaseModel>SplitModelByIsoline(const vector<double>& scalarField, const double& val)const;
+	std::pair< MyBaseModel, MyBaseModel> splitModelByIsoline(const vector<double>& scalarField, const double& val)const;
+
 	// 保存纹理
-	void WriteTexturedObjFile(const string& filename, const vector<PDD>& uvs)const;
-	void WriteTexturedObjFile(const string& filename, const vector<double>& uvs)const;
+	void writeTexturedObjFile(const string& filename, const vector<PDD>& uvs)const;
+
+	void writeTexturedObjFile(const string& filename, const vector<double>& uvs)const;
 };

@@ -16,6 +16,13 @@
 int strcasecmp(const char *c1, const char *c2) { return _stricmp(c1, c2); }
 #endif // WIN
 
+#ifndef EMPTY_ARG
+#define EMPTY_ARG   -1
+#endif 
+#ifndef INVALID_ARG
+#define INVALID_ARG -2
+#endif
+
 template <typename T>
 inline void cmdLineCleanUp(T* t);
 

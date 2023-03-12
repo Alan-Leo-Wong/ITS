@@ -50,6 +50,7 @@
     <ProjectGuid>{a7753bff-e7b2-4e23-be99-cdcba2132071}</ProjectGuid>
     <RootNamespace>Intersecting4Meshes</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>3DThinShell</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

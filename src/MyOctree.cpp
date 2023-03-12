@@ -1,10 +1,11 @@
 #include "MyOctree.h"
 #include "utils/common.hpp"
 #include <queue>
-#include <Eigen\Sparse>
-#include <Windows.h>
-#include <numeric>
 #include <chrono>
+#include <numeric>
+#include <iomanip>
+#include <Windows.h>
+#include <Eigen\Sparse>
 
 inline double BaseFunction(double x, double width, double node_x)
 {

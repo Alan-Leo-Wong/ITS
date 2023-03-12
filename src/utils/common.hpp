@@ -7,9 +7,6 @@
 #define CUDA_CALLABLE_MEMBER
 #endif
 
-#define EMPTY_ARG   -1
-#define INVALID_ARG -2
-
 template <typename T>
 CUDA_CALLABLE_MEMBER
 bool isInRange(const double& l, const double& r, const T& query) {
