@@ -1,6 +1,6 @@
 #pragma once
 #include <igl/signed_distance.h>
-#include "MyBaseModel.h"
+#include "BaseModel.h"
 
 class MarchingCubes
 {
@@ -313,7 +313,7 @@ public:
     void ExtractIsoSurface(vector<V3d>& Vertices, vector<V3i>& Faces);
 };
 
-class ThinShells : public MyBaseModel
+class ThinShells : public BaseModel
 {
 protected:
 	

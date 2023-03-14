@@ -1,8 +1,8 @@
 #pragma once
-#include "BasicDataType.h"
 #include "SharedPath.h"
+#include "BasicDataType.h"
 
-class MyBaseModel
+class BaseModel
 {
 protected:
 	MXd m_V;
@@ -11,8 +11,8 @@ protected:
 	vector<V3i> modelFaces;
 
 public:
-	MyBaseModel() {};
-	MyBaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
+	BaseModel() {};
+	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
 
 	// 获取模型顶点接口
 	vector<V3d> getVertices()const;
@@ -42,7 +42,7 @@ public:
 	void saveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const;
 
 	// 切分模型
-	std::pair< MyBaseModel, MyBaseModel> splitModelByIsoline(const vector<double>& scalarField, const double& val)const;
+	std::pair< BaseModel, BaseModel> splitModelByIsoline(const vector<double>& scalarField, const double& val)const;
 
 	// 保存纹理
 	void writeTexturedObjFile(const string& filename, const vector<PDD>& uvs)const;

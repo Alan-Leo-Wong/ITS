@@ -10,6 +10,9 @@
 #include <Eigen\sparse>
 
 using UINT = unsigned int;
+
+constexpr double DINF = (std::numeric_limits<double>::max)();
+
 using V3d = Eigen::Vector3d;
 using V2i = Eigen::Vector2i;
 using V3i = Eigen::Vector3i;
@@ -18,6 +21,11 @@ using MXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajo
 using MXi = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using SpMat = Eigen::SparseMatrix<double>;
 using VXd = Eigen::VectorXd;
+
+using PII = std::pair<int, int>;
+using PDD = std::pair<double, double>;
+using PV3d = std::pair<V3d, V3d>;
+
 using std::vector;
 using std::string;
 using std::map;
@@ -28,11 +36,6 @@ using std::max;
 using std::ifstream;
 using std::cout;
 using std::endl;
-using PII = std::pair<int, int>;
-using PDD = std::pair<double, double>;
-using PV3d = std::pair<V3d, V3d>;
-
-constexpr double DINF = (std::numeric_limits<double>::max)();
 
 //struct double3
 //{

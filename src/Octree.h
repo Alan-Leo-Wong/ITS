@@ -1,9 +1,7 @@
 #pragma once
-#include "MyBaseModel.h"
+#include "BaseModel.h"
 
-inline double BaseFunction(double x, double width, double node_x);
-
-inline double dBaseFunction(double x, double width, double node_x);
+double BaseFunction(const double& x, const double& node_x, const double& w);
 
 struct OctreeNode
 {
@@ -17,8 +15,12 @@ struct OctreeNode
 	bool isIntersectWithMesh;
 	double SDFValue[8];
 
+	vector<PV3d> edges;
+
 	PV3d boundary;  // 格子边界, <back/bottom/left, front/top/right>	
 	vector<size_t> idxOfPoints; // 包含的点的index
+
+	std::array<V3d, 4> domain; // 影响范围
 
 	OctreeNode()
 	{
@@ -52,37 +54,47 @@ struct OctreeNode
 		}
 		delete[] child;*/
 	}
+
+	void setCorner();
+
+	void setEdges();
+
+	void setDomain(); // 设置影响范围
+
+	bool isInDomain(const OctreeNode* node);
+
+	inline double BaseFunction4Point(const V3d& p);
 };
 
-class MyOctree : public MyBaseModel
+class Octree : public BaseModel
 {
 protected:
 	int maxDepth;
+	int numNodes = 0;
+	int numLeafNodes = 0;
 
 	OctreeNode* root;
 
 	MXd nodeVerts;    // 存储叶子节点
 
-	vector<vector<PV3d>> nodeXEdges; // 节点X轴方向的边，只用于求交
-	vector<vector<PV3d>> nodeYEdges; // 节点Y轴方向的边，只用于求交
-	vector<vector<PV3d>> nodeZEdges; // 节点Z轴方向的边，只用于求交
+	std::unordered_map<int, OctreeNode*> edgeIdx2Node;
+	vector<PV3d> nodeXEdges; // 节点X轴方向的边，只用于求交
+	vector<PV3d> nodeYEdges; // 节点Y轴方向的边，只用于求交
+	vector<PV3d> nodeZEdges; // 节点Z轴方向的边，只用于求交
 
 	vector<OctreeNode*> leafNodes;
+	vector<OctreeNode*> intersectLeafNodes;
+	vector<vector<OctreeNode*>> inDomainLeafNodess;
 
 	vector<V3d> intersections;
+	Eigen::VectorXd BSplineValue;
 
 	string modelName;
 
 public:
-	MyOctree(int _maxDepth, string _modelName) :maxDepth(_maxDepth), modelName(_modelName)
-	{
-		root = new OctreeNode;
-		nodeXEdges.resize(maxDepth);
-		nodeYEdges.resize(maxDepth);
-		nodeZEdges.resize(maxDepth);
-	}
+	Octree(int _maxDepth, string _modelName) :maxDepth(_maxDepth), modelName(_modelName) { root = new OctreeNode; }
 
-	~MyOctree() { delete root; root = nullptr; };
+	~Octree() { delete root; root = nullptr; };
 
 	void createOctree(const double& scaleSize = 0.1);
 
@@ -98,7 +110,13 @@ public:
 
 	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 
-	SpMat coEfficientOfPoints(const vector<V3d>& edgeIntersections, const vector<V3d>& faceIntersections, SpMat& Bx, SpMat& By, SpMat& Bz);
+	SpMat cpCoefficientOfPoints(const vector<V3d>& edgeIntersections, const vector<V3d>& faceIntersections, SpMat& Bx, SpMat& By, SpMat& Bz);
 
-	void saveBValue2TXT(const string& filename, const Eigen::VectorXd& X) const;
+	void setInDomainLeafNode();
+
+	void setSDF();
+
+	void setBSplineValue();
+
+	void saveBValue(const string& filename, const Eigen::VectorXd& X) const;
 };
