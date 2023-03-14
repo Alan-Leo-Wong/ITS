@@ -30,10 +30,10 @@
     <ClInclude Include="src\CollisionDetection.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\MyBaseModel.h">
+    <ClInclude Include="src\BaseModel.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\MyOctree.h">
+    <ClInclude Include="src\Octree.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\SharedPath.h">
@@ -45,23 +45,24 @@
     <ClInclude Include="src\utils\common.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\utils\CUDACheck.cuh">
-      <Filter>头文件\utils</Filter>
-    </ClInclude>
     <ClInclude Include="src\utils\Timer.hpp">
       <Filter>头文件\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cuda\CUDACompute.h">
-      <Filter>头文件\cuda</Filter>
     </ClInclude>
     <ClInclude Include="src\utils\CMDParser.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="src\cuda\CUDACompute.cu">
-      <Filter>源文件\cuda</Filter>
-    </CudaCompile>
+    <ClInclude Include="src\cuAcc\CUDACheck.cuh">
+      <Filter>头文件\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuAcc\CUDACompute.h">
+      <Filter>头文件\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuAcc\CUDAMacro.h">
+      <Filter>头文件\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SDFHelper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CollisionDetection.cpp">
@@ -70,10 +71,10 @@
     <ClCompile Include="src\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\MyBaseModel.cpp">
+    <ClCompile Include="src\BaseModel.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\MyOctree.cpp">
+    <ClCompile Include="src\Octree.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\ThinShells.cpp">
@@ -84,5 +85,10 @@
     <None Include="src\utils\CMDParser.inl">
       <Filter>头文件\utils</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="src\cuAcc\CUDACompute.cu">
+      <Filter>源文件\cuda</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

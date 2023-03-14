@@ -21,28 +21,30 @@
   <ItemGroup>
     <ClInclude Include="src\BasicDataType.h" />
     <ClInclude Include="src\CollisionDetection.h" />
-    <ClInclude Include="src\cuda\CUDACompute.h" />
-    <ClInclude Include="src\MyBaseModel.h" />
-    <ClInclude Include="src\MyOctree.h" />
+    <ClInclude Include="src\BaseModel.h" />
+    <ClInclude Include="src\cuAcc\CUDACheck.cuh" />
+    <ClInclude Include="src\cuAcc\CUDACompute.h" />
+    <ClInclude Include="src\cuAcc\CUDAMacro.h" />
+    <ClInclude Include="src\Octree.h" />
+    <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\SharedPath.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\common.hpp" />
-    <ClInclude Include="src\utils\CUDACheck.cuh" />
     <ClInclude Include="src\utils\Timer.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="src\cuda\CUDACompute.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CollisionDetection.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\MyBaseModel.cpp" />
-    <ClCompile Include="src\MyOctree.cpp" />
+    <ClCompile Include="src\BaseModel.cpp" />
+    <ClCompile Include="src\Octree.cpp" />
     <ClCompile Include="src\ThinShells.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\utils\CMDParser.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="src\cuAcc\CUDACompute.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -100,6 +102,10 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IncludePath>.\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>.\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -135,7 +141,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\3rdParty\libigl\include;E:\3rdParty\eigen-3.4.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -151,7 +157,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\3rdParty\libigl\include;E:\3rdParty\eigen-3.4.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>

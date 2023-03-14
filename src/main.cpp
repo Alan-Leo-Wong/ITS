@@ -1,5 +1,5 @@
 //#include "CollisionDetection.h"
-#include "MyOctree.h"
+#include "Octree.h"
 #include "utils/common.hpp"
 #include "utils/Timer.hpp"
 #include "utils/CMDParser.hpp"
