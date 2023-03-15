@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -25,12 +25,13 @@
     <ClInclude Include="src\cuAcc\CUDACheck.cuh" />
     <ClInclude Include="src\cuAcc\CUDACompute.h" />
     <ClInclude Include="src\cuAcc\CUDAMacro.h" />
+    <ClInclude Include="src\MarchingCubes.hpp" />
     <ClInclude Include="src\Octree.h" />
     <ClInclude Include="src\SDFHelper.h" />
-    <ClInclude Include="src\SharedPath.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\common.hpp" />
+    <ClInclude Include="src\utils\String.hpp" />
     <ClInclude Include="src\utils\Timer.hpp" />
   </ItemGroup>
   <ItemGroup>

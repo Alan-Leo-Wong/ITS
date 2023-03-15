@@ -36,9 +36,6 @@
     <ClInclude Include="src\Octree.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\SharedPath.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\ThinShells.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -62,6 +59,12 @@
     </ClInclude>
     <ClInclude Include="src\SDFHelper.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\MarchingCubes.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\String.hpp">
+      <Filter>头文件\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

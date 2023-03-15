@@ -4,6 +4,13 @@
 #include "utils/Timer.hpp"
 #include "utils/CMDParser.hpp"
 
+//#ifndef MODEL_DIR
+//#define MODEL_DIR ".\model\"
+//#endif
+//#ifndef OUT_DIR
+//#define OUT_DIR ".\output\"
+//#endif
+
 std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** argv)
 {
 	CmdLineParameter<UINT> _res_1("res1"); // resolution of the first model
@@ -33,7 +40,7 @@ std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** 
 
 int main(int argc, char** argv)
 {
-	auto [res_1, res_2, mp_1, mp_2] = execArgParser(argc, argv);
+	//auto [res_1, res_2, mp_1, mp_2] = execArgParser(argc, argv);
 
 	/*int s1, s2;
 	cout << "resolution of the first model is: ";
@@ -47,19 +54,31 @@ int main(int argc, char** argv)
 	CollisionDetection d;
 	d.ExtractIntersectLines(s1, s2, modelName1, modelName2, ".off", ".obj");*/
 
-	/*MyOctree octree(2, "bunny");
+	Octree octree(3, "bunny");
 
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 	startTimer(&timer);
 
-	octree.ReadFile("./model/bunny.off");
+	octree.readFile("./model/bunny.off");
 	octree.createOctree();
 	octree.cpIntersection();
 
 	stopTimer(&timer);
 	double time = getTimerValue(&timer) * 1e-3;
-	printf("Compute intersection spent %lf s.\n", time);*/
+	printf("Compute intersection spent %lf s.\n", time);
+
+	startTimer(&timer);
+	octree.setInDomainLeafNode();
+	stopTimer(&timer);
+	time = getTimerValue(&timer) * 1e-3;
+	printf("Select indomain leaf nodes spent %lf s.\n", time);
+
+	startTimer(&timer);
+	octree.setBSplineValue();
+	stopTimer(&timer);
+	time = getTimerValue(&timer) * 1e-3;
+	printf("Compute B-spline value spent %lf s.\n", time);
 
 	return 0;
 }

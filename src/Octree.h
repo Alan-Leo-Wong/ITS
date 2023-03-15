@@ -98,7 +98,7 @@ public:
 
 	void createOctree(const double& scaleSize = 0.1);
 
-	void selectLeafNode(OctreeNode* node);
+	//void selectLeafNode(OctreeNode* node);
 
 	vector<OctreeNode*> getLeafNodes();
 
@@ -109,8 +109,6 @@ public:
 	void createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints);
 
 	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
-
-	SpMat cpCoefficientOfPoints(const vector<V3d>& edgeIntersections, const vector<V3d>& faceIntersections, SpMat& Bx, SpMat& By, SpMat& Bz);
 
 	void setInDomainLeafNode();
 
