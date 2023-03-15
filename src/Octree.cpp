@@ -213,7 +213,7 @@ vector<OctreeNode*> Octree::getLeafNodes()
 {
 	if (leafNodes.size() > 2)
 		return leafNodes;
-	selectLeafNode(root);
+	//selectLeafNode(root);
 	return leafNodes;
 }
 

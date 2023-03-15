@@ -33,7 +33,7 @@ void BaseModel::readObjFile(const string& filename)
 	ifstream in(filename);
 	if (!in)
 	{
-		fprintf(stderr, "Unable to open the file!\n");
+		fprintf(stderr, "Unable to open the File: %s !\n");
 		exit(-1);
 	}
 
@@ -656,4 +656,3 @@ void BaseModel::writeTexturedObjFile(const string& filename, const vector<double
 	}
 	out.close();
 }
-
