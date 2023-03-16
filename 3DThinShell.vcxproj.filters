@@ -66,6 +66,12 @@
     <ClInclude Include="src\utils\String.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\utils\Geometry.hpp">
+      <Filter>头文件\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\BSpline.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CollisionDetection.cpp">

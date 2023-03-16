@@ -159,11 +159,11 @@ ThinShells::ThinShells(const int& resolution, const string& modelName, const str
 	m_modelName = modelName;
 	readFile(SHARED_PATH + modelName + fileFormat);
 	ConstructUniformNode(m_resolution, modelName);
-	SaveNode(OUT_PATH + modelName + "/" + std::to_string(m_resolution) + "node.obj");
+	SaveNode(OUT_DIR + modelName + "/" + std::to_string(m_resolution) + "node.obj");
 	vector<V3d> intersections;
 	vector<vector<int>> relativeNodes;
 	Intersection(intersections, relativeNodes);
-	saveVertices(OUT_PATH + modelName + "/" + std::to_string(m_resolution) + "intersections.obj", intersections);
+	saveVertices(OUT_DIR + modelName + "/" + std::to_string(m_resolution) + "intersections.obj", intersections);
 	VXd BSplineCoefficient = ImplicitField(intersections, relativeNodes);
 	
 }
@@ -934,17 +934,17 @@ VXd ThinShells::ImplicitField(const vector<V3d>& intersections, const vector<vec
 	vector<V3d> MaxV;
 	vector<V3i> MaxF;
 	MarchingCubes mc1(m_BSplineCoefficient, m_nodes, m_shellValue.second, m_resolution, MaxV, MaxF);
-	writeObjFile(OUT_PATH + m_modelName + "/" + std::to_string(m_resolution) + "MAX.obj", MaxV, MaxF);
+	writeObjFile(OUT_DIR + m_modelName + "/" + std::to_string(m_resolution) + "MAX.obj", MaxV, MaxF);
 
 	vector<V3d> ZeroV;
 	vector<V3i> ZeroF;
 	MarchingCubes mc2(m_BSplineCoefficient, m_nodes, 0, m_resolution, ZeroV, ZeroF);
-	writeObjFile(OUT_PATH + m_modelName + "/" + std::to_string(m_resolution) + "ZERO.obj", ZeroV, ZeroF);
+	writeObjFile(OUT_DIR + m_modelName + "/" + std::to_string(m_resolution) + "ZERO.obj", ZeroV, ZeroF);
 
 	vector<V3d> MinV;
 	vector<V3i> MinF;
 	MarchingCubes mc3(m_BSplineCoefficient, m_nodes, m_shellValue.first, m_resolution, MinV, MinF);
-	writeObjFile(OUT_PATH + m_modelName + "/" + std::to_string(m_resolution) + "MIN.obj", MinV, MinF);
+	writeObjFile(OUT_DIR + m_modelName + "/" + std::to_string(m_resolution) + "MIN.obj", MinV, MinF);
 
 	return IBSValue;
 }

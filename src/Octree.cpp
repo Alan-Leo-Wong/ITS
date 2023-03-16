@@ -1,5 +1,6 @@
 #include "Octree.h"
 #include "SDFHelper.h"
+#include "BSpline.hpp"
 #include "utils\common.hpp"
 #include "MarchingCubes.hpp"
 #include <queue>
@@ -7,10 +8,9 @@
 #include <numeric>
 #include <iomanip>
 #include <Windows.h>
-#include <Eigen\Sparse>
 #include <igl\writeOBJ.h>
 
-void OctreeNode::setCorner()
+void OctreeNode::setCorners()
 {
 	double minX = boundary.first.x();
 	double minY = boundary.first.y();
@@ -69,13 +69,6 @@ bool OctreeNode::isInDomain(const OctreeNode* otherNode)
 	return false;
 }
 
-inline double BaseFunction(const double& x, const double& node_x, const double& w)
-{
-	if (x <= node_x - w || x >= node_x + w) return 0.0;
-	if (x <= node_x) return 1 + (x - node_x) / w;
-	if (x > node_x) return 1 - (x - node_x) / w;
-}
-
 inline double OctreeNode::BaseFunction4Point(const V3d& p)
 {
 	const V3d nodePosition = boundary.first;
@@ -122,7 +115,7 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 
 	if (depth + 1 >= maxDepth || idxOfPoints.empty())
 	{
-		node->setCorner();
+		node->setCorners();
 		node->setEdges();
 		node->setDomain();
 		nLeafNodes++;
@@ -169,8 +162,7 @@ void Octree::cpIntersection()
 	cout << "--Number of leaf nodes = " << nLeafNodes << endl;
 
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
-	std::cout << "Continue to compute the intersections for triangle EDGES...\n";
-	auto start = std::chrono::system_clock::now();
+	std::cout << "Compute the intersections between triangle EDGES and nodes...\n";
 
 	for (int i = 0; i < modelEdges.size(); i++)
 	{
@@ -221,18 +213,14 @@ void Octree::cpIntersection()
 		}
 	}
 
-	auto end = std::chrono::system_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	cout << "三角形边与node的交点数量：" << interPoints.size() <<
-		", spent " << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << "s." << endl;
+	cout << "三角形边与node的交点数量：" << interPoints.size() << endl;
 	//intersections.erase(std::unique(intersections.begin(), intersections.end()), intersections.end());
-	std::cout << "#####################################################################" << endl;
-	saveIntersections("./vis/4/edgeInter.xyz", interPoints);
+
+	saveIntersections(concatString(DELIMITER, VIS_DIR, std::to_string(maxDepth), "edgeInter.xyz"), interPoints);
 
 	// 三角形面与node边线交（有重合点）
-	start = std::chrono::system_clock::now();
 	vector<V3d> faceIntersections;
-	std::cout << "Continue to compute the intersections for triangle FACES..." << endl;
+	std::cout << "Compute the intersections between triangle FACES and node EDGES..." << endl;
 
 	for (const auto& leafNode : leafNodes)
 	{
@@ -316,15 +304,14 @@ void Octree::cpIntersection()
 
 		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // 筛选有交点的叶子节点
 	}
-	end = std::chrono::system_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	faceIntersections.erase(std::unique(faceIntersections.begin(), faceIntersections.end()), faceIntersections.end());
-	cout << "三角形面与node边的交点数量：" << faceIntersections.size() <<
-		", spent " << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << "s." << endl;
 
-	saveIntersections("./vis/4/faceInter.xyz", faceIntersections);
+	faceIntersections.erase(std::unique(faceIntersections.begin(), faceIntersections.end()), faceIntersections.end());
+	cout << "三角形面与node边的交点数量：" << faceIntersections.size() << endl;
+
+	saveIntersections(concatString(DELIMITER, VIS_DIR, std::to_string(maxDepth), "faceInter.xyz"), faceIntersections)
 
 	interPoints.erase(std::unique(interPoints.begin(), interPoints.end()), interPoints.end());
+
 	cout << "总交点数量：" << interPoints.size() << endl;
 }
 
@@ -344,46 +331,20 @@ void Octree::setInDomainLeafNode()
 }
 
 //TODO: 待并行
-void Octree::setSDF(std::string& filename)
+void Octree::setSDF()
 {
 	// initialize a 3d scene
 	fcpw::Scene<3> scene;
 	initSDF(scene, modelVerts, modelFaces);
 
-	//std::ofstream out("./output/4/SDFValue.txt");
-	std::ofstream out(filename);
-
-	int cnt = 1;
 	for (auto& leaf : leafNodes)
-	{
-		double minX = leaf->boundary.first.x();
-		double minY = leaf->boundary.first.y();
-		double minZ = leaf->boundary.first.z();
-		double maxX = leaf->boundary.second.x();
-		double maxY = leaf->boundary.second.y();
-		double maxZ = leaf->boundary.second.z();
-
-		leaf->corners[0] = leaf->boundary.first;
-		leaf->corners[1] = V3d(maxX, minY, minZ);
-		leaf->corners[2] = V3d(minX, maxY, minZ);
-		leaf->corners[3] = V3d(maxX, maxY, minZ);
-		leaf->corners[4] = V3d(minX, minY, maxZ);
-		leaf->corners[5] = V3d(maxX, minY, maxZ);
-		leaf->corners[6] = V3d(minX, maxY, maxZ);
-		leaf->corners[7] = leaf->boundary.second;
-
-		out << cnt++ << endl;
 		for (int i = 0; i < 8; ++i)
-		{
 			leaf->sdfVal[i] = getSignedDistance(leaf->corners[i], scene);
-			out << leaf->sdfVal[i] << endl;
-		}
-	}
 
-	out.close();
+	saveSDFValue(concatString(DELIMITER, OUT_DIR, std::to_string(maxDepth), "SDFValue.txt"))
 }
 
-void Octree::setBSplineValue(std::string& filename)
+void Octree::setBSplineValue()
 {
 	const size_t nVerts = modelVerts.size();
 	const size_t nInterPoints = interPoints.size(); // 交点数量
@@ -395,12 +356,9 @@ void Octree::setBSplineValue(std::string& filename)
 
 	double output = 100.0 / (nVerts + nInterPoints);
 
-	std::ofstream out(filename);
-
 	for (int i = 0; i < nVerts; ++i)
 	{
 		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << i * output << "%]";
-		out << i + 1 << endl;
 		V3d modelPoint = modelVerts[i];
 
 		for (int j = 0; j < nInterLeafNodes; ++j)
@@ -419,7 +377,6 @@ void Octree::setBSplineValue(std::string& filename)
 	for (int i = 0; i < nInterPoints; ++i)
 	{
 		cnt = i + nVerts;
-		out << cnt + 1 << endl;
 		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << cnt * output << "%]";
 		V3d interPoint = interPoints[i];
 
@@ -435,12 +392,15 @@ void Octree::setBSplineValue(std::string& filename)
 		}
 	}
 
-	out.close();
+	saveBSplineValue(concatString(DELIMITER, OUT_DIR, std::to_string(maxDepth), "BSplineValue.txt"));
 }
 
+//! save data
 inline void Octree::saveNodeCorners2OBJFile(const string& filename) const
 {
 	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not be opened!", filename.c_str()); return; }
+
 	int count = -8;
 	for (const auto& leaf : leafNodes)
 	{
@@ -468,18 +428,39 @@ inline void Octree::saveNodeCorners2OBJFile(const string& filename) const
 inline void Octree::saveIntersections(const string& filename, const vector<V3d>& intersections) const
 {
 	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not be opened!", filename.c_str()); return; }
 	for (V3d p : intersections)
 		out << p.x() << " " << p.y() << " " << p.z() << endl;
+	out.close();
+}
+
+inline void Octree::saveSDFValue(const string& filename) const
+{
+	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
+
+	int cnt = 1; // node
+	for (auto& leaf : leafNodes)
+	{
+		out << cnt++ << endl;
+		for (int i = 0; i < 8; ++i)
+		{
+			leaf->sdfVal[i] = getSignedDistance(leaf->corners[i], scene);
+			out << leaf->sdfVal[i] << endl;
+		}
+	}
 	out.close();
 }
 
 inline void Octree::saveBSplineValue(const string& filename) const
 {
 	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
 	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << BSplineValue << endl;
 	out.close();
 }
 
+//! visulization
 inline void Octree::mcVisualization(const string& filename, const V3i& resolution) const
 {
 	auto mesh = MC::extractIsoSurface(bb.boxOrigin, bb.boxWidth, resolution, [&](const V3d& voxelVert)->double {
