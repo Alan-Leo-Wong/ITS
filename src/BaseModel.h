@@ -4,7 +4,9 @@
 #ifndef SHARED_PATH
 #  define SHARED_PATH "../data/"
 #endif
-
+#ifndef VIS_DIR
+#  define VIS_DIR "./vis/"
+#endif
 #ifndef OUT_PATH
 #  define OUT_PATH "output/"
 #endif
@@ -54,5 +56,5 @@ public:
 	// ±£¥ÊŒ∆¿Ì
 	void writeTexturedObjFile(const string& filename, const vector<PDD>& uvs)const;
 
-	void writeTexturedObjFile(const string& filename, const vector<double>& uvs)const;
+	void writeTexturedObjFile(const string& filename, const VXd& uvs)const;
 };

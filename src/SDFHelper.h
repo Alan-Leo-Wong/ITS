@@ -4,12 +4,15 @@
 //#define FCPW_SIMD_WIDTH 4
 #include <fcpw/fcpw.h>
 
-double getDistance(const V3d& queryPoint, const fcpw::Scene<3>& scene)
+double getSignedDistance(const V3d& queryPoint, const fcpw::Scene<3>& scene)
 {
 	// perform a closest point query
 	fcpw::Interaction<3> interaction;
 	scene.findClosestPoint(queryPoint, interaction);
-	cout << "¾àÀë = " << interaction.signedDistance(queryPoint) << endl;
+	/*cout << "p = " << interaction.p << endl;
+	cout << "d = " << interaction.d << endl;
+	cout << "n = " << interaction.n << endl;*/
+	//cout << "¾àÀë = " << interaction.signedDistance(queryPoint) << endl;
 	return interaction.signedDistance(queryPoint);
 }
 
@@ -32,4 +35,9 @@ void initSDF(fcpw::Scene<3>& scene, const vector<V3d>& modelVerts, const vector<
 	// specify the triangle indices
 	for (int i = 0; i < nTriangles; i++)
 		scene.setObjectTriangle(modelFaces[i].data(), i, 0);
+
+	scene.computeObjectNormals(0);
+
+	// now that the geometry has been specified, build the acceleration structure
+	scene.build(fcpw::AggregateType::Bvh_SurfaceArea, true); // the second boolean argument enables vectorization
 }

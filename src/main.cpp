@@ -54,31 +54,50 @@ int main(int argc, char** argv)
 	CollisionDetection d;
 	d.ExtractIntersectLines(s1, s2, modelName1, modelName2, ".off", ".obj");*/
 
-	Octree octree(3, "bunny");
-
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
+
 	startTimer(&timer);
-
-	octree.readFile("./model/bunny.off");
-	octree.createOctree();
-	octree.cpIntersection();
-
+	Octree octree(4, "./model/bunny.off");
 	stopTimer(&timer);
-	double time = getTimerValue(&timer) * 1e-3;
+	double time = getElapsedTime(&timer) * 1e-3;
+	printf("Create octree spent %lf s.\n", time);
+
+	startTimer(&timer);
+	octree.cpIntersection();
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
 	printf("Compute intersection spent %lf s.\n", time);
+
+	startTimer(&timer);
+	octree.setSDF();
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("Compute SDF spent %lf s.\n", time);
 
 	startTimer(&timer);
 	octree.setInDomainLeafNode();
 	stopTimer(&timer);
-	time = getTimerValue(&timer) * 1e-3;
+	time = getElapsedTime(&timer) * 1e-3;
 	printf("Select indomain leaf nodes spent %lf s.\n", time);
 
 	startTimer(&timer);
 	octree.setBSplineValue();
 	stopTimer(&timer);
-	time = getTimerValue(&timer) * 1e-3;
+	time = getElapsedTime(&timer) * 1e-3;
 	printf("Compute B-spline value spent %lf s.\n", time);
+
+	octree.saveBSplineValue("./output/4/BSplineValue.txt");
+
+	startTimer(&timer);
+	octree.mcVisualization("./vis/4/mc_shell.obj", V3i(20, 20, 20));
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("MarchingCubes spent %lf s.\n", time);
+
+	octree.txtVisualization("./vis/4/txt_shell.obj");
+
+	deleteTimer(&timer);
 
 	return 0;
 }
