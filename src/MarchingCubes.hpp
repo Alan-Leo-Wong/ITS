@@ -291,9 +291,9 @@ namespace MC
 
 	V3d interploateEdgeVert(const V3d& p_1, const V3d& p_2, const double& val_1, const double& val_2, const double& isoVal);
 
-	void creatVoxels(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, TriMesh& mesh);
+	void creatVoxels(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, const double& isoVal, TriMesh& mesh);
 
-	TriMesh extractIsoSurface(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf);
+	TriMesh extractIsoSurface(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, const double& isoVal = .0);
 
 	struct TriMesh
 	{
@@ -408,20 +408,20 @@ namespace MC
 		V3d newPoint = p_1 + lambda * (p_2 - p_1);
 		return newPoint;
 	}
-	
-	void creatVoxels(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, TriMesh& mesh)
+
+	void creatVoxels(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, const double& isoVal, TriMesh& mesh)
 	{
-		const int& numGrid_x = resolution.x();
-		const int& numGrid_y = resolution.y();
-		const int& numGrid_z = resolution.z();
+		const int numGrid_x = resolution.x();
+		const int numGrid_y = resolution.y();
+		const int numGrid_z = resolution.z();
 
-		const double& min_x = boxOrigin.x();
-		const double& min_y = boxOrigin.y();
-		const double& min_z = boxOrigin.z();
+		const double min_x = boxOrigin.x();
+		const double min_y = boxOrigin.y();
+		const double min_z = boxOrigin.z();
 
-		const double& boxWidth_x = boxWidth.x();
-		const double& boxWidth_y = boxWidth.y();
-		const double& boxWidth_z = boxWidth.z();
+		const double boxWidth_x = boxWidth.x();
+		const double boxWidth_y = boxWidth.y();
+		const double boxWidth_z = boxWidth.z();
 		for (int grid_x = 0; grid_x < numGrid_x; ++grid_x)
 		{
 			for (int grid_y = 0; grid_y < numGrid_y; ++grid_y)
@@ -435,15 +435,16 @@ namespace MC
 						(grid_z != numGrid_z - 1 ? boxWidth_z / numGrid_z : boxWidth_z - cubePos.z());
 					Voxel voxel(cubePos, cubeSize);
 					voxel.setVoxelSDF(sdf);
+					voxel.triangulation(mesh, isoVal);
 				}
 			}
 		}
 	}
 
-	TriMesh extractIsoSurface(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf)
+	TriMesh extractIsoSurface(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, const double& isoVal)
 	{
 		TriMesh mesh;
-		creatVoxels(boxOrigin, boxWidth, resolution, sdf, mesh);
+		creatVoxels(boxOrigin, boxWidth, resolution, sdf, isoVal, mesh);
 		return mesh;
 	}
 }

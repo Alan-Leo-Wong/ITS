@@ -1,12 +1,14 @@
 #include "Octree.h"
 #include "SDFHelper.h"
 #include "utils\common.hpp"
+#include "MarchingCubes.hpp"
 #include <queue>
 #include <chrono>
 #include <numeric>
 #include <iomanip>
 #include <Windows.h>
 #include <Eigen\Sparse>
+#include <igl\writeOBJ.h>
 
 void OctreeNode::setCorner()
 {
@@ -51,17 +53,18 @@ void OctreeNode::setEdges()
 void OctreeNode::setDomain()
 {
 	domain[0] = boundary.first - width;
-	domain[1] = domain[0] + V3d(width.x() * 2, 0, 0);
-	domain[2] = domain[0] + V3d(0, width.y() * 2, 0);
-	domain[3] = domain[0] + V3d(0, 0, width.z() * 2);
+	domain[1] = boundary.second;
 }
 
-bool OctreeNode::isInDomain(const OctreeNode* node)
+bool OctreeNode::isInDomain(const OctreeNode* otherNode)
 {
-	V3d nodeOrigin = node->boundary.first;
-	if (domain[0].x() <= nodeOrigin.x() && nodeOrigin.x() <= domain[1].x() &&
-		domain[0].y() <= nodeOrigin.y() && nodeOrigin.y() <= domain[1].y() &&
-		domain[0].z() <= nodeOrigin.z() && nodeOrigin.z() <= domain[1].z())
+	V3d nodeOrigin = boundary.first;
+	V3d st_domain = otherNode->domain[0];
+	V3d ed_domain = otherNode->domain[1];
+
+	if (st_domain.x() <= nodeOrigin.x() && nodeOrigin.x() < ed_domain.x() &&
+		st_domain.y() <= nodeOrigin.y() && nodeOrigin.y() < ed_domain.y() &&
+		st_domain.z() <= nodeOrigin.z() && nodeOrigin.z() < ed_domain.z())
 		return true;
 	return false;
 }
@@ -91,7 +94,6 @@ void Octree::createOctree(const double& scaleSize)
 	vector<size_t> idxOfPoints(pointNum);
 	std::iota(idxOfPoints.begin(), idxOfPoints.end(), 0); // 0~pointNum-1
 
-	std::pair<V3d, V3d> boundary;
 	V3d maxV = m_V.colwise().maxCoeff();
 	V3d minV = m_V.colwise().minCoeff();
 
@@ -99,14 +101,14 @@ void Octree::createOctree(const double& scaleSize)
 	// bounding box
 	V3d b_beg = minV - (maxV - minV) * scaleSize;
 	V3d b_end = maxV + (maxV - minV) * scaleSize;
+	PV3d boundary = std::make_pair(b_beg, b_end);
 	V3d width = b_end - b_beg;
-	boundary.first = b_beg;
-	boundary.second = b_end;
+	bb = BoundingBox(b_beg, b_end);
 
 	root = new OctreeNode(0, width, boundary, idxOfPoints);
 	createNode(root, 0, width, boundary, idxOfPoints);
 
-	saveNodeCorners2OBJFile("./vis/octree.obj");
+	saveNodeCorners2OBJFile(concatString(DELIMITER, VIS_DIR, std::to_string(maxDepth), "octree.obj"));
 }
 
 void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints)
@@ -122,6 +124,8 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 	{
 		node->setCorner();
 		node->setEdges();
+		node->setDomain();
+		nLeafNodes++;
 		leafNodes.emplace_back(node);
 		return;
 	}
@@ -157,81 +161,17 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 	}
 }
 
-//void Octree::selectLeafNode(OctreeNode* node)
-//{
-//	if (!node) return;
-//
-//	std::queue<OctreeNode*> q;
-//	q.push(node);
-//
-//	while (!q.empty())
-//	{
-//		auto froNode = q.front();
-//		q.pop();
-//
-//		if (froNode->isLeaf)
-//		{
-//			leafNodes.emplace_back(froNode);
-//		}
-//		else
-//		{
-//			for (const auto& child : froNode->childs)
-//				if (child != nullptr) q.push(child);
-//		}
-//	}
-//}
-
-void Octree::saveNodeCorners2OBJFile(const string& filename)
-{
-	std::ofstream out(filename);
-	//selectLeafNode(root);
-	int count = -8;
-	for (const auto& leaf : leafNodes)
-	{
-		for (int i = 0; i < 8; i++)
-		{
-			out << "v " << std::setiosflags(std::ios::fixed) << std::setprecision(9) << leaf->corners[i].x() << " " << leaf->corners[i].y() << " " << leaf->corners[i].z() << endl;
-			count++;
-		}
-		out << "l " << 1 + count << " " << 2 + count << endl;
-		out << "l " << 1 + count << " " << 3 + count << endl;
-		out << "l " << 1 + count << " " << 5 + count << endl;
-		out << "l " << 2 + count << " " << 4 + count << endl;
-		out << "l " << 2 + count << " " << 6 + count << endl;
-		out << "l " << 3 + count << " " << 4 + count << endl;
-		out << "l " << 3 + count << " " << 7 + count << endl;
-		out << "l " << 4 + count << " " << 8 + count << endl;
-		out << "l " << 5 + count << " " << 6 + count << endl;
-		out << "l " << 5 + count << " " << 7 + count << endl;
-		out << "l " << 6 + count << " " << 8 + count << endl;
-		out << "l " << 7 + count << " " << 8 + count << endl;
-	}
-	out.close();
-}
-
-vector<OctreeNode*> Octree::getLeafNodes()
-{
-	if (leafNodes.size() > 2)
-		return leafNodes;
-	//selectLeafNode(root);
-	return leafNodes;
-}
-
 void Octree::cpIntersection()
 {
-	cout << "We are begining to extract edges" << endl;
+	cout << "Extracting edges from " << std::quoted(modelName) << "..." << endl;
 	vector<V2i> modelEdges = extractEdges();
-
-	//cout << "We are begining to select leaves" << endl;
-	//selectLeafNode(root);
+	cout << "--Number of edges = " << modelEdges.size() << endl;
+	cout << "--Number of leaf nodes = " << nLeafNodes << endl;
 
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
-
-	std::cout << "开始求交\n";
+	std::cout << "Continue to compute the intersections for triangle EDGES...\n";
 	auto start = std::chrono::system_clock::now();
 
-	cout << "边的数量：" << modelEdges.size() << endl;
-	cout << "叶子节点数量：" << leafNodes.size() << endl;
 	for (int i = 0; i < modelEdges.size(); i++)
 	{
 		Eigen::Vector2i e = modelEdges[i];
@@ -261,57 +201,58 @@ void Octree::cpIntersection()
 				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + back_t * dir).y()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + back_t * dir).z()))
 			{
-				intersections.emplace_back(p1 + back_t * dir);
-				node->isIntersectWithMesh = true;
+				interPoints.emplace_back(p1 + back_t * dir);
+				node->isInterMesh = true;
 			}
 			if (isInRange(.0, 1.0, left_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + left_t * dir).x()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + left_t * dir).z()))
 			{
-				intersections.emplace_back(p1 + left_t * dir);
-				node->isIntersectWithMesh = true;
+				interPoints.emplace_back(p1 + left_t * dir);
+				node->isInterMesh = true;
 			}
 			if (isInRange(.0, 1.0, bottom_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + bottom_t * dir).x()) &&
 				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + bottom_t * dir).y()))
 			{
-				intersections.emplace_back(p1 + bottom_t * dir);
-				node->isIntersectWithMesh = true;
+				interPoints.emplace_back(p1 + bottom_t * dir);
+				node->isInterMesh = true;
 			}
 		}
 	}
-	cout << "去重前交点数量：" << intersections.size() << endl;
-	//intersections.erase(std::unique(intersections.begin(), intersections.end()), intersections.end());
-	//cout << "去重后交点数量：" << intersections.size() << endl;
+
 	auto end = std::chrono::system_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	cout << "花费了"
-		<< double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den
-		<< "秒" << endl;
+	cout << "三角形边与node的交点数量：" << interPoints.size() <<
+		", spent " << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << "s." << endl;
+	//intersections.erase(std::unique(intersections.begin(), intersections.end()), intersections.end());
 	std::cout << "#####################################################################" << endl;
+	saveIntersections("./vis/4/edgeInter.xyz", interPoints);
 
-	saveIntersections("./vis/edgeInter.xyz", intersections);
+	// 三角形面与node边线交（有重合点）
+	start = std::chrono::system_clock::now();
+	vector<V3d> faceIntersections;
+	std::cout << "Continue to compute the intersections for triangle FACES..." << endl;
 
-	// 三角形面与node边线交
-	std::cout << "Continue to compute the intersections for triangle faces..." << endl;
-	for (int i = 0; i < modelFaces.size(); i++)
+	for (const auto& leafNode : leafNodes)
 	{
-		V3i f = modelFaces[i];
-		V3d p1 = modelVerts[f.x()];
-		V3d p2 = modelVerts[f.y()];
-		V3d p3 = modelVerts[f.z()];
-		Eigen::Matrix3d faceMatrix;
-		faceMatrix << p1.x(), p2.x(), p3.x(),
-			p1.y(), p2.y(), p3.y(),
-			p1.z(), p2.z(), p3.z();
-		V3d maxElement = faceMatrix.rowwise().maxCoeff();
-		V3d minElement = faceMatrix.rowwise().minCoeff();
+		auto edges = leafNode->edges;
 
-		Triangle t(p1, p2, p3);
-
-		for (const auto& leafNode : leafNodes)
+		for (int i = 0; i < modelFaces.size(); i++)
 		{
-			auto edges = leafNode->edges;
+			V3i f = modelFaces[i];
+			V3d p1 = modelVerts[f.x()];
+			V3d p2 = modelVerts[f.y()];
+			V3d p3 = modelVerts[f.z()];
+			Eigen::Matrix3d faceMatrix;
+			faceMatrix << p1.x(), p2.x(), p3.x(),
+				p1.y(), p2.y(), p3.y(),
+				p1.z(), p2.z(), p3.z();
+			V3d maxElement = faceMatrix.rowwise().maxCoeff();
+			V3d minElement = faceMatrix.rowwise().minCoeff();
+
+			Triangle t(p1, p2, p3);
+
 			for (int j = 0; j < 4; ++j)
 			{
 				auto edge = edges[j];
@@ -325,8 +266,9 @@ void Octree::cpIntersection()
 					double interX = coefficient.x() * p1.x() + coefficient.y() * p2.x() + coefficient.z() * p3.x();
 					if (interX >= edge.first.x() && interX <= edge.second.x())
 					{
-						intersections.emplace_back(V3d(interX, y, z));
-						leafNode->isIntersectWithMesh = true;
+						interPoints.emplace_back(V3d(interX, y, z));
+						faceIntersections.emplace_back(V3d(interX, y, z));
+						leafNode->isInterMesh = true;
 					}
 				}
 			}
@@ -344,8 +286,9 @@ void Octree::cpIntersection()
 					double interY = coefficient.x() * p1.y() + coefficient.y() * p2.y() + coefficient.z() * p3.y();
 					if (interY >= edge.first.y() && interY <= edge.second.y())
 					{
-						intersections.emplace_back(V3d(x, interY, z));
-						leafNode->isIntersectWithMesh = true;
+						interPoints.emplace_back(V3d(x, interY, z));
+						faceIntersections.emplace_back(V3d(x, interY, z));
+						leafNode->isInterMesh = true;
 					}
 				}
 			}
@@ -363,47 +306,54 @@ void Octree::cpIntersection()
 					double interZ = coefficient.x() * p1.z() + coefficient.y() * p2.z() + coefficient.z() * p3.z();
 					if (interZ >= edge.first.z() && interZ <= edge.second.z())
 					{
-						intersections.emplace_back(V3d(x, y, interZ));
-						leafNode->isIntersectWithMesh = true;
+						interPoints.emplace_back(V3d(x, y, interZ));
+						faceIntersections.emplace_back(V3d(x, y, interZ));
+						leafNode->isInterMesh = true;
 					}
 				}
 			}
-
-			if (leafNode->isIntersectWithMesh) intersectLeafNodes.emplace_back(leafNode); // 筛选有交点的叶子节点
 		}
-	}
-}
 
-void Octree::saveIntersections(const string& filename, const vector<V3d>& intersections) const
-{
-	std::ofstream out(filename);
-	for (V3d p : intersections)
-		out << p.x() << " " << p.y() << " " << p.z() << endl;
-	out.close();
+		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // 筛选有交点的叶子节点
+	}
+	end = std::chrono::system_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	faceIntersections.erase(std::unique(faceIntersections.begin(), faceIntersections.end()), faceIntersections.end());
+	cout << "三角形面与node边的交点数量：" << faceIntersections.size() <<
+		", spent " << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << "s." << endl;
+
+	saveIntersections("./vis/4/faceInter.xyz", faceIntersections);
+
+	interPoints.erase(std::unique(interPoints.begin(), interPoints.end()), interPoints.end());
+	cout << "总交点数量：" << interPoints.size() << endl;
 }
 
 void Octree::setInDomainLeafNode()
 {
-	if (intersectLeafNodes.empty()) return;
-	inDomainLeafNodess.resize(intersectLeafNodes.size());
-	for (int i = 0; i < intersectLeafNodes.size(); ++i)
+	if (interLeafNodes.empty()) return;
+	inDomainLeafNodes.resize(interLeafNodes.size());
+	for (int i = 0; i < interLeafNodes.size(); ++i)
 	{
 		for (const auto& leafNode : leafNodes)
 		{
-			auto iNode = intersectLeafNodes[i];
+			auto iNode = interLeafNodes[i];
 			if (iNode->isInDomain(leafNode))
-				inDomainLeafNodess[i].emplace_back(leafNode);
+				inDomainLeafNodes[i].emplace_back(leafNode);
 		}
 	}
 }
 
 //TODO: 待并行
-void Octree::setSDF()
+void Octree::setSDF(std::string& filename)
 {
 	// initialize a 3d scene
 	fcpw::Scene<3> scene;
 	initSDF(scene, modelVerts, modelFaces);
 
+	//std::ofstream out("./output/4/SDFValue.txt");
+	std::ofstream out(filename);
+
+	int cnt = 1;
 	for (auto& leaf : leafNodes)
 	{
 		double minX = leaf->boundary.first.x();
@@ -422,57 +372,131 @@ void Octree::setSDF()
 		leaf->corners[6] = V3d(minX, maxY, maxZ);
 		leaf->corners[7] = leaf->boundary.second;
 
+		out << cnt++ << endl;
 		for (int i = 0; i < 8; ++i)
-			leaf->SDFValue[i] = getDistance(leaf->corners[i], scene);
+		{
+			leaf->sdfVal[i] = getSignedDistance(leaf->corners[i], scene);
+			out << leaf->sdfVal[i] << endl;
+		}
 	}
+
+	out.close();
 }
 
-void Octree::setBSplineValue()
+void Octree::setBSplineValue(std::string& filename)
 {
-	const size_t numVerts = modelVerts.size();
-	const size_t numInterPoints = intersections.size();
-	BSplineValue.resize(numVerts + numInterPoints);
+	const size_t nVerts = modelVerts.size();
+	const size_t nInterPoints = interPoints.size(); // 交点数量
+	BSplineValue.resize(nVerts + nInterPoints);
 	BSplineValue.setZero();
-	const size_t numLeafNodes = leafNodes.size();
 
-	double output = 100.0 / (numVerts + numInterPoints);
+	const size_t nLeafNodes = leafNodes.size();
+	const size_t nInterLeafNodes = interLeafNodes.size();
 
-	for (int i = 0; i < numVerts; ++i)
+	double output = 100.0 / (nVerts + nInterPoints);
+
+	std::ofstream out(filename);
+
+	for (int i = 0; i < nVerts; ++i)
 	{
 		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << i * output << "%]";
-		V3d inter = modelVerts[i];
-		for (int j = 0; j < numLeafNodes; ++j)
+		out << i + 1 << endl;
+		V3d modelPoint = modelVerts[i];
+
+		for (int j = 0; j < nInterLeafNodes; ++j)
 		{
-			for (int k = 0; k < inDomainLeafNodess[j].size(); ++k)
+			for (int k = 0; k < inDomainLeafNodes[j].size(); ++k)
 			{
-				auto node = inDomainLeafNodess[j][k];
-				BSplineValue[i] += node->SDFValue[0] * (node->BaseFunction4Point(inter));
+				auto node = inDomainLeafNodes[j][k];
+
+				out << node->BaseFunction4Point(modelPoint) << endl;
+				BSplineValue[i] += node->sdfVal[0] * (node->BaseFunction4Point(modelPoint));
 			}
 		}
 	}
 
 	int cnt = 0;
-	const size_t numIntersectLeafNodes = intersectLeafNodes.size();
-	for (int i = 0; i < intersections.size(); ++i)
+	for (int i = 0; i < nInterPoints; ++i)
 	{
-		cnt = i + numVerts;
+		cnt = i + nVerts;
+		out << cnt + 1 << endl;
 		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << cnt * output << "%]";
-		V3d interPoint = intersections[i];
+		V3d interPoint = interPoints[i];
 
-		for (int j = 0; j < numIntersectLeafNodes; ++j)
+		for (int j = 0; j < nInterLeafNodes; ++j)
 		{
-			for (int k = 0; k < inDomainLeafNodess[j].size(); ++k)
+			for (int k = 0; k < inDomainLeafNodes[j].size(); ++k)
 			{
-				auto node = inDomainLeafNodess[j][k];
-				BSplineValue[cnt] += node->SDFValue[0] * (node->BaseFunction4Point(interPoint));
+				auto node = inDomainLeafNodes[j][k];
+
+				out << node->BaseFunction4Point(interPoint) << endl;
+				BSplineValue[cnt] += node->sdfVal[0] * (node->BaseFunction4Point(interPoint));
 			}
 		}
 	}
+
+	out.close();
 }
 
-void Octree::saveBValue(const string& filename, const Eigen::VectorXd& X) const
+inline void Octree::saveNodeCorners2OBJFile(const string& filename) const
 {
 	std::ofstream out(filename);
-	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << X << endl;
+	int count = -8;
+	for (const auto& leaf : leafNodes)
+	{
+		for (int i = 0; i < 8; i++)
+		{
+			out << "v " << std::setiosflags(std::ios::fixed) << std::setprecision(9) << leaf->corners[i].x() << " " << leaf->corners[i].y() << " " << leaf->corners[i].z() << endl;
+			count++;
+		}
+		out << "l " << 1 + count << " " << 2 + count << endl;
+		out << "l " << 1 + count << " " << 3 + count << endl;
+		out << "l " << 1 + count << " " << 5 + count << endl;
+		out << "l " << 2 + count << " " << 4 + count << endl;
+		out << "l " << 2 + count << " " << 6 + count << endl;
+		out << "l " << 3 + count << " " << 4 + count << endl;
+		out << "l " << 3 + count << " " << 7 + count << endl;
+		out << "l " << 4 + count << " " << 8 + count << endl;
+		out << "l " << 5 + count << " " << 6 + count << endl;
+		out << "l " << 5 + count << " " << 7 + count << endl;
+		out << "l " << 6 + count << " " << 8 + count << endl;
+		out << "l " << 7 + count << " " << 8 + count << endl;
+	}
 	out.close();
+}
+
+inline void Octree::saveIntersections(const string& filename, const vector<V3d>& intersections) const
+{
+	std::ofstream out(filename);
+	for (V3d p : intersections)
+		out << p.x() << " " << p.y() << " " << p.z() << endl;
+	out.close();
+}
+
+inline void Octree::saveBSplineValue(const string& filename) const
+{
+	std::ofstream out(filename);
+	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << BSplineValue << endl;
+	out.close();
+}
+
+inline void Octree::mcVisualization(const string& filename, const V3i& resolution) const
+{
+	auto mesh = MC::extractIsoSurface(bb.boxOrigin, bb.boxWidth, resolution, [&](const V3d& voxelVert)->double {
+		double sum = 0.0;
+		for (const auto& node : leafNodes)
+			sum += node->sdfVal[0] * (node->BaseFunction4Point(voxelVert));
+		return sum;
+		});
+
+	MXd verts;
+	MXi faces;
+	list2Matrix<MXd, double, 3>(mesh.meshVerts, verts);
+	list2Matrix<MXi, int, 3>(mesh.meshFaces, faces);
+	igl::writeOBJ(filename, verts, faces);
+}
+
+inline void Octree::txtVisualization(const string& filename) const
+{
+	writeTexturedObjFile(filename, BSplineValue);
 }

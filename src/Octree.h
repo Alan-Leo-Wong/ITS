@@ -1,34 +1,47 @@
 #pragma once
 #include "BaseModel.h"
+#include "utils/String.hpp"
 
 double BaseFunction(const double& x, const double& node_x, const double& w);
 
+struct BoundingBox
+{
+	V3d boxOrigin;
+	V3d boxEnd;
+	V3d boxWidth;
+
+	BoundingBox() {}
+
+	BoundingBox(const V3d& _origin, const V3d& _end) :boxOrigin(_origin), boxEnd(_end) { boxWidth = boxEnd - boxOrigin; }
+};
+
 struct OctreeNode
 {
+public:
+	int depth;
+	bool isLeaf;
+	bool isInterMesh; // if intersect with mesh
+	double sdfVal[8];
+
+	V3d width;
+	V3d corners[8];
+	PV3d boundary;  // <back/bottom/left, front/top/right>	
+	vector<PV3d> edges; // used to compute intersection between mesh's faces and node's edges
+	vector<size_t> idxOfPoints; // index of points 
+
 	OctreeNode* parent;
 	vector<OctreeNode*> childs;
 
-	int depth;   //格子深度
-	V3d width;
-	V3d corners[8];
-	bool isLeaf;
-	bool isIntersectWithMesh;
-	double SDFValue[8];
+	std::array<V3d, 2> domain; // influence domain
 
-	vector<PV3d> edges;
-
-	PV3d boundary;  // 格子边界, <back/bottom/left, front/top/right>	
-	vector<size_t> idxOfPoints; // 包含的点的index
-
-	std::array<V3d, 4> domain; // 影响范围
-
+public:
 	OctreeNode()
 	{
 		parent = nullptr;
 		depth = 0;
 		width = V3d(.0, .0, .0);
 		isLeaf = true;
-		isIntersectWithMesh = false;
+		isInterMesh = false;
 	}
 
 	OctreeNode(const int& _depth, const V3d& _width, const std::pair<V3d, V3d> _boundary, const std::vector<size_t>& _idxOfPoints)
@@ -39,7 +52,7 @@ struct OctreeNode
 		boundary = _boundary;
 		idxOfPoints = _idxOfPoints;
 		isLeaf = true;
-		isIntersectWithMesh = false;
+		isInterMesh = false;
 	}
 
 	~OctreeNode()
@@ -59,9 +72,9 @@ struct OctreeNode
 
 	void setEdges();
 
-	void setDomain(); // 设置影响范围
+	void setDomain();
 
-	bool isInDomain(const OctreeNode* node);
+	inline bool isInDomain(const OctreeNode* otherNode); // whether in otherNode's domain
 
 	inline double BaseFunction4Point(const V3d& p);
 };
@@ -69,52 +82,61 @@ struct OctreeNode
 class Octree : public BaseModel
 {
 protected:
-	int maxDepth;
+	int maxDepth = -1;
 	int numNodes = 0;
-	int numLeafNodes = 0;
-
-	OctreeNode* root;
-
-	MXd nodeVerts;    // 存储叶子节点
-
-	std::unordered_map<int, OctreeNode*> edgeIdx2Node;
-	vector<PV3d> nodeXEdges; // 节点X轴方向的边，只用于求交
-	vector<PV3d> nodeYEdges; // 节点Y轴方向的边，只用于求交
-	vector<PV3d> nodeZEdges; // 节点Z轴方向的边，只用于求交
-
-	vector<OctreeNode*> leafNodes;
-	vector<OctreeNode*> intersectLeafNodes;
-	vector<vector<OctreeNode*>> inDomainLeafNodess;
-
-	vector<V3d> intersections;
-	Eigen::VectorXd BSplineValue;
-
+	int nLeafNodes = 0;
+	double scaleSize = 0.01;
 	string modelName;
 
+	OctreeNode* root;
+	BoundingBox bb;
+
+	vector<OctreeNode*> leafNodes;
+	vector<OctreeNode*> interLeafNodes;
+	vector<vector<OctreeNode*>> inDomainLeafNodes;
+
+	vector<PV3d> nodeXEdges; // 所有节点X轴方向的边，只用于求交
+	vector<PV3d> nodeYEdges; // 所有节点Y轴方向的边，只用于求交
+	vector<PV3d> nodeZEdges; // 所有节点Z轴方向的边，只用于求交
+
+	VXd BSplineValue;
+	vector<V3d> interPoints; // intersection points
+
 public:
-	Octree(int _maxDepth, string _modelName) :maxDepth(_maxDepth), modelName(_modelName) { root = new OctreeNode; }
+	// constructor and destructor
+	Octree(const int& _maxDepth, const string& _modelPath, const double& _scaleSize = 0.1) :
+		maxDepth(_maxDepth), modelName(getFileName(DELIMITER, _modelPath)), scaleSize(_scaleSize)
+	{
+		readFile(_modelPath);
+		createOctree(scaleSize);
+	}
 
 	~Octree() { delete root; root = nullptr; };
 
-	void createOctree(const double& scaleSize = 0.1);
-
-	//void selectLeafNode(OctreeNode* node);
-
-	vector<OctreeNode*> getLeafNodes();
-
-	void saveNodeCorners2OBJFile(const string& filename);
-
-	void cpIntersection();
+public:
+	void createOctree(const double& scaleSize);
 
 	void createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints);
 
-	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
+	void cpIntersection();
 
 	void setInDomainLeafNode();
 
-	void setSDF();
+	void setSDF(std::string& filename);
 
-	void setBSplineValue();
+	void setBSplineValue(std::string& filename);
 
-	void saveBValue(const string& filename, const Eigen::VectorXd& X) const;
+
+public:
+	// save data
+	inline void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
+	
+	inline void saveNodeCorners2OBJFile(const string& filename) const;
+
+	inline void saveBSplineValue(const string& filename) const;
+
+	// visulization
+	inline void mcVisualization(const string& filename, const V3i& resolution) const;
+
+	inline void txtVisualization(const string& filename) const;
 };

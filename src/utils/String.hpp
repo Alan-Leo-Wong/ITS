@@ -4,9 +4,29 @@
 #include <string.h>
 
 using std::string;
+
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+#  define DELIMITER '/'
+#else
+#  define DELIMITER '\'
+#endif
+
 #ifndef CONTACT(x,y)
 #  define CONTACT(x,y) x##y
 #endif
+
+template<typename T = string>
+string concatString(const char delimiter, T firstArg)
+{
+	return firstArg;
+}
+
+template<typename T = string, typename...Types>
+string concatString(const char delimiter, T firstArg, Types ... args)
+{
+	firstArg = firstArg + delimiter;
+	return firstArg + concatString(delimiter, args...);
+}
 
 inline char* getFileNameWithExt(const char delimiter, char* filePath)
 {

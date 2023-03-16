@@ -133,10 +133,10 @@ void BaseModel::writeObjFile(const string& filename, const vector<V3d>& V, const
 {
 	std::ofstream out(filename);
 	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
-	for (size_t  i = 0; i < V.size(); i++)
+	for (size_t i = 0; i < V.size(); i++)
 	{
 		V3d v = V[i];
-		out << "v " <<std::fixed << std::setprecision(5) << v.x() << " " << v.y() << " " << v.z() << " " << endl;
+		out << "v " << std::fixed << std::setprecision(5) << v.x() << " " << v.y() << " " << v.z() << " " << endl;
 	}
 	for (size_t i = 0; i < F.size(); i++)
 	{
@@ -633,21 +633,23 @@ void BaseModel::writeTexturedObjFile(const string& filename, const vector<PDD>& 
 	out.close();
 }
 
-void BaseModel::writeTexturedObjFile(const string& filename, const vector<double>& uvs)const
+void BaseModel::writeTexturedObjFile(const string& filename, const VXd& uvs)const
 {
 	std::ofstream out(filename);
 	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
-	out << "mtllib defaultmaterial.mtl" << endl;
-	out << "usemtl mydefault" << endl;
+	/*out << "mtllib defaultmaterial.mtl" << endl;
+	out << "usemtl mydefault" << endl;*/
 	for (auto v : modelVerts)
 	{
 		out << "v " << v.x() << " " << v.y() << " " << v.z() << " " << endl;
 	}
 	// 纹理坐标需介于0-1之间
-	auto maxU = *max_element(uvs.begin(), uvs.end());
+	//auto maxU = *max_element(uvs.begin(), uvs.end());
+	double maxU = uvs.maxCoeff();
+	double minU = uvs.minCoeff();
 	for (auto u : uvs)
 	{
-		out << "vt " << u / maxU << " " << 0 << " " << endl;
+		out << "vt " << (u - minU) / (maxU - minU) << " " << 0 << " " << endl;
 	}
 	for (auto f : modelFaces)
 	{
