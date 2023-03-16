@@ -4,7 +4,7 @@
 //#define FCPW_SIMD_WIDTH 4
 #include <fcpw/fcpw.h>
 
-double getSignedDistance(const V3d& queryPoint, const fcpw::Scene<3>& scene)
+inline double getSignedDistance(const V3d& queryPoint, const fcpw::Scene<3>& scene)
 {
 	// perform a closest point query
 	fcpw::Interaction<3> interaction;
@@ -16,7 +16,7 @@ double getSignedDistance(const V3d& queryPoint, const fcpw::Scene<3>& scene)
 	return interaction.signedDistance(queryPoint);
 }
 
-void initSDF(fcpw::Scene<3>& scene, const vector<V3d>& modelVerts, const vector<V3i>& modelFaces)
+inline void initSDF(fcpw::Scene<3>& scene, const vector<V3d>& modelVerts, const vector<V3i>& modelFaces)
 {
 	// set the types of primitives the objects in the scene contain;
 	// in this case, we have a single object consisting of only triangles

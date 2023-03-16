@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\BasicDataType.h" />
+    <ClInclude Include="src\BSpline.hpp" />
     <ClInclude Include="src\CollisionDetection.h" />
     <ClInclude Include="src\BaseModel.h" />
     <ClInclude Include="src\cuAcc\CUDACheck.cuh" />
@@ -31,6 +32,7 @@
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\common.hpp" />
+    <ClInclude Include="src\utils\Geometry.hpp" />
     <ClInclude Include="src\utils\String.hpp" />
     <ClInclude Include="src\utils\Timer.hpp" />
   </ItemGroup>

@@ -280,7 +280,7 @@ void CollisionDetection::ExtractCommonNodes(vector<V3d>& commonNodesVertex, vect
 		}
 	}
 	cout << overlappingNodesID.size() << endl;
-	SaveNode(OUT_PATH + m_model1.m_modelName + "/" + std::to_string(m_model1.m_resolution) + "SplitedNodes.obj", overlappingNodesID, overlappingNodesVertices);
+	SaveNode(OUT_DIR + m_model1.m_modelName + "/" + std::to_string(m_model1.m_resolution) + "SplitedNodes.obj", overlappingNodesID, overlappingNodesVertices);
 
 	// *************** Extract the nodes that the first model passes through*************************
 	VXd IBSvalueInNodes1(overlappingNodesVertices.size());   // the IBS value of splited node vertices in the first ndoes
@@ -315,7 +315,7 @@ void CollisionDetection::ExtractCommonNodes(vector<V3d>& commonNodesVertex, vect
 	// the fact that the first model does not pass the intersect node region means two models will not collide
 	if (passVertexID.empty()) return;
 
-	SaveNode(OUT_PATH + m_model1.m_modelName + "/" + std::to_string(m_model1.m_resolution) + "ContainedNodes.obj", passNodesID, overlappingNodesVertices);
+	SaveNode(OUT_DIR + m_model1.m_modelName + "/" + std::to_string(m_model1.m_resolution) + "ContainedNodes.obj", passNodesID, overlappingNodesVertices);
 
 	// *************** Extract the nodes that both model pass through ****************************
 	vector<double> IBSvalueInNodes2(overlappingNodesVertices.size(), 0);   // the IBS value of splited node vertices in the second ndoes
@@ -372,8 +372,8 @@ void CollisionDetection::ExtractCommonNodes(vector<V3d>& commonNodesVertex, vect
 		commonNodesID.emplace_back(newv);
 	}
 	
-	SaveNode(OUT_PATH + m_model2.m_modelName + "/" + std::to_string(m_model2.m_resolution) + "CommonNodes.obj", commonNodesID, commonNodesVertex);
-	SaveNode(OUT_PATH + m_model1.m_modelName + "/" + std::to_string(m_model1.m_resolution) + "CommonNodes.obj", commonNodesID, commonNodesVertex);
+	SaveNode(OUT_DIR + m_model2.m_modelName + "/" + std::to_string(m_model2.m_resolution) + "CommonNodes.obj", commonNodesID, commonNodesVertex);
+	SaveNode(OUT_DIR + m_model1.m_modelName + "/" + std::to_string(m_model1.m_resolution) + "CommonNodes.obj", commonNodesID, commonNodesVertex);
 }
 
 vector<std::pair<V3d, V3d>> CollisionDetection::ExtractInterLinesInSingleNode(const vector<V3d>& verts, const vector<int>& node, 

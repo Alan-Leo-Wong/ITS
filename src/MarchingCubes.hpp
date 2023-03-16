@@ -324,6 +324,7 @@ namespace MC
 			verts[1] = V3d(minPoint.x(), minPoint.y() + size.y(), minPoint.z());
 			verts[2] = V3d(minPoint.x() + size.x(), minPoint.y() + size.y(), minPoint.z());
 			verts[3] = V3d(minPoint.x() + size.x(), minPoint.y(), minPoint.z());
+
 			verts[4] = V3d(minPoint.x(), minPoint.y(), minPoint.z() + size.z());
 			verts[5] = V3d(minPoint.x(), minPoint.y() + size.y(), minPoint.z() + size.z());
 			verts[6] = V3d(minPoint.x() + size.x(), minPoint.y() + size.y(), minPoint.z() + size.z());
@@ -422,6 +423,7 @@ namespace MC
 		const double boxWidth_x = boxWidth.x();
 		const double boxWidth_y = boxWidth.y();
 		const double boxWidth_z = boxWidth.z();
+
 		for (int grid_x = 0; grid_x < numGrid_x; ++grid_x)
 		{
 			for (int grid_y = 0; grid_y < numGrid_y; ++grid_y)
@@ -430,9 +432,9 @@ namespace MC
 				{
 					V3d cubePos, cubeSize;
 					cubePos << min_x + grid_x * (boxWidth_x / numGrid_x), min_y + grid_y * (boxWidth_y / numGrid_y), min_z + grid_z * (boxWidth_z / numGrid_z);
-					cubeSize << (grid_x != numGrid_x - 1 ? boxWidth_x / numGrid_x : boxWidth_x - cubePos.x()),
-						(grid_y != numGrid_y - 1 ? boxWidth_y / numGrid_y : boxWidth_y - cubePos.y()),
-						(grid_z != numGrid_z - 1 ? boxWidth_z / numGrid_z : boxWidth_z - cubePos.z());
+					cubeSize << (grid_x != numGrid_x - 1 ? boxWidth_x / numGrid_x : min_x + boxWidth_x - cubePos.x()),
+						(grid_y != numGrid_y - 1 ? boxWidth_y / numGrid_y : min_y + boxWidth_y - cubePos.y()),
+						(grid_z != numGrid_z - 1 ? boxWidth_z / numGrid_z : min_z + boxWidth_z - cubePos.z());
 					Voxel voxel(cubePos, cubeSize);
 					voxel.setVoxelSDF(sdf);
 					voxel.triangulation(mesh, isoVal);

@@ -1,19 +1,7 @@
 #pragma once
 #include "BaseModel.h"
-#include "utils/String.hpp"
-
-double BaseFunction(const double& x, const double& node_x, const double& w);
-
-struct BoundingBox
-{
-	V3d boxOrigin;
-	V3d boxEnd;
-	V3d boxWidth;
-
-	BoundingBox() {}
-
-	BoundingBox(const V3d& _origin, const V3d& _end) :boxOrigin(_origin), boxEnd(_end) { boxWidth = boxEnd - boxOrigin; }
-};
+#include "utils\String.hpp"
+#include "utils\Geometry.hpp"
 
 struct OctreeNode
 {
@@ -44,7 +32,7 @@ public:
 		isInterMesh = false;
 	}
 
-	OctreeNode(const int& _depth, const V3d& _width, const std::pair<V3d, V3d> _boundary, const std::vector<size_t>& _idxOfPoints)
+	OctreeNode(const int& _depth, const V3d& _width, const PV3d& _boundary, const std::vector<size_t>& _idxOfPoints)
 	{
 		parent = nullptr;
 		depth = _depth;
@@ -68,15 +56,15 @@ public:
 		delete[] child;*/
 	}
 
-	void setCorner();
-
 	void setEdges();
 
 	void setDomain();
 
-	inline bool isInDomain(const OctreeNode* otherNode); // whether in otherNode's domain
+	void setCorners();
 
 	inline double BaseFunction4Point(const V3d& p);
+
+	inline bool isInDomain(const OctreeNode* otherNode); // whether in otherNode's domain
 };
 
 class Octree : public BaseModel
@@ -122,16 +110,17 @@ public:
 
 	void setInDomainLeafNode();
 
-	void setSDF(std::string& filename);
+	void setSDF();
 
-	void setBSplineValue(std::string& filename);
-
+	void setBSplineValue();
 
 public:
 	// save data
 	inline void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 	
 	inline void saveNodeCorners2OBJFile(const string& filename) const;
+
+	inline void saveSDFValue(const string& filename) const;
 
 	inline void saveBSplineValue(const string& filename) const;
 

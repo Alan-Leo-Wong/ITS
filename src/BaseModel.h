@@ -1,14 +1,17 @@
 #pragma once
 #include "BasicDataType.h"
 
+#ifndef MODEL_DIR
+#  define MODEL_DIR "./model/"
+#endif
 #ifndef SHARED_PATH
 #  define SHARED_PATH "../data/"
 #endif
 #ifndef VIS_DIR
 #  define VIS_DIR "./vis/"
 #endif
-#ifndef OUT_PATH
-#  define OUT_PATH "output/"
+#ifndef OUT_DIR
+#  define OUT_DIR "./output/"
 #endif
 
 class BaseModel
