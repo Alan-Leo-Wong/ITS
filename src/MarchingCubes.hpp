@@ -341,14 +341,14 @@ namespace MC
 		int determineCase(const double& isoVal)
 		{
 			if (!isSDFSet) return -1;
-			return (vertsValue[0] > isoVal ? 1 << 0 : 0) |
-				(vertsValue[1] > isoVal ? 1 << 1 : 0) |
-				(vertsValue[2] > isoVal ? 1 << 2 : 0) |
-				(vertsValue[3] > isoVal ? 1 << 3 : 0) |
-				(vertsValue[4] > isoVal ? 1 << 4 : 0) |
-				(vertsValue[5] > isoVal ? 1 << 5 : 0) |
-				(vertsValue[6] > isoVal ? 1 << 6 : 0) |
-				(vertsValue[7] > isoVal ? 1 << 7 : 0);
+			return (vertsValue[0] < isoVal ? 1 << 0 : 0) |
+				(vertsValue[1] < isoVal ? 1 << 1 : 0) |
+				(vertsValue[2] < isoVal ? 1 << 2 : 0) |
+				(vertsValue[3] < isoVal ? 1 << 3 : 0) |
+				(vertsValue[4] < isoVal ? 1 << 4 : 0) |
+				(vertsValue[5] < isoVal ? 1 << 5 : 0) |
+				(vertsValue[6] < isoVal ? 1 << 6 : 0) |
+				(vertsValue[7] < isoVal ? 1 << 7 : 0);
 		}
 
 		void triangulation(TriMesh& mesh, const double& isoVal)
@@ -412,9 +412,9 @@ namespace MC
 
 	void creatVoxels(const V3d& boxOrigin, const V3d& boxWidth, const V3i& resolution, const std::function<double(const V3d&)>& sdf, const double& isoVal, TriMesh& mesh)
 	{
-		const int numGrid_x = resolution.x();
-		const int numGrid_y = resolution.y();
-		const int numGrid_z = resolution.z();
+		const int nVoxel_x = resolution.x();
+		const int nVoxel_y = resolution.y();
+		const int nVoxel_z = resolution.z();
 
 		const double min_x = boxOrigin.x();
 		const double min_y = boxOrigin.y();
@@ -424,18 +424,20 @@ namespace MC
 		const double boxWidth_y = boxWidth.y();
 		const double boxWidth_z = boxWidth.z();
 
-		for (int grid_x = 0; grid_x < numGrid_x; ++grid_x)
+		const double voxelSize_x = boxWidth_x / (nVoxel_x - 1);
+		const double voxelSize_y = boxWidth_y / (nVoxel_y - 1);
+		const double voxelSize_z = boxWidth_z / (nVoxel_z - 1);
+		const V3d voxelSize = V3d(voxelSize_x, voxelSize_y, voxelSize_z);
+
+		for (int voxel_x = 0; voxel_x < nVoxel_x - 1; ++voxel_x)
 		{
-			for (int grid_y = 0; grid_y < numGrid_y; ++grid_y)
+			for (int voxel_y = 0; voxel_y < nVoxel_y - 1; ++voxel_y)
 			{
-				for (int grid_z = 0; grid_z < numGrid_z; ++grid_z)
+				for (int voxel_z = 0; voxel_z < nVoxel_z - 1; ++voxel_z)
 				{
-					V3d cubePos, cubeSize;
-					cubePos << min_x + grid_x * (boxWidth_x / numGrid_x), min_y + grid_y * (boxWidth_y / numGrid_y), min_z + grid_z * (boxWidth_z / numGrid_z);
-					cubeSize << (grid_x != numGrid_x - 1 ? boxWidth_x / numGrid_x : min_x + boxWidth_x - cubePos.x()),
-						(grid_y != numGrid_y - 1 ? boxWidth_y / numGrid_y : min_y + boxWidth_y - cubePos.y()),
-						(grid_z != numGrid_z - 1 ? boxWidth_z / numGrid_z : min_z + boxWidth_z - cubePos.z());
-					Voxel voxel(cubePos, cubeSize);
+					V3d voxelPos;
+					voxelPos << min_x + voxel_x * voxelSize_x, min_y + voxel_y * voxelSize_y, min_z + voxel_z * voxelSize_z;
+					Voxel voxel(voxelPos, voxelSize);
 					voxel.setVoxelSDF(sdf);
 					voxel.triangulation(mesh, isoVal);
 				}

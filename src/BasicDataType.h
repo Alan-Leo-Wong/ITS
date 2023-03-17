@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iostream>
 #include <Eigen\dense>
-#include <Eigen\sparse>
 
 using UINT = unsigned int;
 
@@ -19,7 +18,6 @@ using V3i = Eigen::Vector3i;
 using VXi = Eigen::VectorXi;
 using MXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using MXi = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using SpMat = Eigen::SparseMatrix<double>;
 using VXd = Eigen::VectorXd;
 
 using PII = std::pair<int, int>;

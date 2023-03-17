@@ -8,6 +8,7 @@
 #include <numeric>
 #include <iomanip>
 #include <Windows.h>
+#include <Eigen\sparse>
 #include <igl\writeOBJ.h>
 
 void OctreeNode::setCorners()
@@ -56,7 +57,7 @@ void OctreeNode::setDomain()
 	domain[1] = boundary.second;
 }
 
-bool OctreeNode::isInDomain(const OctreeNode* otherNode)
+inline bool OctreeNode::isInDomain(const OctreeNode* otherNode)
 {
 	V3d nodeOrigin = boundary.first;
 	V3d st_domain = otherNode->domain[0];
@@ -77,7 +78,7 @@ inline double OctreeNode::BaseFunction4Point(const V3d& p)
 	double y = BaseFunction(p.y(), nodePosition.y(), width.y());
 	if (y <= 0.0) return 0.0;
 	double z = BaseFunction(p.z(), nodePosition.z(), width.z());
-	if (z <= 0) return 0.0;
+	if (z <= 0.0) return 0.0;
 	return x * y * z;
 }
 
@@ -94,14 +95,19 @@ void Octree::createOctree(const double& scaleSize)
 	// bounding box
 	V3d b_beg = minV - (maxV - minV) * scaleSize;
 	V3d b_end = maxV + (maxV - minV) * scaleSize;
+	V3d diff = b_end - b_beg;
+	double max_diff = diff.maxCoeff();
+	b_end = b_beg + V3d(max_diff, max_diff, max_diff);
+
 	PV3d boundary = std::make_pair(b_beg, b_end);
 	V3d width = b_end - b_beg;
+
 	bb = BoundingBox(b_beg, b_end);
 
 	root = new OctreeNode(0, width, boundary, idxOfPoints);
 	createNode(root, 0, width, boundary, idxOfPoints);
 
-	saveNodeCorners2OBJFile(concatString(DELIMITER, VIS_DIR, std::to_string(maxDepth), "octree.obj"));
+	saveNodeCorners2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"octree.obj"));
 }
 
 void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints)
@@ -137,12 +143,12 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 	}
 
 	node->childs.resize(8, nullptr);
+	V3d childWidth = width / 2.0;
 	for (int i = 0; i < 8; i++)
 	{
 		const int xOffset = i & 1;
 		const int yOffset = (i >> 1) & 1;
 		const int zOffset = (i >> 2) & 1;
-		V3d childWidth = width / 2.0;
 		V3d childBeg = b_beg + V3d(xOffset * childWidth.x(), yOffset * childWidth.y(), zOffset * childWidth.z());
 		V3d childEnd = childBeg + childWidth;
 		PV3d childBoundary = { childBeg, childEnd };
@@ -216,7 +222,7 @@ void Octree::cpIntersection()
 	cout << "三角形边与node的交点数量：" << interPoints.size() << endl;
 	//intersections.erase(std::unique(intersections.begin(), intersections.end()), intersections.end());
 
-	saveIntersections(concatString(DELIMITER, VIS_DIR, std::to_string(maxDepth), "edgeInter.xyz"), interPoints);
+	saveIntersections(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"edgeInter.xyz"), interPoints);
 
 	// 三角形面与node边线交（有重合点）
 	vector<V3d> faceIntersections;
@@ -308,26 +314,11 @@ void Octree::cpIntersection()
 	faceIntersections.erase(std::unique(faceIntersections.begin(), faceIntersections.end()), faceIntersections.end());
 	cout << "三角形面与node边的交点数量：" << faceIntersections.size() << endl;
 
-	saveIntersections(concatString(DELIMITER, VIS_DIR, std::to_string(maxDepth), "faceInter.xyz"), faceIntersections)
+	saveIntersections(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"faceInter.xyz"), faceIntersections);
 
 	interPoints.erase(std::unique(interPoints.begin(), interPoints.end()), interPoints.end());
 
 	cout << "总交点数量：" << interPoints.size() << endl;
-}
-
-void Octree::setInDomainLeafNode()
-{
-	if (interLeafNodes.empty()) return;
-	inDomainLeafNodes.resize(interLeafNodes.size());
-	for (int i = 0; i < interLeafNodes.size(); ++i)
-	{
-		for (const auto& leafNode : leafNodes)
-		{
-			auto iNode = interLeafNodes[i];
-			if (iNode->isInDomain(leafNode))
-				inDomainLeafNodes[i].emplace_back(leafNode);
-		}
-	}
 }
 
 //TODO: 待并行
@@ -337,39 +328,91 @@ void Octree::setSDF()
 	fcpw::Scene<3> scene;
 	initSDF(scene, modelVerts, modelFaces);
 
-	for (auto& leaf : leafNodes)
-		for (int i = 0; i < 8; ++i)
-			leaf->sdfVal[i] = getSignedDistance(leaf->corners[i], scene);
+	sdfVal.resize(nLeafNodes);
 
-	saveSDFValue(concatString(DELIMITER, OUT_DIR, std::to_string(maxDepth), "SDFValue.txt"))
+	for (int i = 0; i < nLeafNodes; ++i)
+		sdfVal(i) = getSignedDistance(leafNodes[i]->corners[0], scene);
+
+	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
+}
+
+void Octree::setInDomainLeafNodes()
+{
+	//if (interLeafNodes.empty()) return;
+	//inDmLeafNodesIdx.resize(interLeafNodes.size());
+	//
+	//for (int i = 0; i < interLeafNodes.size(); ++i)
+	//{
+	//	auto queryNode = interLeafNodes[i];
+	//	for (int j = 0; j < interLeafNodes.size(); ++j)
+	//	{
+	//		auto node = interLeafNodes[j];
+	//		if (queryNode->isInDomain(node)) // whether queryNode in node's domain
+	//			inDmLeafNodesIdx[i].emplace_back(j);
+	//	}
+	//}
+
+	if (!nLeafNodes) return;
+	inDmLeafNodesIdx.resize(nLeafNodes);
+
+	for (int i = 0; i < nLeafNodes; ++i)
+	{
+		auto queryNode = leafNodes[i];
+		for (int j = 0; j < nLeafNodes; ++j)
+		{
+			auto node = leafNodes[j];
+			if (queryNode->isInDomain(node)) // whether queryNode in node's domain
+				inDmLeafNodesIdx[i].emplace_back(j);
+		}
+	}
+}
+
+void Octree::cpCoefficients()
+{
+	using SpMat = Eigen::SparseMatrix<double>;
+	using Trip = Eigen::Triplet<double>;
+
+	SpMat sm(nLeafNodes, nLeafNodes);
+	vector<Trip> matVal(nLeafNodes);
+
+	// initial matrix
+	setInDomainLeafNodes();
+	for (int i = 0; i < nLeafNodes; ++i)
+	{
+		//if (!leafNodes[i]->isInterMesh) continue;
+		auto node = leafNodes[i];
+		for (int j = 0; j < inDmLeafNodesIdx[i].size(); ++j)
+		{
+			matVal.emplace_back(Trip(i, inDmLeafNodesIdx[i][j], node->BaseFunction4Point(leafNodes[inDmLeafNodesIdx[i][j]]->boundary.first)));
+		}
+	}
+	sm.setFromTriplets(matVal.begin(), matVal.end());
+
+	Eigen::SimplicialCholesky<SpMat> chol(sm);
+	VXd coefficients = chol.solve(sdfVal);
+
+	for (int i = 0; i < nLeafNodes; ++i)
+		leafNodes[i]->lambda = coefficients(i);
+
+	saveCoefficients(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Coefficients.txt"));
 }
 
 void Octree::setBSplineValue()
 {
 	const size_t nVerts = modelVerts.size();
 	const size_t nInterPoints = interPoints.size(); // 交点数量
+	const size_t nInterLeafNodes = interLeafNodes.size();
+
 	BSplineValue.resize(nVerts + nInterPoints);
 	BSplineValue.setZero();
 
-	const size_t nLeafNodes = leafNodes.size();
-	const size_t nInterLeafNodes = interLeafNodes.size();
-
-	double output = 100.0 / (nVerts + nInterPoints);
-
 	for (int i = 0; i < nVerts; ++i)
 	{
-		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << i * output << "%]";
 		V3d modelPoint = modelVerts[i];
-
-		for (int j = 0; j < nInterLeafNodes; ++j)
+		for (int j = 0; j < nLeafNodes; ++j)
 		{
-			for (int k = 0; k < inDomainLeafNodes[j].size(); ++k)
-			{
-				auto node = inDomainLeafNodes[j][k];
-
-				out << node->BaseFunction4Point(modelPoint) << endl;
-				BSplineValue[i] += node->sdfVal[0] * (node->BaseFunction4Point(modelPoint));
-			}
+			auto node = leafNodes[j];
+			BSplineValue[i] += node->lambda * (node->BaseFunction4Point(modelPoint));
 		}
 	}
 
@@ -377,30 +420,26 @@ void Octree::setBSplineValue()
 	for (int i = 0; i < nInterPoints; ++i)
 	{
 		cnt = i + nVerts;
-		std::cout << "\r Computing[" << std::fixed << std::setprecision(2) << cnt * output << "%]";
 		V3d interPoint = interPoints[i];
 
-		for (int j = 0; j < nInterLeafNodes; ++j)
+		for (int j = 0; j < nLeafNodes; ++j)
 		{
-			for (int k = 0; k < inDomainLeafNodes[j].size(); ++k)
-			{
-				auto node = inDomainLeafNodes[j][k];
-
-				out << node->BaseFunction4Point(interPoint) << endl;
-				BSplineValue[cnt] += node->sdfVal[0] * (node->BaseFunction4Point(interPoint));
-			}
+			auto node = leafNodes[j];
+			BSplineValue[cnt] += node->lambda * (node->BaseFunction4Point(interPoint));
 		}
 	}
 
-	saveBSplineValue(concatString(DELIMITER, OUT_DIR, std::to_string(maxDepth), "BSplineValue.txt"));
+	saveBSplineValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"BSplineValue.txt"));
 }
 
 //! save data
 inline void Octree::saveNodeCorners2OBJFile(const string& filename) const
 {
+	checkDir(filename);
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not be opened!", filename.c_str()); return; }
 
+	cout << "leafNodes size = " << leafNodes.size() << endl;
 	int count = -8;
 	for (const auto& leaf : leafNodes)
 	{
@@ -429,44 +468,52 @@ inline void Octree::saveIntersections(const string& filename, const vector<V3d>&
 {
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not be opened!", filename.c_str()); return; }
-	for (V3d p : intersections)
+	checkDir(filename);
+
+	for (const V3d& p : intersections)
 		out << p.x() << " " << p.y() << " " << p.z() << endl;
 	out.close();
 }
 
 inline void Octree::saveSDFValue(const string& filename) const
 {
+	checkDir(filename);
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
 
-	int cnt = 1; // node
-	for (auto& leaf : leafNodes)
-	{
-		out << cnt++ << endl;
-		for (int i = 0; i < 8; ++i)
-		{
-			leaf->sdfVal[i] = getSignedDistance(leaf->corners[i], scene);
-			out << leaf->sdfVal[i] << endl;
-		}
-	}
+	for (const auto& val : sdfVal)
+		out << val << endl;
+
 	out.close();
+}
+
+inline void Octree::saveCoefficients(const string& filename) const
+{
+	checkDir(filename);
+	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
+
+	for (const auto& leafNode : leafNodes)
+		out << leafNode->lambda << endl;
 }
 
 inline void Octree::saveBSplineValue(const string& filename) const
 {
+	checkDir(filename);
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
+
 	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << BSplineValue << endl;
 	out.close();
 }
 
 //! visulization
-inline void Octree::mcVisualization(const string& filename, const V3i& resolution) const
+void Octree::mcVisualization(const string& filename, const V3i& resolution) const
 {
 	auto mesh = MC::extractIsoSurface(bb.boxOrigin, bb.boxWidth, resolution, [&](const V3d& voxelVert)->double {
 		double sum = 0.0;
 		for (const auto& node : leafNodes)
-			sum += node->sdfVal[0] * (node->BaseFunction4Point(voxelVert));
+			sum += node->lambda * (node->BaseFunction4Point(voxelVert));
 		return sum;
 		});
 
@@ -474,10 +521,15 @@ inline void Octree::mcVisualization(const string& filename, const V3i& resolutio
 	MXi faces;
 	list2Matrix<MXd, double, 3>(mesh.meshVerts, verts);
 	list2Matrix<MXi, int, 3>(mesh.meshFaces, faces);
+
+	checkDir(filename);
+
 	igl::writeOBJ(filename, verts, faces);
 }
 
-inline void Octree::txtVisualization(const string& filename) const
+void Octree::textureVisualization(const string& filename) const
 {
+	checkDir(filename);
+
 	writeTexturedObjFile(filename, BSplineValue);
 }

@@ -651,9 +651,10 @@ void BaseModel::writeTexturedObjFile(const string& filename, const VXd& uvs)cons
 	{
 		out << "vt " << (u - minU) / (maxU - minU) << " " << 0 << " " << endl;
 	}
+	int i = 0;
 	for (auto f : modelFaces)
 	{
-		auto ids = (f + Eigen::Vector3i(1, 1, 1)).transpose();
+		V3i ids = f + V3i(1, 1, 1);
 		out << "f " << ids.x() << "/" << ids.x() << " " << ids.y() << "/" << ids.y() << " " << ids.z() << "/" << ids.z() << endl;
 	}
 	out.close();
