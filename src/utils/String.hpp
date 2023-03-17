@@ -1,14 +1,15 @@
 #pragma once
 #define __STDC_WANT_LIB_EXT1__ 1
+#include <io.h>
 #include <string>
 #include <string.h>
 
 using std::string;
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-#  define DELIMITER '/'
+#  define DELIMITER "\\"
 #else
-#  define DELIMITER '\'
+#  define DELIMITER "/"
 #endif
 
 #ifndef CONTACT(x,y)
@@ -16,16 +17,17 @@ using std::string;
 #endif
 
 template<typename T = string>
-string concatString(const char delimiter, T firstArg)
+string concatFilePath(T firstArg)
 {
 	return firstArg;
 }
 
+// 目前只支持参数全为string类型的情况，待处理参数包中携带const char*(const char[])的这种情况
 template<typename T = string, typename...Types>
-string concatString(const char delimiter, T firstArg, Types ... args)
+string concatFilePath(T firstArg, Types ... args)
 {
-	firstArg = firstArg + delimiter;
-	return firstArg + concatString(delimiter, args...);
+	firstArg = firstArg + (string)DELIMITER;
+	return firstArg + concatFilePath(args...);
 }
 
 inline char* getFileNameWithExt(const char delimiter, char* filePath)
@@ -40,7 +42,7 @@ inline char* getFileNameWithExt(const char delimiter, char* filePath)
 	return fileName;
 }
 
-inline char* getFileNameWithExt(const char delimiter, const char* filePath)
+inline char* getFileNameWithExt(const char* delimiter, const char* filePath)
 {
 	char* filePath_c = new char[strlen(filePath) + 1];
 	strcpy(filePath_c, filePath);
@@ -53,17 +55,17 @@ inline char* getFileNameWithExt(const char delimiter, const char* filePath)
 		if (fileName != nullptr) { delete[] fileName; fileName = nullptr; }
 		fileName = new char[strlen(token) + 1];
 		strcpy(fileName, token);
-		token = strtok(nullptr, &delimiter); // strtok第一个参数传入nullptr，代表使用之前strtok内部保存的SAVE_PTR定位到下一个待处理的字符的位置
+		token = strtok(NULL, &delimiter); // strtok第一个参数传入nullptr，代表使用之前strtok内部保存的SAVE_PTR定位到下一个待处理的字符的位置
 	}
 #else // Thread safe
 	char* ptr = nullptr;
-	char* token = strtok_s(filePath_c, &delimiter, &ptr); //相较于strtok()函数，strtok_s函数需要用户传入一个指针，用于函数内部判断从哪里开始处理字符串
+	char* token = strtok_s(filePath_c, delimiter, &ptr); //相较于strtok()函数，strtok_s函数需要用户传入一个指针，用于函数内部判断从哪里开始处理字符串
 	while (token != nullptr)
 	{
 		if (fileName != nullptr) { delete[] fileName; fileName = nullptr; }
 		fileName = new char[strlen(token) + 1];
 		strcpy(fileName, token);
-		token = strtok_s(nullptr, &delimiter, &ptr);
+		token = strtok_s(NULL, delimiter, &ptr);
 	}
 #endif
 	delete[] filePath_c;
@@ -71,7 +73,7 @@ inline char* getFileNameWithExt(const char delimiter, const char* filePath)
 	return fileName;
 }
 
-inline string getFileNameWithExt(const char delimiter, const string& filePath)
+inline string getFileNameWithExt(const char* delimiter, const string& filePath)
 {
 	string fileName = getFileNameWithExt(delimiter, filePath.c_str());
 	return fileName;
@@ -110,13 +112,13 @@ inline string getFileExtension(const string& filePath)
 	return "";
 }
 
-inline char* getFileName(const char delimiter, char* filePath)
+inline char* getFileName(const char* delimiter, char* filePath)
 {
 	char* fileName = getFileNameWithExt(delimiter, filePath);
 	size_t len = strlen(fileName);
 	for (int i = len - 1; i >= 0; --i)
 	{
-		if (filePath[i] == '.')
+		if (fileName[i] == '.')
 		{
 			fileName[i] = 0;
 			return fileName;
@@ -125,13 +127,13 @@ inline char* getFileName(const char delimiter, char* filePath)
 	return fileName;
 }
 
-inline char* getFileName(const char delimiter, const char* filePath)
+inline char* getFileName(const char* delimiter, const char* filePath)
 {
 	char* fileName = getFileNameWithExt(delimiter, filePath);
 	size_t len = strlen(fileName);
 	for (int i = len - 1; i >= 0; --i)
 	{
-		if (filePath[i] == '.')
+		if (fileName[i] == '.')
 		{
 			fileName[i] = 0;
 			return fileName;
@@ -140,20 +142,20 @@ inline char* getFileName(const char delimiter, const char* filePath)
 	return fileName;
 }
 
-inline string getFileName(const char delimiter, const string& filePath)
+inline string getFileName(const char* delimiter, const string& filePath)
 {
 	string fileName = getFileName(delimiter, filePath.c_str());
 	return fileName;
 }
 
-inline char* getDirName(const char delimiter, const char* filePath)
+inline char* getDirName(const char* delimiter, const char* filePath)
 {
 	const size_t len = strlen(filePath);
 	char* dirName = new char[len + 1];
 	strcpy(dirName, filePath);
 	for (int i = len - 1; i >= 0; --i)
 	{
-		if (filePath[i] == delimiter)
+		if (filePath[i] == delimiter[0])
 		{
 			dirName[i] = 0;
 			return dirName;
@@ -163,14 +165,14 @@ inline char* getDirName(const char delimiter, const char* filePath)
 	return dirName;
 }
 
-inline char* getDirName(const char delimiter, char* filePath)
+inline char* getDirName(const char* delimiter, char* filePath)
 {
 	const size_t len = strlen(filePath);
 	char* dirName = new char[len + 1];
 	strcpy(dirName, filePath);
 	for (int i = len - 1; i >= 0; --i)
 	{
-		if (filePath[i] == delimiter)
+		if (filePath[i] == delimiter[0])
 		{
 			dirName[i] = 0;
 			return dirName;
@@ -178,4 +180,19 @@ inline char* getDirName(const char delimiter, char* filePath)
 	}
 	dirName[0] = 0;
 	return dirName;
+}
+
+inline void checkDir(const string& filename)
+{
+	size_t dir_idx = filename.find_last_of("\\");
+	if (dir_idx != string::npos)
+	{
+		//cout << "output dir = " << filename.substr(0, dir_idx) << endl;
+		string dir = filename.substr(0, dir_idx);
+		if (_access(dir.c_str(), 0) == -1)
+		{
+			string command = "mkdir " + dir;
+			system(command.c_str());
+		}
+	}
 }

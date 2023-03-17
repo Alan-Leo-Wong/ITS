@@ -9,7 +9,7 @@ public:
 	int depth;
 	bool isLeaf;
 	bool isInterMesh; // if intersect with mesh
-	double sdfVal[8];
+	double lambda;
 
 	V3d width;
 	V3d corners[8];
@@ -62,9 +62,9 @@ public:
 
 	void setCorners();
 
-	inline double BaseFunction4Point(const V3d& p);
+	double BaseFunction4Point(const V3d& p);
 
-	inline bool isInDomain(const OctreeNode* otherNode); // whether in otherNode's domain
+	bool isInDomain(const OctreeNode* otherNode); // whether in otherNode's domain
 };
 
 class Octree : public BaseModel
@@ -76,12 +76,14 @@ protected:
 	double scaleSize = 0.01;
 	string modelName;
 
+	VXd sdfVal;
+
 	OctreeNode* root;
 	BoundingBox bb;
 
 	vector<OctreeNode*> leafNodes;
 	vector<OctreeNode*> interLeafNodes;
-	vector<vector<OctreeNode*>> inDomainLeafNodes;
+	vector<vector<int>> inDmLeafNodesIdx;
 
 	vector<PV3d> nodeXEdges; // 所有节点X轴方向的边，只用于求交
 	vector<PV3d> nodeYEdges; // 所有节点Y轴方向的边，只用于求交
@@ -108,7 +110,9 @@ public:
 
 	void cpIntersection();
 
-	void setInDomainLeafNode();
+	void cpCoefficients();
+
+	void setInDomainLeafNodes();
 
 	void setSDF();
 
@@ -116,16 +120,18 @@ public:
 
 public:
 	// save data
-	inline void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
+	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 	
-	inline void saveNodeCorners2OBJFile(const string& filename) const;
+	void saveNodeCorners2OBJFile(const string& filename) const;
 
-	inline void saveSDFValue(const string& filename) const;
+	void saveSDFValue(const string& filename) const;
 
-	inline void saveBSplineValue(const string& filename) const;
+	void saveCoefficients(const string& filename) const;
+
+	void saveBSplineValue(const string& filename) const;
 
 	// visulization
-	inline void mcVisualization(const string& filename, const V3i& resolution) const;
+	void mcVisualization(const string& filename, const V3i& resolution) const;
 
-	inline void txtVisualization(const string& filename) const;
+	void textureVisualization(const string& filename) const;
 };

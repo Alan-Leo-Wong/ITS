@@ -1,7 +1,7 @@
 #pragma once
 #include <Eigen\dense>
 
-using Eigen;
+using Eigen::Vector3d;
 
 struct BoundingBox
 {

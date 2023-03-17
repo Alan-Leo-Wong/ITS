@@ -1,6 +1,7 @@
 //#include "CollisionDetection.h"
 #include "Octree.h"
 #include "utils/Timer.hpp"
+#include "utils/String.hpp"
 #include "utils/common.hpp"
 #include "utils/CMDParser.hpp"
 
@@ -52,8 +53,10 @@ int main(int argc, char** argv)
 
 	startTimer(&timer);
 
-	const int maxDepth = 4;
-	Octree octree(maxDepth, concatString(DELIMITER, MODEL_DIR, "bunny.off"));
+	string modelName = getFileName("", "bunny.off");
+	const int maxDepth = 9;
+	const int res = 21;
+	Octree octree(maxDepth, concatFilePath((string)MODEL_DIR, (string)"bunny.off"));
 
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
@@ -72,10 +75,10 @@ int main(int argc, char** argv)
 	printf("Compute SDF spent %lf s.\n", time);
 
 	startTimer(&timer);
-	octree.setInDomainLeafNode();
+	octree.cpCoefficients();
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
-	printf("Select indomain leaf nodes spent %lf s.\n", time);
+	printf("Compute coefficients spent %lf s.\n", time);
 
 	startTimer(&timer);
 	octree.setBSplineValue();
@@ -83,13 +86,13 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("Compute B-spline value spent %lf s.\n", time);
 
+	octree.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"txt_shell.obj"));
+	
 	startTimer(&timer);
-	octree.mcVisualization(concatString(DELIMITER, MODEL_DIR, std::to_string(maxDepth), "mc_shell.obj"), V3i(20, 20, 20));
+	octree.mcVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"mc_shell.obj"), V3i(res, res, res));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("MarchingCubes spent %lf s.\n", time);
-
-	octree.txtVisualization(concatString(DELIMITER, MODEL_DIR, std::to_string(maxDepth), "txt_shell.obj"));
 
 	deleteTimer(&timer);
 
