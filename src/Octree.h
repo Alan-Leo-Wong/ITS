@@ -92,6 +92,9 @@ protected:
 	VXd BSplineValue;
 	vector<V3d> interPoints; // intersection points
 
+	vector<vector<PV3d>> neighbors; // 存储每个节点的受影响格子（使用边界表示）
+	vector<vector<OctreeNode*>> inDmLeafNodes; // 存储对第i个（有点的）叶子节点有影响的节点
+
 public:
 	// constructor and destructor
 	Octree(const int& _maxDepth, const string& _modelPath, const double& _scaleSize = 0.1) :
