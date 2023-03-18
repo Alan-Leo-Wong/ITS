@@ -10,6 +10,7 @@
 #include <Windows.h>
 #include <Eigen\sparse>
 #include <igl\writeOBJ.h>
+#include <igl\marching_cubes.h>
 
 void OctreeNode::setCorners()
 {
@@ -321,7 +322,6 @@ void Octree::cpIntersection()
 	cout << "总交点数量：" << interPoints.size() << endl;
 }
 
-//TODO: 待并行
 void Octree::setSDF()
 {
 	// initialize a 3d scene
@@ -361,7 +361,7 @@ void Octree::setInDomainLeafNodes()
 		for (int j = 0; j < nLeafNodes; ++j)
 		{
 			auto node = leafNodes[j];
-			if (queryNode->isInDomain(node)) // whether queryNode in node's domain
+			if (queryNode->isInDomain(node)) // whether queryNode is in node's domain
 				inDmLeafNodesIdx[i].emplace_back(j);
 		}
 	}
@@ -372,7 +372,7 @@ void Octree::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
-	SpMat sm(nLeafNodes, nLeafNodes);
+	SpMat sm(nLeafNodes, nLeafNodes); // A
 	vector<Trip> matVal(nLeafNodes);
 
 	// initial matrix
@@ -380,16 +380,21 @@ void Octree::cpCoefficients()
 	for (int i = 0; i < nLeafNodes; ++i)
 	{
 		//if (!leafNodes[i]->isInterMesh) continue;
-		auto node = leafNodes[i];
+		auto node_i = leafNodes[i];
 		for (int j = 0; j < inDmLeafNodesIdx[i].size(); ++j)
 		{
-			matVal.emplace_back(Trip(i, inDmLeafNodesIdx[i][j], node->BaseFunction4Point(leafNodes[inDmLeafNodesIdx[i][j]]->boundary.first)));
+			auto node_j = leafNodes[inDmLeafNodesIdx[i][j]]; // node[j] influence node[i]
+			matVal.emplace_back(Trip(i, inDmLeafNodesIdx[i][j], node_j->BaseFunction4Point(node_i->boundary.first)));
 		}
 	}
 	sm.setFromTriplets(matVal.begin(), matVal.end());
+	sm.makeCompressed();
 
-	Eigen::SimplicialCholesky<SpMat> chol(sm);
-	VXd coefficients = chol.solve(sdfVal);
+	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
+	lscg.compute(sm);
+	//Eigen::SimplicialCholesky<SpMat> chol(sm);
+	VXd coefficients = lscg.solve(sdfVal);
+	cout << "Error: " << (sm * coefficients - sdfVal).norm() << endl;
 
 	for (int i = 0; i < nLeafNodes; ++i)
 		leafNodes[i]->lambda = coefficients(i);
@@ -510,7 +515,7 @@ inline void Octree::saveBSplineValue(const string& filename) const
 //! visulization
 void Octree::mcVisualization(const string& filename, const V3i& resolution) const
 {
-	auto mesh = MC::extractIsoSurface(bb.boxOrigin, bb.boxWidth, resolution, [&](const V3d& voxelVert)->double {
+	/*auto mesh = MC::extractIsoSurface(bb.boxOrigin, bb.boxWidth, resolution, [&](const V3d& voxelVert)->double {
 		double sum = 0.0;
 		for (const auto& node : leafNodes)
 			sum += node->lambda * (node->BaseFunction4Point(voxelVert));
@@ -524,6 +529,30 @@ void Octree::mcVisualization(const string& filename, const V3i& resolution) cons
 
 	checkDir(filename);
 
+	igl::writeOBJ(filename, verts, faces);*/
+
+	V3d grid_width = V3d(bb.boxWidth.x() / (resolution.x() + 1), bb.boxWidth.y() / (resolution.y() + 1), bb.boxWidth.z() / (resolution.z() + 1));
+
+	VXd S(resolution.x() * resolution.y() * resolution.z());
+	MXd GV(resolution.x() * resolution.y() * resolution.z(), 3);
+	for (int k = 0; k < resolution.z(); ++k)
+		for (int j = 0; j < resolution.y(); ++j)
+			for (int i = 0; i < resolution.x(); ++i)
+			{
+				const int idx = k * resolution.x() * resolution.y() + j * resolution.x() + i;
+				GV.row(idx) = V3d(bb.boxOrigin.x() + i * grid_width.x(),
+					bb.boxOrigin.y() + j * grid_width.y(),
+					bb.boxOrigin.z() + k * grid_width.z()
+				);
+
+				double sum = 0.0;
+				for (const auto& node : leafNodes)
+					sum += node->lambda * (node->BaseFunction4Point(GV.row(idx)));
+				S(idx) = sum;
+			}
+	MXd verts;
+	MXi faces;
+	igl::marching_cubes(S, GV, resolution.x(), resolution.y(), resolution.z(), 0, verts, faces);
 	igl::writeOBJ(filename, verts, faces);
 }
 
