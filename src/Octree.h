@@ -6,10 +6,11 @@
 struct OctreeNode
 {
 public:
+	long int id;
+
 	int depth;
 	bool isLeaf;
 	bool isInterMesh; // if intersect with mesh
-	double lambda;
 
 	V3d width;
 	V3d corners[8];
@@ -32,8 +33,21 @@ public:
 		isInterMesh = false;
 	}
 
-	OctreeNode(const int& _depth, const V3d& _width, const PV3d& _boundary, const std::vector<size_t>& _idxOfPoints)
+	// 虚拟节点
+	OctreeNode(const int& _id, const int& _depth, const V3d& _width, const PV3d& _boundary)
 	{
+		id = _id;
+		parent = nullptr;
+		depth = _depth;
+		width = _width;
+		boundary = _boundary;
+		isLeaf = true;
+		isInterMesh = false;
+	}
+
+	OctreeNode(const int& _id, const int& _depth, const V3d& _width, const PV3d& _boundary, const std::vector<size_t>& _idxOfPoints)
+	{
+		id = _id;
 		parent = nullptr;
 		depth = _depth;
 		width = _width;
@@ -64,7 +78,7 @@ public:
 
 	double BaseFunction4Point(const V3d& p);
 
-	bool isInDomain(const OctreeNode* otherNode); // whether in otherNode's domain
+	bool isInDomain(const PV3d& q_boundary); // whether in otherNode's domain
 };
 
 class Octree : public BaseModel
@@ -79,11 +93,14 @@ protected:
 	VXd sdfVal;
 
 	OctreeNode* root;
+	OctreeNode* vir_root;
 	BoundingBox bb;
 
 	vector<OctreeNode*> leafNodes;
+	vector<OctreeNode*> allNodes;
+
 	vector<OctreeNode*> interLeafNodes;
-	vector<vector<int>> inDmLeafNodesIdx;
+	vector<vector<OctreeNode*>> inDmNodes;
 
 	vector<PV3d> nodeXEdges; // 所有节点X轴方向的边，只用于求交
 	vector<PV3d> nodeYEdges; // 所有节点Y轴方向的边，只用于求交
@@ -92,8 +109,7 @@ protected:
 	VXd BSplineValue;
 	vector<V3d> interPoints; // intersection points
 
-	vector<vector<PV3d>> neighbors; // 存储每个节点的受影响格子（使用边界表示）
-	vector<vector<OctreeNode*>> inDmLeafNodes; // 存储对第i个（有点的）叶子节点有影响的节点
+	VXd lambda;
 
 public:
 	// constructor and destructor
@@ -115,7 +131,9 @@ public:
 
 	void cpCoefficients();
 
-	void setInDomainLeafNodes();
+	vector<OctreeNode*> searchNode(const PV3d& boundary, const int& q_depth);
+
+	void setInDomainNodes();
 
 	void setSDF();
 
@@ -123,6 +141,8 @@ public:
 
 public:
 	// save data
+	void saveDomain2OBJFile(const string& filename) const;
+
 	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 	
 	void saveNodeCorners2OBJFile(const string& filename) const;
