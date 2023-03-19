@@ -53,10 +53,10 @@ int main(int argc, char** argv)
 
 	startTimer(&timer);
 
-	string modelName = getFileName("", "sphere.obj");
-	const int maxDepth = 1;
+	string modelName = getFileName("", "datatech.obj");
+	const int maxDepth = 6;
 	const int res = 20;
-	Octree octree(maxDepth, concatFilePath((string)MODEL_DIR, (string)"sphere.obj"));
+	Octree octree(maxDepth, concatFilePath((string)MODEL_DIR, (string)"datatech.obj"));
 
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
