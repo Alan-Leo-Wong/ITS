@@ -124,6 +124,7 @@ void Octree::createOctree(const double& scaleSize)
 		vir_root->childs[i] = new OctreeNode(numNodes++, 0, width, childBoundary);
 		vir_root->childs[i]->parent = vir_root;
 		vir_root->childs[i]->setDomain();
+		vir_root->childs[i]->setCorners();
 
 		allNodes.emplace_back(vir_root->childs[i]);
 	}
@@ -351,10 +352,11 @@ void Octree::setSDF()
 	fcpw::Scene<3> scene;
 	initSDF(scene, modelVerts, modelFaces);
 
-	sdfVal.resize(nLeafNodes);
+	sdfVal.resize(nLeafNodes * 8);
 
 	for (int i = 0; i < nLeafNodes; ++i)
-		sdfVal(i) = getSignedDistance(leafNodes[i]->corners[0], scene);
+		for (int j = 0; j < 8; ++j)
+			sdfVal(i * 8 + j) = getSignedDistance(leafNodes[i]->corners[j], scene);
 
 	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
 }
@@ -396,6 +398,7 @@ vector<OctreeNode*> Octree::searchNode(const PV3d& q_boundary, const int& q_dept
 				fro->childs[i] = new OctreeNode(numNodes++, fro->depth + 1, childWidth, childBoundary);
 				fro->childs[i]->parent = fro;
 				fro->childs[i]->setDomain();
+				fro->childs[i]->setCorners();
 
 				allNodes.emplace_back(fro->childs[i]);
 			}
@@ -454,12 +457,12 @@ void Octree::setInDomainNodes()
 	{
 		auto queryNode = leafNodes[i];
 		auto res = searchNode(queryNode->boundary, queryNode->depth);
-		cout << "res size = " << res.size() << endl;
+		//cout << "res size = " << res.size() << endl;
 		inDmNodes[i].insert(inDmNodes[i].end(), res.begin(), res.end());
 	}
 
-	for (int i = 0; i < nLeafNodes; ++i)
-		saveDomain2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"domain.obj"));
+	/*for (int i = 0; i < nLeafNodes; ++i)
+		saveDomain2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"domain.obj"));*/
 }
 
 void Octree::cpCoefficients()
@@ -470,7 +473,7 @@ void Octree::cpCoefficients()
 	// initial matrix
 	setInDomainNodes();
 
-	SpMat sm(nLeafNodes, numNodes); // A
+	SpMat sm(nLeafNodes * 8, numNodes); // A
 	vector<Trip> matVal;
 
 	for (int i = 0; i < nLeafNodes; ++i)
@@ -482,7 +485,8 @@ void Octree::cpCoefficients()
 		{
 			auto node_j = inDmNodes[i][j]; // node[j] influence node[i]
 			assert(node_j->id < numNodes, "id is larger than numNodes!");
-			matVal.emplace_back(Trip(i, node_j->id, node_j->BaseFunction4Point(i_beg)));
+			for (int k = 0; k < 8; ++k)
+				matVal.emplace_back(Trip(i * 8 + k, node_j->id, node_j->BaseFunction4Point(i_beg)));
 		}
 	}
 	sm.setFromTriplets(matVal.begin(), matVal.end());
@@ -566,7 +570,7 @@ inline void Octree::saveDomain2OBJFile(const string& filename) const
 	}
 	out.close();
 }
- 
+
 inline void Octree::saveNodeCorners2OBJFile(const string& filename) const
 {
 	checkDir(filename);
