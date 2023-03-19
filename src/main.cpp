@@ -54,8 +54,8 @@ int main(int argc, char** argv)
 	startTimer(&timer);
 
 	string modelName = getFileName("", "sphere.obj");
-	const int maxDepth = 6;
-	const int res = 60;
+	const int maxDepth = 1;
+	const int res = 20;
 	Octree octree(maxDepth, concatFilePath((string)MODEL_DIR, (string)"sphere.obj"));
 
 	stopTimer(&timer);
