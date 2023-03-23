@@ -105,9 +105,13 @@ void Octree::createOctree(const double& scaleSize)
 
 	bb = BoundingBox(b_beg, b_end);
 
+	root = new OctreeNode(numNodes++, 0, width, boundary, idxOfPoints);
+	createNode(root, 0, width, boundary, idxOfPoints);
+	treeNumNodes = allNodes.size();
+	treeNodes = allNodes;
+
 	vir_root = new OctreeNode(-1, -1, width * 2.0, PV3d{ boundary.first, boundary.first + width * 2.0 });
 	vir_root->childs.resize(8, nullptr);
-	root = new OctreeNode(numNodes++, 0, width, boundary, idxOfPoints);
 	root->parent = vir_root;
 	vir_root->childs[0] = root;
 
@@ -128,8 +132,6 @@ void Octree::createOctree(const double& scaleSize)
 
 		allNodes.emplace_back(vir_root->childs[i]);
 	}
-
-	createNode(root, 0, width, boundary, idxOfPoints);
 
 	saveNodeCorners2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"octree.obj"));
 }
@@ -352,11 +354,11 @@ void Octree::setSDF()
 	fcpw::Scene<3> scene;
 	initSDF(scene, modelVerts, modelFaces);
 
-	sdfVal.resize(nLeafNodes * 8);
+	sdfVal.resize(treeNumNodes * 8);
 
-	for (int i = 0; i < nLeafNodes; ++i)
+	for (int i = 0; i < treeNumNodes; ++i)
 		for (int j = 0; j < 8; ++j)
-			sdfVal(i * 8 + j) = getSignedDistance(leafNodes[i]->corners[j], scene);
+			sdfVal(i * 8 + j) = getSignedDistance(treeNodes[i]->corners[j], scene);
 
 	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
 }
@@ -450,12 +452,12 @@ vector<OctreeNode*> Octree::searchNode(const PV3d& q_boundary, const int& q_dept
 
 void Octree::setInDomainNodes()
 {
-	if (!nLeafNodes) return;
-	inDmNodes.resize(nLeafNodes);
+	if (!treeNumNodes) return;
+	inDmNodes.resize(treeNumNodes);
 
-	for (int i = 0; i < nLeafNodes; ++i)
+	for (int i = 0; i < treeNumNodes; ++i)
 	{
-		auto queryNode = leafNodes[i];
+		auto queryNode = treeNodes[i];
 		auto res = searchNode(queryNode->boundary, queryNode->depth);
 		//cout << "res size = " << res.size() << endl;
 		inDmNodes[i].insert(inDmNodes[i].end(), res.begin(), res.end());
@@ -473,12 +475,20 @@ void Octree::cpCoefficients()
 	// initial matrix
 	setInDomainNodes();
 
-	SpMat sm(nLeafNodes * 8, numNodes); // A
+	SpMat sm(treeNumNodes * 8, numNodes); // A
 	vector<Trip> matVal;
 
-	for (int i = 0; i < nLeafNodes; ++i)
+	for (int i = 0; i < treeNumNodes; ++i)
 	{
-		auto node_i = leafNodes[i];
+		auto node_i = treeNodes[i];
+
+
+		for (int j = 0; j < 8; ++j)
+		{
+			auto corner = node_i->corners[j];
+
+		}
+
 		V3d i_beg = node_i->boundary.first;
 		const int domainSize = inDmNodes[i].size();
 		for (int j = 0; j < domainSize; ++j)
@@ -486,7 +496,7 @@ void Octree::cpCoefficients()
 			auto node_j = inDmNodes[i][j]; // node[j] influence node[i]
 			assert(node_j->id < numNodes, "id is larger than numNodes!");
 			for (int k = 0; k < 8; ++k)
-				matVal.emplace_back(Trip(i * 8 + k, node_j->id, node_j->BaseFunction4Point(i_beg)));
+				matVal.emplace_back(Trip(i * 8 + k, node_j->id, node_j->BaseFunction4Point(node_i->corners[k])));
 		}
 	}
 	sm.setFromTriplets(matVal.begin(), matVal.end());
