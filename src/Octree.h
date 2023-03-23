@@ -86,6 +86,7 @@ class Octree : public BaseModel
 protected:
 	int maxDepth = -1;
 	int numNodes = 0;
+	int treeNumNodes = 0;
 	int nLeafNodes = 0;
 	double scaleSize = 0.01;
 	string modelName;
@@ -98,6 +99,7 @@ protected:
 
 	vector<OctreeNode*> leafNodes;
 	vector<OctreeNode*> allNodes;
+	vector<OctreeNode*> treeNodes;
 
 	vector<OctreeNode*> interLeafNodes;
 	vector<vector<OctreeNode*>> inDmNodes;
