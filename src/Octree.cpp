@@ -52,12 +52,6 @@ void OctreeNode::setEdges()
 	edges.emplace_back(std::make_pair(corners[3], corners[7]));
 }
 
-void OctreeNode::setDomain()
-{
-	domain[0] = boundary.first - width;
-	domain[1] = boundary.second;
-}
-
 // 判断q_boundary是否在node的影响域内
 inline bool OctreeNode::isInDomain(const PV3d& q_boundary)
 {
@@ -71,17 +65,17 @@ inline bool OctreeNode::isInDomain(const PV3d& q_boundary)
 	return false;
 }
 
-inline double OctreeNode::BaseFunction4Point(const V3d& p)
-{
-	const V3d nodePosition = boundary.first;
-	double x = BaseFunction(p.x(), nodePosition.x(), width.x());
-	if (x <= 0.0) return 0.0;
-	double y = BaseFunction(p.y(), nodePosition.y(), width.y());
-	if (y <= 0.0) return 0.0;
-	double z = BaseFunction(p.z(), nodePosition.z(), width.z());
-	if (z <= 0.0) return 0.0;
-	return x * y * z;
-}
+//inline double OctreeNode::BaseFunction4Point(const V3d& p)
+//{
+//	const V3d nodePosition = boundary.first;
+//	double x = BaseFunction(p.x(), nodePosition.x(), width.x());
+//	if (x <= 0.0) return 0.0;
+//	double y = BaseFunction(p.y(), nodePosition.y(), width.y());
+//	if (y <= 0.0) return 0.0;
+//	double z = BaseFunction(p.z(), nodePosition.z(), width.z());
+//	if (z <= 0.0) return 0.0;
+//	return x * y * z;
+//}
 
 void Octree::createOctree(const double& scaleSize)
 {
@@ -107,31 +101,6 @@ void Octree::createOctree(const double& scaleSize)
 
 	root = new OctreeNode(numNodes++, 0, width, boundary, idxOfPoints);
 	createNode(root, 0, width, boundary, idxOfPoints);
-	treeNumNodes = allNodes.size();
-	treeNodes = allNodes;
-
-	vir_root = new OctreeNode(-1, -1, width * 2.0, PV3d{ boundary.first, boundary.first + width * 2.0 });
-	vir_root->childs.resize(8, nullptr);
-	root->parent = vir_root;
-	vir_root->childs[0] = root;
-
-	for (int i = 1; i < 8; ++i)
-	{
-		const int xOffset = i & 1;
-		const int yOffset = (i >> 1) & 1;
-		const int zOffset = (i >> 2) & 1;
-
-		V3d childBeg = b_beg + V3d(xOffset * width.x(), yOffset * width.y(), zOffset * width.z());
-		V3d childEnd = childBeg + width;
-		PV3d childBoundary = { childBeg, childEnd };
-
-		vir_root->childs[i] = new OctreeNode(numNodes++, 0, width, childBoundary);
-		vir_root->childs[i]->parent = vir_root;
-		vir_root->childs[i]->setDomain();
-		vir_root->childs[i]->setCorners();
-
-		allNodes.emplace_back(vir_root->childs[i]);
-	}
 
 	saveNodeCorners2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"octree.obj"));
 }
@@ -139,7 +108,7 @@ void Octree::createOctree(const double& scaleSize)
 void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints)
 {
 	allNodes.emplace_back(node);
-	node->setDomain();
+	node->setCorners();
 
 	vector<vector<size_t>> childPointsIdx(8);
 
@@ -149,7 +118,6 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 
 	if (depth + 1 >= maxDepth || idxOfPoints.empty())
 	{
-		node->setCorners();
 		node->setEdges();
 		nLeafNodes++;
 		leafNodes.emplace_back(node);
@@ -354,117 +322,53 @@ void Octree::setSDF()
 	fcpw::Scene<3> scene;
 	initSDF(scene, modelVerts, modelFaces);
 
-	sdfVal.resize(treeNumNodes * 8);
+	sdfVal.resize(numNodes * 8);
 
-	for (int i = 0; i < treeNumNodes; ++i)
-		for (int j = 0; j < 8; ++j)
-			sdfVal(i * 8 + j) = getSignedDistance(treeNodes[i]->corners[j], scene);
+	for (int i = 0; i < numNodes; ++i)
+		for (int k = 0; k < 8; ++k)
+			sdfVal(i * 8 + k) = getSignedDistance(allNodes[i]->corners[k], scene);
 
 	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
 }
 
-vector<OctreeNode*> Octree::searchNode(const PV3d& q_boundary, const int& q_depth)
+std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node)
 {
-	vector<OctreeNode*> res;
+	auto temp = node;
+	vector<PV3d> points;
+	vector<size_t> pointsID;
 
-	V3d q_st = q_boundary.first;
-	V3d q_ed = q_boundary.second;
-
-	std::queue<OctreeNode*> q;
-	q.push(vir_root);
-	while (!q.empty())
+	auto getCorners = [&](OctreeNode* node)
 	{
-		auto fro = q.front();
-		q.pop();
-
-		if (fro->depth + 1 >= maxDepth) continue;
-
-		V3d b_beg = fro->boundary.first;
-		V3d b_end = fro->boundary.second;
-		V3d width = fro->width;
-
-		if (fro->childs.empty()) fro->childs.resize(8, nullptr);
-		for (int i = 0; i < 8; ++i)
+		for (int k = 0; k < 8; ++k)
 		{
-			if (!fro->childs[i])
-			{
-				const int xOffset = i & 1;
-				const int yOffset = (i >> 1) & 1;
-				const int zOffset = (i >> 2) & 1;
-
-				V3d childWidth = width / 2.0;
-				V3d childBeg = b_beg + V3d(xOffset * childWidth.x(), yOffset * childWidth.y(), zOffset * childWidth.z());
-				V3d childEnd = childBeg + childWidth;
-				PV3d childBoundary = { childBeg, childEnd };
-
-				fro->childs[i] = new OctreeNode(numNodes++, fro->depth + 1, childWidth, childBoundary);
-				fro->childs[i]->parent = fro;
-				fro->childs[i]->setDomain();
-				fro->childs[i]->setCorners();
-
-				allNodes.emplace_back(fro->childs[i]);
-			}
-
-			if (fro->childs[i]->depth <= q_depth) q.push(fro->childs[i]);
-			if (fro->childs[i]->isInDomain(q_boundary)) res.emplace_back(fro->childs[i]);
+			points.emplace_back(std::make_pair(node->corners[k], node->width));
+			pointsID.emplace_back((node->id) * 8 + k);
 		}
+	};
+
+	while (temp != nullptr)
+	{
+		getCorners(temp);
+		temp = temp->parent;
 	}
 
-	/*OctreeNode* temp = vir_root;
-	while (temp->depth + 1 != maxDepth)
-	{
-		V3d center = (temp->boundary.first + temp->boundary.second) / 2.0;
-
-		int whichChild = 0;
-		if (fabs(q_st.x() - center.x()) < 1e-8 || q_st.x() > center.x()) whichChild |= 1; // >=
-		if (fabs(q_st.y() - center.y()) < 1e-8 || q_st.y() > center.y()) whichChild |= 2;
-		if (fabs(q_st.z() - center.z()) < 1e-8 || q_st.z() > center.z()) whichChild |= 4;
-
-		if (temp->childs.empty()) temp->childs.resize(8, nullptr);
-
-		if (!temp->childs[whichChild])
-		{
-			const int xOffset = whichChild & 1;
-			const int yOffset = (whichChild >> 1) & 1;
-			const int zOffset = (whichChild >> 2) & 1;
-
-			V3d b_beg = temp->boundary.first;
-			V3d b_end = temp->boundary.second;
-
-			V3d childWidth = temp->width / 2.0;
-			V3d childBeg = b_beg + V3d(xOffset * childWidth.x(), yOffset * childWidth.y(), zOffset * childWidth.z());
-			V3d childEnd = childBeg + childWidth;
-			PV3d childBoundary = { childBeg, childEnd };
-
-			temp->childs[whichChild] = new OctreeNode(numNodes++, temp->depth + 1, childWidth, childBoundary);
-			temp->childs[whichChild]->parent = temp;
-		}
-
-		res.emplace_back(temp->childs[whichChild]);
-
-		if (temp->childs[whichChild]->boundary != q_boundary)
-			temp = temp->childs[whichChild];
-		else
-			isFind = true;
-	}*/
-	return res;
+	return std::make_tuple(points, pointsID);
 }
 
-void Octree::setInDomainNodes()
+std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, const int& cornerID)
 {
-	if (!treeNumNodes) return;
-	inDmNodes.resize(treeNumNodes);
+	auto temp = node->childs[cornerID];
+	vector<PV3d> points;
+	vector<size_t> pointsID;
 
-	for (int i = 0; i < treeNumNodes; ++i)
+	while (temp != nullptr)
 	{
-		auto queryNode = treeNodes[i];
-		auto res = searchNode(queryNode->boundary, queryNode->depth);
-		//cout << "res size = " << res.size() << endl;
-		inDmNodes[i].insert(inDmNodes[i].end(), res.begin(), res.end());
+		points.emplace_back(std::make_pair(temp->corners[cornerID], temp->width));
+		pointsID.emplace_back((temp->id) * 8 + cornerID);
+		temp = temp->childs[cornerID];
 	}
 
-	/*for (int i = 0; i < nLeafNodes; ++i)
-		saveDomain2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"domain.obj"));*/
+	return std::make_tuple(points, pointsID);
 }
 
 void Octree::cpCoefficients()
@@ -473,36 +377,43 @@ void Octree::cpCoefficients()
 	using Trip = Eigen::Triplet<double>;
 
 	// initial matrix
-	setInDomainNodes();
-
-	SpMat sm(treeNumNodes * 8, numNodes); // A
+	SpMat sm(numNodes * 8, numNodes * 8); // A
 	vector<Trip> matVal;
 
-	for (int i = 0; i < treeNumNodes; ++i)
+	for (int i = 0; i < numNodes; ++i)
 	{
-		auto node_i = treeNodes[i];
+		auto node_i = allNodes[i];
+		auto [inDmPoints, inDmPointsID] = setInDomainPoints(node_i);
 
-
-		for (int j = 0; j < 8; ++j)
+		for (int k = 0; k < 8; ++k)
 		{
-			auto corner = node_i->corners[j];
+			auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k);
+			inDmPoints.insert(inDmPoints.end(), inDmPoints2.begin(), inDmPoints2.end());
+			inDmPointsID.insert(inDmPointsID.end(), inDmPointsID2.begin(), inDmPointsID2.end());
+			const int nInDmPoints = inDmPoints.size();
 
-		}
-
-		V3d i_beg = node_i->boundary.first;
-		const int domainSize = inDmNodes[i].size();
-		for (int j = 0; j < domainSize; ++j)
-		{
-			auto node_j = inDmNodes[i][j]; // node[j] influence node[i]
-			assert(node_j->id < numNodes, "id is larger than numNodes!");
-			for (int k = 0; k < 8; ++k)
-				matVal.emplace_back(Trip(i * 8 + k, node_j->id, node_j->BaseFunction4Point(node_i->corners[k])));
+			V3d i_corner = node_i->corners[k];
+			for (int j = 0; j < nInDmPoints; ++j)
+			{
+				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
+				assert(inDmPointsID[j] < numNodes * 8, "index of col > numNodes * 8!");
+				if (val != .0) matVal.emplace_back(Trip(i * 8 + k, inDmPointsID[j], val));
+			}
+			//for (int j = 0; j < numNodes; ++j)
+			//{
+			//	auto node_j = allNodes[j]; // node[j] influence node[i]
+			//	for (int m = 0; m < 8; m++)
+			//	{
+			//		double bValue = BaseFunction4Point(node_j->corners[m], node_j->width, i_corner);
+			//		if (bValue != .0) matVal.emplace_back(Trip(8 * i + k, 8 * j + m, bValue));
+			//	}
+			//}
 		}
 	}
 	sm.setFromTriplets(matVal.begin(), matVal.end());
 	//sm.makeCompressed();
-	auto A = sm.transpose() * sm;
-	auto b = sm.transpose() * sdfVal;
+	auto A = sm;
+	auto b = sdfVal;
 
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
 	lscg.compute(A);
@@ -529,7 +440,8 @@ void Octree::setBSplineValue()
 		for (int j = 0; j < numNodes; ++j)
 		{
 			auto node = allNodes[j];
-			BSplineValue[i] += lambda[j] * (node->BaseFunction4Point(modelPoint));
+			for (int k = 0; k < 8; k++)
+				BSplineValue[i] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, modelPoint));
 		}
 	}
 
@@ -542,7 +454,8 @@ void Octree::setBSplineValue()
 		for (int j = 0; j < numNodes; ++j)
 		{
 			auto node = allNodes[j];
-			BSplineValue[cnt] += lambda[j] * (node->BaseFunction4Point(interPoint));
+			for (int k = 0; k < 8; k++)
+				BSplineValue[cnt] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, interPoint));
 		}
 	}
 
@@ -689,8 +602,11 @@ void Octree::mcVisualization(const string& filename, const V3i& resolution) cons
 				);
 
 				double sum = 0.0;
-				for (int m = 0; m < allNodes.size(); ++m)
-					sum += lambda[m] * (allNodes[m]->BaseFunction4Point(GV.row(idx)));
+				for (int m = 0; m < numNodes; ++m)
+				{
+					for (int l = 0; l < 8; l++)
+						sum += lambda[m * 8 + l] * BaseFunction4Point(allNodes[m]->corners[l], allNodes[m]->width, GV.row(idx));
+				}
 				S(idx) = sum;
 			}
 	MXd verts;
