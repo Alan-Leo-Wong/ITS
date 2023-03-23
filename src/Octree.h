@@ -72,11 +72,9 @@ public:
 
 	void setEdges();
 
-	void setDomain();
-
 	void setCorners();
 
-	double BaseFunction4Point(const V3d& p);
+	//double BaseFunction4Point(const V3d& p);
 
 	bool isInDomain(const PV3d& q_boundary); // whether in otherNode's domain
 };
@@ -86,7 +84,6 @@ class Octree : public BaseModel
 protected:
 	int maxDepth = -1;
 	int numNodes = 0;
-	int treeNumNodes = 0;
 	int nLeafNodes = 0;
 	double scaleSize = 0.01;
 	string modelName;
@@ -94,12 +91,10 @@ protected:
 	VXd sdfVal;
 
 	OctreeNode* root;
-	OctreeNode* vir_root;
 	BoundingBox bb;
 
 	vector<OctreeNode*> leafNodes;
 	vector<OctreeNode*> allNodes;
-	vector<OctreeNode*> treeNodes;
 
 	vector<OctreeNode*> interLeafNodes;
 	vector<vector<OctreeNode*>> inDmNodes;
@@ -133,9 +128,8 @@ public:
 
 	void cpCoefficients();
 
-	vector<OctreeNode*> searchNode(const PV3d& boundary, const int& q_depth);
-
-	void setInDomainNodes();
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node);
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, const int& cornerID);
 
 	void setSDF();
 
