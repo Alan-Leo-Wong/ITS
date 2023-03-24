@@ -363,7 +363,7 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 	return std::make_tuple(points, pointsID);
 }
 
-std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, const int& cornerID)
+std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, const int& cornerID, map<size_t, bool>& visID)
 {
 	auto temp = node->childs[cornerID];
 	vector<PV3d> points;
@@ -371,6 +371,7 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 
 	while (temp->depth + 1 != maxDepth)
 	{
+		visID[temp->id] = true;
 		points.emplace_back(std::make_pair(temp->corners[cornerID], temp->width));
 		pointsID.emplace_back((temp->id) * 8 + cornerID);
 		if (temp->isLeaf) break;
@@ -399,12 +400,10 @@ void Octree::cpCoefficients()
 		for (int k = 0; k < 8; ++k)
 		{
 			V3d i_corner = node_i->corners[k];
-			/*for (const auto& id : corner2IDs[i_corner])
-				if (!visID[id]) matVal.emplace_back(Trip(i * 8 + k, id * 8 + k, 1));*/
 
-			if (!node_i->isLeaf)
+			/*if (!node_i->isLeaf)
 			{
-				auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k);
+				auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k, visID);
 				inDmPoints.insert(inDmPoints.end(), inDmPoints2.begin(), inDmPoints2.end());
 				inDmPointsID.insert(inDmPointsID.end(), inDmPointsID2.begin(), inDmPointsID2.end());
 			}
@@ -415,20 +414,25 @@ void Octree::cpCoefficients()
 				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
 				assert(inDmPointsID[j] < numNodes * 8, "index of col > numNodes * 8!");
 				if (val != 0) matVal.emplace_back(Trip(i * 8 + k, inDmPointsID[j], val));
+			}*/
+
+			/*for (const auto& id : corner2IDs[i_corner])
+				if (!visID[id]) matVal.emplace_back(Trip(i * 8 + k, id * 8 + k, 1));*/
+
+			for (int j = 0; j < numNodes; ++j)
+			{
+				auto node_j = allNodes[j]; // node[j] influence node[i]
+				for (int m = 0; m < 8; m++)
+				{
+					double bValue = BaseFunction4Point(node_j->corners[m], node_j->width, i_corner);
+					if (bValue != .0) matVal.emplace_back(Trip(8 * i + k, 8 * j + m, bValue));
+				}
 			}
-			//for (int j = 0; j < numNodes; ++j)
-			//{
-			//	auto node_j = allNodes[j]; // node[j] influence node[i]
-			//	for (int m = 0; m < 8; m++)
-			//	{
-			//		double bValue = BaseFunction4Point(node_j->corners[m], node_j->width, i_corner);
-			//		if (bValue != .0) matVal.emplace_back(Trip(8 * i + k, 8 * j + m, bValue));
-			//	}
-			//}
 		}
 	}
+	cout << 111 << endl;
 	sm.setFromTriplets(matVal.begin(), matVal.end());
-	//sm.makeCompressed();
+	sm.makeCompressed();
 	auto A = sm;
 	auto b = sdfVal;
 

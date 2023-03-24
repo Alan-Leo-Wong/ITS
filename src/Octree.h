@@ -133,7 +133,7 @@ public:
 	void cpCoefficients();
 
 	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
-	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, const int& cornerID);
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, const int& cornerID, map<size_t, bool>& visID);
 
 	void setSDF();
 
