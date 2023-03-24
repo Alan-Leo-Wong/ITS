@@ -74,6 +74,8 @@ public:
 
 	void setCorners();
 
+	void setCornersIdx(map<V3d, vector<size_t>>& corner2IDs);
+
 	//double BaseFunction4Point(const V3d& p);
 
 	bool isInDomain(const PV3d& q_boundary); // whether in otherNode's domain
@@ -108,6 +110,8 @@ protected:
 
 	VXd lambda;
 
+	map<V3d, vector<size_t>> corner2IDs;
+
 public:
 	// constructor and destructor
 	Octree(const int& _maxDepth, const string& _modelPath, const double& _scaleSize = 0.1) :
@@ -128,7 +132,7 @@ public:
 
 	void cpCoefficients();
 
-	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node);
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
 	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, const int& cornerID);
 
 	void setSDF();
@@ -140,7 +144,7 @@ public:
 	void saveDomain2OBJFile(const string& filename) const;
 
 	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
-	
+
 	void saveNodeCorners2OBJFile(const string& filename) const;
 
 	void saveSDFValue(const string& filename) const;

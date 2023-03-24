@@ -34,3 +34,17 @@ using std::max;
 using std::ifstream;
 using std::cout;
 using std::endl;
+
+template <>
+struct std::less<V3d> {
+public:
+    bool operator()(const V3d& a, const V3d& b) const {
+        for (size_t i = 0; i < a.size(); ++i) {
+            if (a[i] < b[i])
+                return true;
+            if (a[i] > b[i])
+                return false;
+        }
+        return false;
+    }
+};
