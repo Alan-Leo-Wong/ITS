@@ -31,6 +31,12 @@ void OctreeNode::setCorners()
 	corners[7] = boundary.second;
 }
 
+void OctreeNode::setCornersIdx(map<V3d, vector<size_t>>& corner2IDs)
+{
+	for (int k = 0; k < 8; ++k)
+		corner2IDs[corners[k]].emplace_back(id);
+}
+
 void OctreeNode::setEdges()
 {
 	// X
@@ -109,6 +115,7 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 {
 	allNodes.emplace_back(node);
 	node->setCorners();
+	node->setCornersIdx(corner2IDs);
 
 	vector<vector<size_t>> childPointsIdx(8);
 
@@ -331,7 +338,7 @@ void Octree::setSDF()
 	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
 }
 
-std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node)
+std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID)
 {
 	auto temp = node;
 	vector<PV3d> points;
@@ -344,6 +351,7 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 			points.emplace_back(std::make_pair(node->corners[k], node->width));
 			pointsID.emplace_back((node->id) * 8 + k);
 		}
+		visID[node->id] = true;
 	};
 
 	while (temp != nullptr)
@@ -361,10 +369,11 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 	vector<PV3d> points;
 	vector<size_t> pointsID;
 
-	while (temp != nullptr)
+	while (temp->depth + 1 != maxDepth)
 	{
 		points.emplace_back(std::make_pair(temp->corners[cornerID], temp->width));
 		pointsID.emplace_back((temp->id) * 8 + cornerID);
+		if (temp->isLeaf) break;
 		temp = temp->childs[cornerID];
 	}
 
@@ -383,21 +392,29 @@ void Octree::cpCoefficients()
 	for (int i = 0; i < numNodes; ++i)
 	{
 		auto node_i = allNodes[i];
-		auto [inDmPoints, inDmPointsID] = setInDomainPoints(node_i);
+		map<size_t, bool> visID;
+		auto [inDmPoints, inDmPointsID] = setInDomainPoints(node_i, visID);
+		//const int nInDmPoints = inDmPoints.size();
 
 		for (int k = 0; k < 8; ++k)
 		{
-			auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k);
-			inDmPoints.insert(inDmPoints.end(), inDmPoints2.begin(), inDmPoints2.end());
-			inDmPointsID.insert(inDmPointsID.end(), inDmPointsID2.begin(), inDmPointsID2.end());
+			V3d i_corner = node_i->corners[k];
+			/*for (const auto& id : corner2IDs[i_corner])
+				if (!visID[id]) matVal.emplace_back(Trip(i * 8 + k, id * 8 + k, 1));*/
+
+			if (!node_i->isLeaf)
+			{
+				auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k);
+				inDmPoints.insert(inDmPoints.end(), inDmPoints2.begin(), inDmPoints2.end());
+				inDmPointsID.insert(inDmPointsID.end(), inDmPointsID2.begin(), inDmPointsID2.end());
+			}
 			const int nInDmPoints = inDmPoints.size();
 
-			V3d i_corner = node_i->corners[k];
 			for (int j = 0; j < nInDmPoints; ++j)
 			{
 				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
 				assert(inDmPointsID[j] < numNodes * 8, "index of col > numNodes * 8!");
-				if (val != .0) matVal.emplace_back(Trip(i * 8 + k, inDmPointsID[j], val));
+				if (val != 0) matVal.emplace_back(Trip(i * 8 + k, inDmPointsID[j], val));
 			}
 			//for (int j = 0; j < numNodes; ++j)
 			//{
