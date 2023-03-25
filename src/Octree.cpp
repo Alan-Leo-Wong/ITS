@@ -334,17 +334,20 @@ void Octree::setSDF()
 	initSDF(scene, modelVerts, modelFaces);
 
 	sdfVal.resize(numNodes * 8);
+	//sdfVal.resize(nLeafNodes * 8);
 
 	for (int i = 0; i < numNodes; ++i)
+	//for (int i = 0; i < nLeafNodes; ++i)
 		for (int k = 0; k < 8; ++k)
 			sdfVal(i * 8 + k) = getSignedDistance(allNodes[i]->corners[k], scene);
+			//sdfVal(i * 8 + k) = getSignedDistance(leafNodes[i]->corners[k], scene);
 
 	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
 }
 
 std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID)
 {
-	auto temp = node;
+	auto temp = node->parent;
 	vector<PV3d> points;
 	vector<size_t> pointsID;
 
@@ -352,10 +355,20 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 	{
 		for (int k = 0; k < 8; ++k)
 		{
-			points.emplace_back(std::make_pair(node->corners[k], node->width));
-			pointsID.emplace_back((node->id) * 8 + k);
+			V3d i_corner = node->corners[k];
+			for (const auto& id_ck : corner2IDs[i_corner])
+			{
+				const UINT o_id = id_ck.first;
+				const UINT o_k = id_ck.second;
+				const UINT o_realID = o_id * 8 + o_k;
+
+				if (visID[o_realID] && fabs(allNodes[o_id]->width[0] - node->width[0]) > 1e-9) continue;
+				visID[o_realID] = true;
+
+				points.emplace_back(std::make_pair(i_corner, allNodes[o_id]->width));
+				pointsID.emplace_back(o_realID);
+			}
 		}
-		visID[node->id] = true;
 	};
 
 	while (temp != nullptr)
@@ -395,15 +408,18 @@ void Octree::cpCoefficients()
 
 	// initial matrix
 	SpMat sm(numNodes * 8, numNodes * 8); // A
+	//SpMat sm(nLeafNodes * 8, numNodes * 8); // A
 	vector<Trip> matVal;
 
-	//string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix.txt");
-	string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix_1.txt");
+	string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix.txt");
+	//string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix_1.txt");
 	std::ofstream os(file);
 
 	for (int i = 0; i < numNodes; ++i)
+	//for (int i = 0; i < nLeafNodes; ++i)
 	{
 		auto node_i = allNodes[i];
+		//auto node_i = leafNodes[i];
 		map<size_t, bool> visID;
 		auto [inDmPoints, inDmPointsID] = setInDomainPoints(node_i, visID);
 		const int nInDmPoints = inDmPoints.size();
@@ -411,18 +427,30 @@ void Octree::cpCoefficients()
 		for (int k = 0; k < 8; ++k)
 		{
 			V3d i_corner = node_i->corners[k];
-			//for (const auto& id_ck : corner2IDs[i_corner])
-			//{
-			//	// i_corner所在的其他节点的id和位置
-			//	const unsigned int o_id = id_ck.first;
-			//	const unsigned int o_k = id_ck.second;
+			const UINT ic_row = i * 8 + k;
 
-			//	if (!visID[o_id])
-			//	{
-			//		matVal.emplace_back(Trip(i * 8 + k, o_id * 8 + o_k, 1));
-			//		temp(i * 8 + k, o_id * 8 + o_k) = 1;
-			//	}
-			//}
+			/*if (8 * i + k == 9)
+			{
+				cout << "!" << endl;
+				cout << "node_i corner k = " << i_corner.transpose() << endl << "parent:\n";
+				cout << "node_i depth = " << node_i->depth << endl;
+				for (int l = 0; l < 8; ++l)
+					cout << node_i->corners[l].transpose() << endl;
+			}*/
+
+			for (const auto& id_ck : corner2IDs[i_corner])
+			{
+				// i_corner所在的其他节点的id和位置
+				const UINT o_id = id_ck.first;
+				const UINT o_k = id_ck.second;
+				const UINT o_realID = o_id * 8 + o_k;
+
+				if (!visID[o_realID])
+				{
+					matVal.emplace_back(Trip(ic_row, o_realID, 1));
+					temp(ic_row, o_realID) = 1;
+				}
+			}
 
 			//if (!node_i->isLeaf)
 			//{
@@ -432,39 +460,49 @@ void Octree::cpCoefficients()
 			//}
 			//const int nInDmPoints = inDmPoints.size();
 
-			/*for (int j = 0; j < nInDmPoints; ++j)
+			for (int j = 0; j < nInDmPoints; ++j)
 			{
 				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
 				assert(inDmPointsID[j] < numNodes * 8, "index of col > numNodes * 8!");
-				if (val != 0) matVal.emplace_back(Trip(i * 8 + k, inDmPointsID[j], val));
-				temp(i * 8 + k, inDmPointsID[j]) = val;
-			}*/
-
-			for (int j = 0; j < numNodes; ++j)
-			{
-				auto node_j = allNodes[j]; // node[j] influence node[i]
-				for (int m = 0; m < 8; m++)
-				{
-					double bValue = BaseFunction4Point(node_j->corners[m], node_j->width, i_corner);
-					if (bValue != .0) matVal.emplace_back(Trip(8 * i + k, 8 * j + m, bValue));
-					os << bValue << ' ';
-				}
+				if (val != 0) matVal.emplace_back(Trip(ic_row, inDmPointsID[j], val));
+				temp(ic_row, inDmPointsID[j]) = val;
 			}
-			os << endl;
+
+			//for (int j = 0; j < numNodes; ++j)
+			//{
+			//	auto node_j = allNodes[j]; // node[j] influence node[i]
+			//	for (int m = 0; m < 8; m++)
+			//	{
+			//		/*if (8 * i + k == 17 && 8 * j + m == 80)
+			//		{
+			//			cout << "8 * j + m = 80:\n";
+			//			cout << "node_j depth = " << node_j->depth << endl;
+			//			for (int l = 0; l < 8; ++l)
+			//				cout << node_j->corners[l].transpose() << endl;
+			//		}*/
+			//
+			//		double bValue = BaseFunction4Point(node_j->corners[m], node_j->width, i_corner);
+			//		if (bValue != .0) matVal.emplace_back(Trip(ic_row, 8 * j + m, bValue));
+			//		os << bValue << ' ';
+			//	}
+			//}
+			//os << endl;
 		}
 	}
-	/*for (int i = 0; i < temp.rows(); ++i)
+	for (int i = 0; i < temp.rows(); ++i)
 	{
 		for (int j = 0; j < temp.cols(); ++j)
 			os << temp(i, j) << ' ';
 		os << endl;
-	}*/
+	}
 	os.close();
 	cout << 111 << endl;
 	sm.setFromTriplets(matVal.begin(), matVal.end());
-	sm.makeCompressed();
+	//sm.makeCompressed();
 	auto A = sm;
 	auto b = sdfVal;
+	/*auto A = sm.transpose() * sm;
+	auto b = sm.transpose() * sdfVal;*/
 
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
 	lscg.compute(A);
