@@ -74,7 +74,7 @@ public:
 
 	void setCorners();
 
-	void setCornersIdx(map<V3d, vector<size_t>>& corner2IDs);
+	void setCornersIdx(map<V3d, vector<PUII>>& corner2IDs);
 
 	//double BaseFunction4Point(const V3d& p);
 
@@ -110,7 +110,7 @@ protected:
 
 	VXd lambda;
 
-	map<V3d, vector<size_t>> corner2IDs;
+	map<V3d, vector<PUII>> corner2IDs;
 
 public:
 	// constructor and destructor
