@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 	startTimer(&timer);
 
 	string modelName = getFileName("", "bunny.off");
-	const int maxDepth = 3;
+	const int maxDepth = 5;
 	const int res = 60;
 	Octree octree(maxDepth, concatFilePath((string)MODEL_DIR, (string)"bunny.off"));
 
