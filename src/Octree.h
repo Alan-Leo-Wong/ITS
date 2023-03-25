@@ -112,6 +112,8 @@ protected:
 
 	map<V3d, vector<PUII>> corner2IDs;
 
+	double minBVal, maxBVal;
+
 public:
 	// constructor and destructor
 	Octree(const int& _maxDepth, const string& _modelPath, const double& _scaleSize = 0.1) :
@@ -154,7 +156,7 @@ public:
 	void saveBSplineValue(const string& filename) const;
 
 	// visulization
-	void mcVisualization(const string& filename, const V3i& resolution) const;
+	void mcVisualization(const string& filename, const V3i& resolution, const double& isoVal = .0) const;
 
 	void textureVisualization(const string& filename) const;
 };
