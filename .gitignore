@@ -367,4 +367,4 @@ include/
 
 vis/
 
-output/
+!output/

@@ -31,10 +31,14 @@ void OctreeNode::setCorners()
 	corners[7] = boundary.second;
 }
 
-void OctreeNode::setCornersIdx(map<V3d, vector<size_t>>& corner2IDs)
+void OctreeNode::setCornersIdx(map<V3d, vector<PUII>>& corner2IDs)
 {
 	for (int k = 0; k < 8; ++k)
-		corner2IDs[corners[k]].emplace_back(id);
+	{
+		/*if (id == 22 && k == 2)
+			cout << "!\n";*/
+		corner2IDs[corners[k]].emplace_back(std::make_pair(id, k));
+	}
 }
 
 void OctreeNode::setEdges()
@@ -121,7 +125,7 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 
 	V3d b_beg = boundary.first;
 	V3d b_end = boundary.second;
-	V3d center = (b_beg + b_end) / 2.0;
+	V3d center = (b_beg + b_end) * 0.5;
 
 	if (depth + 1 >= maxDepth || idxOfPoints.empty())
 	{
@@ -145,7 +149,7 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 		childPointsIdx[whichChild].emplace_back(idx);
 	}
 
-	V3d childWidth = width / 2.0;
+	V3d childWidth = width * 0.5;
 	for (int i = 0; i < 8; i++)
 	{
 		const int xOffset = i & 1;
@@ -386,38 +390,55 @@ void Octree::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
+	MXd temp(numNodes * 8, numNodes * 8);
+	temp.setZero();
+
 	// initial matrix
 	SpMat sm(numNodes * 8, numNodes * 8); // A
 	vector<Trip> matVal;
+
+	//string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix.txt");
+	string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix_1.txt");
+	std::ofstream os(file);
 
 	for (int i = 0; i < numNodes; ++i)
 	{
 		auto node_i = allNodes[i];
 		map<size_t, bool> visID;
 		auto [inDmPoints, inDmPointsID] = setInDomainPoints(node_i, visID);
-		//const int nInDmPoints = inDmPoints.size();
+		const int nInDmPoints = inDmPoints.size();
 
 		for (int k = 0; k < 8; ++k)
 		{
 			V3d i_corner = node_i->corners[k];
+			//for (const auto& id_ck : corner2IDs[i_corner])
+			//{
+			//	// i_corner所在的其他节点的id和位置
+			//	const unsigned int o_id = id_ck.first;
+			//	const unsigned int o_k = id_ck.second;
 
-			/*if (!node_i->isLeaf)
-			{
-				auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k, visID);
-				inDmPoints.insert(inDmPoints.end(), inDmPoints2.begin(), inDmPoints2.end());
-				inDmPointsID.insert(inDmPointsID.end(), inDmPointsID2.begin(), inDmPointsID2.end());
-			}
-			const int nInDmPoints = inDmPoints.size();
+			//	if (!visID[o_id])
+			//	{
+			//		matVal.emplace_back(Trip(i * 8 + k, o_id * 8 + o_k, 1));
+			//		temp(i * 8 + k, o_id * 8 + o_k) = 1;
+			//	}
+			//}
 
-			for (int j = 0; j < nInDmPoints; ++j)
+			//if (!node_i->isLeaf)
+			//{
+			//	auto [inDmPoints2, inDmPointsID2] = setInDomainPoints(node_i, k, visID);
+			//	inDmPoints.insert(inDmPoints.end(), inDmPoints2.begin(), inDmPoints2.end());
+			//	inDmPointsID.insert(inDmPointsID.end(), inDmPointsID2.begin(), inDmPointsID2.end());
+			//}
+			//const int nInDmPoints = inDmPoints.size();
+
+			/*for (int j = 0; j < nInDmPoints; ++j)
 			{
 				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
 				assert(inDmPointsID[j] < numNodes * 8, "index of col > numNodes * 8!");
 				if (val != 0) matVal.emplace_back(Trip(i * 8 + k, inDmPointsID[j], val));
+				temp(i * 8 + k, inDmPointsID[j]) = val;
 			}*/
-
-			/*for (const auto& id : corner2IDs[i_corner])
-				if (!visID[id]) matVal.emplace_back(Trip(i * 8 + k, id * 8 + k, 1));*/
 
 			for (int j = 0; j < numNodes; ++j)
 			{
@@ -426,10 +447,19 @@ void Octree::cpCoefficients()
 				{
 					double bValue = BaseFunction4Point(node_j->corners[m], node_j->width, i_corner);
 					if (bValue != .0) matVal.emplace_back(Trip(8 * i + k, 8 * j + m, bValue));
+					os << bValue << ' ';
 				}
 			}
+			os << endl;
 		}
 	}
+	/*for (int i = 0; i < temp.rows(); ++i)
+	{
+		for (int j = 0; j < temp.cols(); ++j)
+			os << temp(i, j) << ' ';
+		os << endl;
+	}*/
+	os.close();
 	cout << 111 << endl;
 	sm.setFromTriplets(matVal.begin(), matVal.end());
 	sm.makeCompressed();

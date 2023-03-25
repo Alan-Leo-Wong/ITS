@@ -21,6 +21,7 @@ using MXi = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using VXd = Eigen::VectorXd;
 
 using PII = std::pair<int, int>;
+using PUII = std::pair<unsigned int, unsigned int>;
 using PDD = std::pair<double, double>;
 using PV3d = std::pair<V3d, V3d>;
 
@@ -38,13 +39,13 @@ using std::endl;
 template <>
 struct std::less<V3d> {
 public:
-    bool operator()(const V3d& a, const V3d& b) const {
-        for (size_t i = 0; i < a.size(); ++i) {
-            if (a[i] < b[i])
-                return true;
-            if (a[i] > b[i])
-                return false;
-        }
-        return false;
-    }
+	bool operator()(const V3d& a, const V3d& b) const {
+		for (size_t i = 0; i < a.size(); ++i) {
+			if (fabs(a[i] - b[i]) < 1e-9) continue;
+
+			if (a[i] < b[i]) return true;
+			else if (a[i] > b[i]) return false;
+		}
+		return false;
+	}
 };
