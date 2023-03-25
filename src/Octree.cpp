@@ -8,6 +8,7 @@
 #include <numeric>
 #include <iomanip>
 #include <Windows.h>
+#include <algorithm>
 #include <Eigen\sparse>
 #include <igl\writeOBJ.h>
 #include <igl\marching_cubes.h>
@@ -337,10 +338,10 @@ void Octree::setSDF()
 	//sdfVal.resize(nLeafNodes * 8);
 
 	for (int i = 0; i < numNodes; ++i)
-	//for (int i = 0; i < nLeafNodes; ++i)
+		//for (int i = 0; i < nLeafNodes; ++i)
 		for (int k = 0; k < 8; ++k)
 			sdfVal(i * 8 + k) = getSignedDistance(allNodes[i]->corners[k], scene);
-			//sdfVal(i * 8 + k) = getSignedDistance(leafNodes[i]->corners[k], scene);
+	//sdfVal(i * 8 + k) = getSignedDistance(leafNodes[i]->corners[k], scene);
 
 	saveSDFValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"SDFValue.txt"));
 }
@@ -403,20 +404,20 @@ void Octree::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
-	MXd temp(numNodes * 8, numNodes * 8);
-	temp.setZero();
+	/*MXd temp(numNodes * 8, numNodes * 8);
+	temp.setZero();*/
 
 	// initial matrix
 	SpMat sm(numNodes * 8, numNodes * 8); // A
 	//SpMat sm(nLeafNodes * 8, numNodes * 8); // A
 	vector<Trip> matVal;
 
-	string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix.txt");
+	//string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix.txt");
 	//string file = concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Matrix_1.txt");
-	std::ofstream os(file);
+	//std::ofstream os(file);
 
 	for (int i = 0; i < numNodes; ++i)
-	//for (int i = 0; i < nLeafNodes; ++i)
+		//for (int i = 0; i < nLeafNodes; ++i)
 	{
 		auto node_i = allNodes[i];
 		//auto node_i = leafNodes[i];
@@ -448,7 +449,7 @@ void Octree::cpCoefficients()
 				if (!visID[o_realID])
 				{
 					matVal.emplace_back(Trip(ic_row, o_realID, 1));
-					temp(ic_row, o_realID) = 1;
+					//temp(ic_row, o_realID) = 1;
 				}
 			}
 
@@ -465,7 +466,7 @@ void Octree::cpCoefficients()
 				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
 				assert(inDmPointsID[j] < numNodes * 8, "index of col > numNodes * 8!");
 				if (val != 0) matVal.emplace_back(Trip(ic_row, inDmPointsID[j], val));
-				temp(ic_row, inDmPointsID[j]) = val;
+				//temp(ic_row, inDmPointsID[j]) = val;
 			}
 
 			//for (int j = 0; j < numNodes; ++j)
@@ -489,13 +490,13 @@ void Octree::cpCoefficients()
 			//os << endl;
 		}
 	}
-	for (int i = 0; i < temp.rows(); ++i)
+	/*for (int i = 0; i < temp.rows(); ++i)
 	{
 		for (int j = 0; j < temp.cols(); ++j)
 			os << temp(i, j) << ' ';
 		os << endl;
-	}
-	os.close();
+	}*/
+	//os.close();
 	cout << 111 << endl;
 	sm.setFromTriplets(matVal.begin(), matVal.end());
 	//sm.makeCompressed();
@@ -547,6 +548,9 @@ void Octree::setBSplineValue()
 				BSplineValue[cnt] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, interPoint));
 		}
 	}
+
+	minBVal = *(std::min_element(BSplineValue.begin(), BSplineValue.end()));
+	maxBVal = *(std::max_element(BSplineValue.begin(), BSplineValue.end()));
 
 	saveBSplineValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"BSplineValue.txt"));
 }
@@ -658,7 +662,7 @@ inline void Octree::saveBSplineValue(const string& filename) const
 }
 
 //! visulization
-void Octree::mcVisualization(const string& filename, const V3i& resolution) const
+void Octree::mcVisualization(const string& filename, const V3i& resolution, const double& isoVal) const
 {
 	/*auto mesh = MC::extractIsoSurface(bb.boxOrigin, bb.boxWidth, resolution, [&](const V3d& voxelVert)->double {
 		double sum = 0.0;
@@ -700,7 +704,8 @@ void Octree::mcVisualization(const string& filename, const V3i& resolution) cons
 			}
 	MXd verts;
 	MXi faces;
-	igl::marching_cubes(S, GV, resolution.x(), resolution.y(), resolution.z(), 0, verts, faces);
+
+	igl::marching_cubes(S, GV, resolution.x(), resolution.y(), resolution.z(), maxBVal, verts, faces);
 	igl::writeOBJ(filename, verts, faces);
 }
 
