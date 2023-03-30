@@ -1,153 +1,33 @@
 #include "BaseModel.h"
-#include <sstream>   // 字符流
-#include <iomanip>   // set the precision of output data
+#include "utils\String.hpp"
+#include <sstream>
+#include <iomanip>
 #include <igl\writeOBJ.h>
 #include <igl\read_triangle_mesh.h>
 
-vector<V3d> BaseModel::getVertices()const
+void BaseModel::setBoundingBox(const double& scaleSize)
 {
-	return modelVerts;
-}
+	V3d minV = m_V.colwise().minCoeff();
+	V3d maxV = m_V.colwise().maxCoeff();
 
-void BaseModel::saveVertices(const string& filename, const vector<V3d>& verts)
-{
-	std::ofstream out(filename);
-	out << "# " << verts.size() << " vertices " << std::endl;
+	// 保证外围格子是空的
+	// bounding box
+	V3d b_beg = minV - (maxV - minV) * scaleSize;
+	V3d b_end = maxV + (maxV - minV) * scaleSize;
+	V3d diff = b_end - b_beg;
+	double max_diff = diff.maxCoeff();
+	b_end = b_beg + V3d(max_diff, max_diff, max_diff);
 
-	for (const V3d& v : verts)
-	{
-		out << "v " << std::setiosflags(std::ios::fixed) << std::setprecision(10) << v.x() << " " << v.y() << " " << v.z() << std::endl;
-	}
-	out.close();
-}
+	PV3d boundary = std::make_pair(b_beg, b_end);
+	V3d width = b_end - b_beg;
 
-void BaseModel::readFile(const string& filename)
-{
-	igl::read_triangle_mesh(filename, m_V, m_F);
-	for (int i = 0; i < m_V.rows(); i++) modelVerts.emplace_back(m_V.row(i));
-	for (int i = 0; i < m_F.rows(); i++) modelFaces.emplace_back(m_F.row(i));
-}
-
-void BaseModel::readObjFile(const string& filename)
-{
-	ifstream in(filename);
-	if (!in)
-	{
-		fprintf(stderr, "Unable to open the File: %s !\n");
-		exit(-1);
-	}
-
-	char buf[1024];
-	while (in.getline(buf, sizeof(buf)))   // 读入文件行于buf
-	{
-		std::stringstream line(buf);         // 将line改为字符串
-		string word;
-
-		line >> word;                  // word为第一个字符串，以空格为标识
-		if (word == "v")
-		{
-			double x, y, z;
-			line >> x >> y >> z;
-			modelVerts.emplace_back(V3d(x, y, z));
-
-			//cout << "v " << x << y << z << endl;
-		}
-
-		else if (word == "f")
-		{
-			vector<int>indices;
-			int index;
-
-			while (line >> index)
-			{
-				indices.emplace_back(index);
-			}
-			for (int i = 1; i < indices.size() - 1; i++)
-			{
-				modelFaces.emplace_back(Eigen::Vector3i(indices[0] - 1, indices[i] - 1, indices[i + 1] - 1));
-			}
-		}
-	}
-	in.close();
-}
-
-void BaseModel::readOffFile(const string& filename)
-{
-	ifstream in(filename);
-	if (!in.is_open())
-	{
-		cout << "Unable to open the file!" << endl;
-	}
-	string line;
-	in >> line;  // off字符串
-	int VertexNum, FaceNum, EdgeNum;
-	in >> VertexNum >> FaceNum >> EdgeNum;   // 读取顶点、面、边的数量
-
-	for (size_t i = 0; i < VertexNum; i++)
-	{
-		double x, y, z;
-		in >> x >> y >> z;
-		modelVerts.emplace_back(V3d(x, y, z));
-		//cout << x << " " << y << " " << z << endl;
-	}
-
-	for (size_t i = 0; i < FaceNum; i++)
-	{
-
-		int EdgeNumOfFace;   // 网格面片形状
-		in >> EdgeNumOfFace;
-
-		vector<int>indices;
-		for (int j = 0; j < EdgeNumOfFace; j++)
-		{
-
-			int index;
-			in >> index;
-			indices.emplace_back(index);
-		}
-		for (int j = 1; j < EdgeNumOfFace - 1; j++)
-		{
-			modelFaces.emplace_back(V3i(indices[0], indices[j], indices[j + 1]));
-			//cout << indices[0] <<" " << indices[j] << " " << indices[j + 1] << endl;
-		}
-	}
-	in.close();
-}
-
-void BaseModel::writeObjFile(const string& filename) const
-{
-	std::ofstream out(filename);
-	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
-	for (auto v : modelVerts)
-	{
-		out << "v " << v.x() << " " << v.y() << " " << v.z() << " " << endl;
-	}
-	for (auto f : modelFaces)
-	{
-		out << "f " << (f + V3i(1, 1, 1)).transpose() << endl;
-	}
-	out.close();
-}
-
-void BaseModel::writeObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const
-{
-	std::ofstream out(filename);
-	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
-	for (size_t i = 0; i < V.size(); i++)
-	{
-		V3d v = V[i];
-		out << "v " << std::fixed << std::setprecision(5) << v.x() << " " << v.y() << " " << v.z() << " " << endl;
-	}
-	for (size_t i = 0; i < F.size(); i++)
-	{
-		V3i f = F[i];
-		out << "f " << (f + V3i(1, 1, 1)).transpose() << endl;
-	}
-	out.close();
+	modelBoundingBox = BoundingBox(b_beg, b_end);
 }
 
 vector<V2i> BaseModel::extractEdges()
 {
+	cout << "Extracting edges from " << std::quoted(modelName) << "..." << endl;
+
 	vector<V2i> edges;
 	set<PII> uset;
 
@@ -162,9 +42,9 @@ vector<V2i> BaseModel::extractEdges()
 		uset.insert(std::make_pair(minF, maxF));
 	}
 	for (PII it : uset)
-	{
 		edges.emplace_back(V2i(it.first, it.second));
-	}
+
+	cout << "--Number of model's edges = " << edges.size() << endl;
 	return edges;
 }
 
@@ -327,35 +207,7 @@ vector<vector<V3d>> BaseModel::extractIsoline(const vector<double>& scalarField,
 	return loops;
 }
 
-void BaseModel::saveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const
-{
-	std::ofstream out(filename);
-	out << "g 3d_lines" << endl;
-	int cnt(0);
-	for (auto loop : isoline)
-	{
-		/*for (auto v : loop)
-		{
-			out << "v " << v.transpose() << endl;
-		}*/
-		for (int i = 0; i < loop.size(); i++)
-		{
-			out << "v " << loop[i].x() << " " << loop[i].y() << " " << loop[i].z() << endl;
-		}
-		//out << "l ";
-		for (int i = 1; i <= loop.size() - 1; i++)
-		{
-			out << "l " << i + cnt << " " << i + 1 + cnt << endl;;
-		}
-		out << "l " << loop.size() << " " << 1 << endl;
-		//out << 1 + cnt << endl;
-		cnt += loop.size();
-	}
-
-	out.close();
-}
-
-std::pair< BaseModel, BaseModel> BaseModel::splitModelByIsoline(const vector<double>& scalarField, const double& val)const
+std::pair<BaseModel, BaseModel> BaseModel::splitModelByIsoline(const vector<double>& scalarField, const double& val)const
 {
 	vector<V3i>faceLess;
 	vector<V3i>faceLarger;
@@ -609,6 +461,185 @@ std::pair< BaseModel, BaseModel> BaseModel::splitModelByIsoline(const vector<dou
 	}
 
 	return make_pair(BaseModel(vertsLarger, faceLarger), BaseModel(vertsLess, faceLess));
+}
+
+vector<V3d> BaseModel::getVertices() const
+{
+	return modelVerts;
+}
+
+vector<V3i> BaseModel::getFaces() const
+{
+	return modelFaces;
+}
+
+//! I/O
+void BaseModel::readFile(const string& filename)
+{
+	igl::read_triangle_mesh(filename, m_V, m_F);
+	for (int i = 0; i < m_V.rows(); i++) modelVerts.emplace_back(m_V.row(i));
+	for (int i = 0; i < m_F.rows(); i++) modelFaces.emplace_back(m_F.row(i));
+
+	modelName = getFileName(DELIMITER, filename);
+	nModelVerts = modelVerts.size(), nModelFaces = modelFaces.size();
+}
+
+void BaseModel::readOffFile(const string& filename)
+{
+	ifstream in(filename);
+	if (!in.is_open())
+	{
+		cout << "Unable to open the file!" << endl;
+	}
+	string line;
+	in >> line;  // off字符串
+	int VertexNum, FaceNum, EdgeNum;
+	in >> VertexNum >> FaceNum >> EdgeNum;   // 读取顶点、面、边的数量
+
+	for (size_t i = 0; i < VertexNum; i++)
+	{
+		double x, y, z;
+		in >> x >> y >> z;
+		modelVerts.emplace_back(V3d(x, y, z));
+		//cout << x << " " << y << " " << z << endl;
+	}
+
+	for (size_t i = 0; i < FaceNum; i++)
+	{
+
+		int EdgeNumOfFace;   // 网格面片形状
+		in >> EdgeNumOfFace;
+
+		vector<int>indices;
+		for (int j = 0; j < EdgeNumOfFace; j++)
+		{
+
+			int index;
+			in >> index;
+			indices.emplace_back(index);
+		}
+		for (int j = 1; j < EdgeNumOfFace - 1; j++)
+		{
+			modelFaces.emplace_back(V3i(indices[0], indices[j], indices[j + 1]));
+			//cout << indices[0] <<" " << indices[j] << " " << indices[j + 1] << endl;
+		}
+	}
+	in.close();
+}
+
+void BaseModel::readObjFile(const string& filename)
+{
+	ifstream in(filename);
+	if (!in)
+	{
+		fprintf(stderr, "Unable to open the File: %s !\n");
+		exit(-1);
+	}
+
+	char buf[1024];
+	while (in.getline(buf, sizeof(buf)))   // 读入文件行于buf
+	{
+		std::stringstream line(buf);         // 将line改为字符串
+		string word;
+
+		line >> word;                  // word为第一个字符串，以空格为标识
+		if (word == "v")
+		{
+			double x, y, z;
+			line >> x >> y >> z;
+			modelVerts.emplace_back(V3d(x, y, z));
+
+			//cout << "v " << x << y << z << endl;
+		}
+
+		else if (word == "f")
+		{
+			vector<int>indices;
+			int index;
+
+			while (line >> index)
+			{
+				indices.emplace_back(index);
+			}
+			for (int i = 1; i < indices.size() - 1; i++)
+			{
+				modelFaces.emplace_back(Eigen::Vector3i(indices[0] - 1, indices[i] - 1, indices[i + 1] - 1));
+			}
+		}
+	}
+	in.close();
+}
+
+void BaseModel::writeObjFile(const string& filename) const
+{
+	std::ofstream out(filename);
+	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
+	for (auto v : modelVerts)
+	{
+		out << "v " << v.x() << " " << v.y() << " " << v.z() << " " << endl;
+	}
+	for (auto f : modelFaces)
+	{
+		out << "f " << (f + V3i(1, 1, 1)).transpose() << endl;
+	}
+	out.close();
+}
+
+void BaseModel::writeObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const
+{
+	std::ofstream out(filename);
+	out << "# Vertices: " << modelVerts.size() << "\tFaces: " << modelFaces.size() << endl;
+	for (size_t i = 0; i < V.size(); i++)
+	{
+		V3d v = V[i];
+		out << "v " << std::fixed << std::setprecision(5) << v.x() << " " << v.y() << " " << v.z() << " " << endl;
+	}
+	for (size_t i = 0; i < F.size(); i++)
+	{
+		V3i f = F[i];
+		out << "f " << (f + V3i(1, 1, 1)).transpose() << endl;
+	}
+	out.close();
+}
+
+void BaseModel::saveVertices(const string& filename, const vector<V3d>& verts)
+{
+	std::ofstream out(filename);
+	out << "# " << verts.size() << " vertices " << std::endl;
+
+	for (const V3d& v : verts)
+	{
+		out << "v " << std::setiosflags(std::ios::fixed) << std::setprecision(10) << v.x() << " " << v.y() << " " << v.z() << std::endl;
+	}
+	out.close();
+}
+
+void BaseModel::saveIsoline(const string& filename, const vector<vector<V3d>>& isoline)const
+{
+	std::ofstream out(filename);
+	out << "g 3d_lines" << endl;
+	int cnt(0);
+	for (auto loop : isoline)
+	{
+		/*for (auto v : loop)
+		{
+			out << "v " << v.transpose() << endl;
+		}*/
+		for (int i = 0; i < loop.size(); i++)
+		{
+			out << "v " << loop[i].x() << " " << loop[i].y() << " " << loop[i].z() << endl;
+		}
+		//out << "l ";
+		for (int i = 1; i <= loop.size() - 1; i++)
+		{
+			out << "l " << i + cnt << " " << i + 1 + cnt << endl;;
+		}
+		out << "l " << loop.size() << " " << 1 << endl;
+		//out << 1 + cnt << endl;
+		cnt += loop.size();
+	}
+
+	out.close();
 }
 
 void BaseModel::writeTexturedObjFile(const string& filename, const vector<PDD>& uvs)const

@@ -2,7 +2,7 @@
 #include "LookTable.h"
 #include "MarchingCubes.h"
 #include "..\..\utils\String.hpp"
-// #include <cuda\std\functional>
+#include "..\..\BSpline.hpp"
 #include <chrono>
 #include <cuda_device_runtime_api.h>
 #include <cuda_runtime_api.h>
@@ -11,8 +11,8 @@
 #include <fstream>
 #include <functional>
 #include <texture_types.h>
-#include <thrust/device_vector.h>
-#include <thrust/scan.h>
+#include <thrust\device_vector.h>
+#include <thrust\scan.h>
 #include <vector_functions.h>
 #include <vector_types.h>
 
@@ -36,8 +36,12 @@ inline __device__ double3 MCKernel::vertexLerp(const double3& p_0,
 	return lerp_p;
 }
 
-inline __device__ double MCKernel::computeSDF(double3 pos) {
-	return pos.x * pos.x + pos.y * pos.y + pos.z * pos.z - 1;
+inline __device__ double MCKernel::computeSDF(const int numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes) {
+	double sum = 0.0;
+	for (int i = 0; i < numNodes; ++i)
+		for (int j = 0; j < 8; ++j)
+			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_allNodes[i]->corners[j], d_allNodes[i]->width, V3d(pos));
+	return sum;
 }
 
 inline __device__ uint3 MCKernel::getVoxelShift(const uint& index,
@@ -62,7 +66,7 @@ inline __device__ uint3 MCKernel::getVoxelShift(const uint& index,
  * @param d_voxelSDF       每个 voxel 八个顶点的 sdf 值
  * @param d_isValidVoxel   判断每个 voxel 是否是合理的 voxel
  */
-__global__ void MCKernel::determineVoxelKernel(
+__global__ void MCKernel::determineVoxelKernel(const int numNodes, OctreeNode** d_allNodes, double* d_lambda,
 	const uint nVoxels, const double* d_isoVal, const double3* d_voxelSize,
 	const double3* d_origin, const uint3* d_res,
 	const cudaTextureObject_t nVertsTex, uint* d_nVoxelVerts,
@@ -94,7 +98,7 @@ __global__ void MCKernel::determineVoxelKernel(
 
 		double sdf[8];
 		for (int i = 0; i < 8; ++i) {
-			sdf[i] = computeSDF(corners[i]);
+			sdf[i] = computeSDF(numNodes, corners[i], d_lambda, d_allNodes);
 			d_voxelSDF[tid * 8 + i] = sdf[i];
 		}
 
@@ -237,6 +241,9 @@ namespace MC {
 
 	// device
 	namespace {
+		OctreeNode** d_allNodes;
+		double* d_lambda;
+
 		uint3* d_res = nullptr;
 		double* d_isoVal = nullptr;
 
@@ -295,59 +302,66 @@ inline void MC::setTextureObject(const uint& srcSizeInBytes, int* srcDev,
 	CUDA_CHECK(cudaCreateTextureObject(texObj, &texRes, &texDesc, nullptr));
 }
 
-inline void MC::initResources(const uint3& resolution, const uint& nVoxels,
+inline void MC::initResources(const vector<OctreeNode*> allNodes, const VXd& lambda,
+	const uint3& resolution, const uint& nVoxels,
 	const double& isoVal, const double3& gridOrigin,
 	const double3& voxelSize, const uint& maxVerts) {
 	// host
-	{
-		h_triPoints = (double3*)malloc(sizeof(double3) * maxVerts);
-		// printf("h_triPoints = %d\n", h_triPoints);
-	}
+		{
+			h_triPoints = (double3*)malloc(sizeof(double3) * maxVerts);
+			// printf("h_triPoints = %d\n", h_triPoints);
+		}
 
-	// device
-	{
-		CUDA_CHECK(cudaMalloc((void**)&d_res, sizeof(uint3)));
-		CUDA_CHECK(
-			cudaMemcpy(d_res, &resolution, sizeof(uint3), cudaMemcpyHostToDevice));
+		// device
+		{
+			CUDA_CHECK(cudaMalloc((void**)&d_allNodes, sizeof(OctreeNode*) * allNodes.size()));
+			CUDA_CHECK(cudaMemcpy(d_allNodes, allNodes.data(), sizeof(OctreeNode*) * allNodes.size(), cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_isoVal, sizeof(double)));
-		CUDA_CHECK(
-			cudaMemcpy(d_isoVal, &isoVal, sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows()));
+			CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(
-			cudaMalloc((void**)&d_nVoxelVertsArray, sizeof(uint) * nVoxels));
-		CUDA_CHECK(cudaMalloc((void**)&d_nVoxelVertsScan, sizeof(uint) * nVoxels));
+			CUDA_CHECK(cudaMalloc((void**)&d_res, sizeof(uint3)));
+			CUDA_CHECK(
+				cudaMemcpy(d_res, &resolution, sizeof(uint3), cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(
-			cudaMalloc((void**)&d_isValidVoxelArray, sizeof(uint) * nVoxels));
-		CUDA_CHECK(
-			cudaMalloc((void**)&d_nValidVoxelsScan, sizeof(uint) * nVoxels));
+			CUDA_CHECK(cudaMalloc((void**)&d_isoVal, sizeof(double)));
+			CUDA_CHECK(
+				cudaMemcpy(d_isoVal, &isoVal, sizeof(double), cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_gridOrigin, sizeof(double3)));
-		CUDA_CHECK(cudaMemcpy(d_gridOrigin, &gridOrigin, sizeof(double3),
-			cudaMemcpyHostToDevice));
+			CUDA_CHECK(
+				cudaMalloc((void**)&d_nVoxelVertsArray, sizeof(uint) * nVoxels));
+			CUDA_CHECK(cudaMalloc((void**)&d_nVoxelVertsScan, sizeof(uint) * nVoxels));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_voxelSize, sizeof(double3)));
-		CUDA_CHECK(cudaMemcpy(d_voxelSize, &voxelSize, sizeof(double3),
-			cudaMemcpyHostToDevice));
+			CUDA_CHECK(
+				cudaMalloc((void**)&d_isValidVoxelArray, sizeof(uint) * nVoxels));
+			CUDA_CHECK(
+				cudaMalloc((void**)&d_nValidVoxelsScan, sizeof(uint) * nVoxels));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_voxelSDF, sizeof(double) * nVoxels * 8));
-		CUDA_CHECK(cudaMalloc((void**)&d_voxelCubeIndex, sizeof(uint) * nVoxels));
+			CUDA_CHECK(cudaMalloc((void**)&d_gridOrigin, sizeof(double3)));
+			CUDA_CHECK(cudaMemcpy(d_gridOrigin, &gridOrigin, sizeof(double3),
+				cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_triTable, sizeof(int) * 256 * 16));
-		CUDA_CHECK(cudaMemcpy(d_triTable, triTable, sizeof(int) * 256 * 16,
-			cudaMemcpyHostToDevice));
+			CUDA_CHECK(cudaMalloc((void**)&d_voxelSize, sizeof(double3)));
+			CUDA_CHECK(cudaMemcpy(d_voxelSize, &voxelSize, sizeof(double3),
+				cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_nVertsTable, sizeof(int) * 256));
-		CUDA_CHECK(cudaMemcpy(d_nVertsTable, nVertsTable, sizeof(int) * 256,
-			cudaMemcpyHostToDevice));
+			CUDA_CHECK(cudaMalloc((void**)&d_voxelSDF, sizeof(double) * nVoxels * 8));
+			CUDA_CHECK(cudaMalloc((void**)&d_voxelCubeIndex, sizeof(uint) * nVoxels));
 
-		// texture
-		setTextureObject(256 * 16 * sizeof(int), d_triTable, &triTex);
-		setTextureObject(256 * sizeof(int), d_nVertsTable, &nVertsTex);
+			CUDA_CHECK(cudaMalloc((void**)&d_triTable, sizeof(int) * 256 * 16));
+			CUDA_CHECK(cudaMemcpy(d_triTable, triTable, sizeof(int) * 256 * 16,
+				cudaMemcpyHostToDevice));
 
-		CUDA_CHECK(cudaMalloc((void**)&d_triPoints, sizeof(double3) * maxVerts));
-	}
+			CUDA_CHECK(cudaMalloc((void**)&d_nVertsTable, sizeof(int) * 256));
+			CUDA_CHECK(cudaMemcpy(d_nVertsTable, nVertsTable, sizeof(int) * 256,
+				cudaMemcpyHostToDevice));
+
+			// texture
+			setTextureObject(256 * 16 * sizeof(int), d_triTable, &triTex);
+			setTextureObject(256 * sizeof(int), d_nVertsTable, &nVertsTex);
+
+			CUDA_CHECK(cudaMalloc((void**)&d_triPoints, sizeof(double3) * maxVerts));
+		}
 }
 
 inline void MC::freeResources() {
@@ -356,6 +370,10 @@ inline void MC::freeResources() {
 
 	// device
 	{
+		CUDA_CHECK(cudaFree(d_allNodes));
+		CUDA_CHECK(cudaFree(d_lambda));
+
+
 		CUDA_CHECK(cudaFree(d_res));
 
 		CUDA_CHECK(cudaFree(d_nVoxelVertsArray));
@@ -381,7 +399,8 @@ inline void MC::freeResources() {
 	}
 }
 
-inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
+inline void MC::launch_determineVoxelKernel(const int& numNodes,
+	const uint& nVoxels,
 	const double& isoVal,
 	const uint& maxVerts) {
 	dim3 nThreads(NTHREADS, 1, 1);
@@ -392,7 +411,7 @@ inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
 	}
 
 	MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (
-		nVoxels, d_isoVal, d_voxelSize, d_gridOrigin, d_res, nVertsTex,
+		numNodes, d_allNodes, d_lambda, nVoxels, d_isoVal, d_voxelSize, d_gridOrigin, d_res, nVertsTex,
 		d_nVoxelVertsArray, d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);
 	getLastCudaError("Kernel: 'determineVoxelKernel' failed!\n");
 
@@ -478,15 +497,22 @@ inline void MC::writeToOBJFile(const std::string& filename) {
 	out.close();
 }
 
-void MC::marching_cubes(int argc, char** argv) {
-	uint3 resolution = make_uint3(20, 20, 20); // resolution
+/**
+ * @brief 主方法
+ *
+ * @param gridOrigin origin coordinate of grid
+ * @param gridWidth  width of grid
+ * @param resolution voxel 的分辨率
+ * @param isoVal     isosurface value
+ * @param filename   output obj file
+ */
+void MC::marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda,
+	const double3& gridOrigin, const double3& gridWidth,
+	const uint3& resolution, const double& isoVal, const std::string& filename) {
 	uint nVoxels = resolution.x * resolution.y * resolution.z;
-	uint maxVerts = nVoxels * 18;
-	double isoVal = .0;
-	const string filename = ".\\test\\sphere.obj";
 
-	double3 gridOrigin = make_double3(-1, -1, -1); // origin coordinate of grid
-	double3 gridWidth = make_double3(2, 2, 2);     // with of grid
+	uint maxVerts = nVoxels * 18;
+
 	double3 voxelSize =
 		make_double3(gridWidth.x / resolution.x, gridWidth.y / resolution.y,
 			gridWidth.z / resolution.z);
@@ -496,9 +522,9 @@ void MC::marching_cubes(int argc, char** argv) {
 
 	start = system_clock::now();
 
-	initResources(resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
+	initResources(allNodes, lambda, resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
 
-	launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
+	launch_determineVoxelKernel(allNodes.size(), nVoxels, isoVal, maxVerts);
 	if (allTriVertices == 0) {
 		printf("There is no valid vertices...\n");
 		return;
@@ -518,5 +544,4 @@ void MC::marching_cubes(int argc, char** argv) {
 	writeToOBJFile(filename);
 
 	freeResources();
-	// cuda::std::function;
 }

@@ -8,7 +8,7 @@
 #include <iostream>
 #include <Eigen\dense>
 
-using UINT = unsigned int;
+using uint = unsigned int;
 
 constexpr double DINF = (std::numeric_limits<double>::max)();
 

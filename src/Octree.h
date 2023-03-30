@@ -83,7 +83,15 @@ public:
 
 class Octree : public BaseModel
 {
-protected:
+public:
+	struct Message {
+
+	};
+	void update(Message m) {
+
+	}
+friend class ThinShells;
+private:
 	int maxDepth = -1;
 	int numNodes = 0;
 	int nLeafNodes = 0;
@@ -114,7 +122,15 @@ protected:
 
 	double minBVal, maxBVal;
 
+	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
+	vector<V3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
+	vector<V3d> allInterPoints;  // All intersection points of octree node and mesh
+
 public:
+	Octree() {}
+
+	Octree(const int& _maxDepth) :maxDepth(_maxDepth) {}
+
 	// constructor and destructor
 	Octree(const int& _maxDepth, const string& _modelPath, const double& _scaleSize = 0.1) :
 		maxDepth(_maxDepth), modelName(getFileName(DELIMITER, _modelPath)), scaleSize(_scaleSize)
@@ -126,9 +142,15 @@ public:
 	~Octree() { delete root; root = nullptr; };
 
 public:
+	void createOctree(const BoundingBox& bb);
+
 	void createOctree(const double& scaleSize);
 
 	void createNode(OctreeNode*& node, const int& depth, const V3d& width, const std::pair<V3d, V3d>& boundary, const vector<size_t>& idxOfPoints);
+
+	void setInterPoints(const vector<V3d>&, const vector<V3d>&, const vector<V3d>&);
+
+	void setInterLeafNodes(const vector<OctreeNode*>&);
 
 	void cpIntersection();
 
@@ -139,7 +161,18 @@ public:
 
 	void setSDF();
 
+	void setSDFOfNodes(const VXd& _sdfVal) { sdfVal = _sdfVal; }
+
 	void setBSplineValue();
+
+public:
+	int getTreeDepth() const { return maxDepth; }
+
+	int getNumLeafNodes() const { return nLeafNodes; }
+
+	vector<OctreeNode*> getLeafNodes() const { return leafNodes; }
+
+	vector<OctreeNode*> getAllNodes() const { return allNodes; }
 
 public:
 	// save data

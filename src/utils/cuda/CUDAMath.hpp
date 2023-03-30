@@ -9,8 +9,20 @@
  */
 #pragma once
 #include "cuda_runtime.h"
+#include <Eigen\Core>
 
 using uint = unsigned int;
+
+// constructor
+inline __host__ __device__ uint3 make_uint3(const VXi& a)
+{
+	return make_uint3(uint(a.x()), uint(a.y()), uint(a.z()));
+}
+
+inline __host__ __device__ double3 make_double3(const VXd& a)
+{
+	return make_double3(a.x(), a.y(), a.z());
+}
 
 // addition
 inline __host__ __device__ float3 operator+(const float3& a, const float3& b) {
