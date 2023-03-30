@@ -16,11 +16,20 @@
     <Filter Include="头文件\utils">
       <UniqueIdentifier>{75cd7cdd-39d7-41fc-9817-1282866fefa2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件\cuda">
+    <Filter Include="头文件\cudaAcc">
+      <UniqueIdentifier>{b7b4f24e-551d-414a-95a7-296c16eebe75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\cudaAcc\MarchingCubes">
+      <UniqueIdentifier>{b024bc3f-f5a1-4107-bd7a-1471a5a9862e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\cudaAcc">
       <UniqueIdentifier>{f3fcb83d-d715-4237-a6a3-45b2c5e8a93b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="头文件\cuda">
-      <UniqueIdentifier>{b7b4f24e-551d-414a-95a7-296c16eebe75}</UniqueIdentifier>
+    <Filter Include="源文件\cudaAcc\MarchingCubes">
+      <UniqueIdentifier>{97202684-eee6-4f5a-aab5-3cd21b7dfcac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\utils\cuda">
+      <UniqueIdentifier>{565a5fee-8ec3-487d-8af2-c81b4fbb0fe9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -45,14 +54,8 @@
     <ClInclude Include="src\utils\CMDParser.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\cuAcc\CUDACheck.cuh">
-      <Filter>头文件\cuda</Filter>
-    </ClInclude>
     <ClInclude Include="src\cuAcc\CUDACompute.h">
-      <Filter>头文件\cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cuAcc\CUDAMacro.h">
-      <Filter>头文件\cuda</Filter>
+      <Filter>头文件\cudaAcc</Filter>
     </ClInclude>
     <ClInclude Include="src\SDFHelper.h">
       <Filter>头文件</Filter>
@@ -71,6 +74,24 @@
     </ClInclude>
     <ClInclude Include="src\Octree.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuAcc\MarchingCubes\Define.h">
+      <Filter>头文件\cudaAcc\MarchingCubes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuAcc\MarchingCubes\LookTable.h">
+      <Filter>头文件\cudaAcc\MarchingCubes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuAcc\MarchingCubes\MarchingCubes.h">
+      <Filter>头文件\cudaAcc\MarchingCubes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\cuda\CUDACheck.cuh">
+      <Filter>头文件\utils\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\cuda\CUDAMacro.h">
+      <Filter>头文件\utils\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\cuda\CUDAMath.hpp">
+      <Filter>头文件\utils\cuda</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -97,7 +118,10 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\cuAcc\CUDACompute.cu">
-      <Filter>源文件\cuda</Filter>
+      <Filter>源文件\cudaAcc</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu">
+      <Filter>源文件\cudaAcc\MarchingCubes</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

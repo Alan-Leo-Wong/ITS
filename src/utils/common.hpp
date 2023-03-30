@@ -1,5 +1,5 @@
 #pragma once
-#include "../cuAcc/CUDAMacro.h"
+#include "cuda\CUDAMacro.h"
 
 // used to check colums
 template<typename T>

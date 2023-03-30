@@ -23,15 +23,19 @@
     <ClInclude Include="src\BSpline.hpp" />
     <ClInclude Include="src\CollisionDetection.h" />
     <ClInclude Include="src\BaseModel.h" />
-    <ClInclude Include="src\cuAcc\CUDACheck.cuh" />
     <ClInclude Include="src\cuAcc\CUDACompute.h" />
-    <ClInclude Include="src\cuAcc\CUDAMacro.h" />
+    <ClInclude Include="src\cuAcc\MarchingCubes\Define.h" />
+    <ClInclude Include="src\cuAcc\MarchingCubes\LookTable.h" />
+    <ClInclude Include="src\cuAcc\MarchingCubes\MarchingCubes.h" />
     <ClInclude Include="src\MarchingCubes.hpp" />
     <ClInclude Include="src\Octree.h" />
     <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\common.hpp" />
+    <ClInclude Include="src\utils\cuda\CUDACheck.cuh" />
+    <ClInclude Include="src\utils\cuda\CUDAMacro.h" />
+    <ClInclude Include="src\utils\cuda\CUDAMath.hpp" />
     <ClInclude Include="src\utils\Geometry.hpp" />
     <ClInclude Include="src\utils\String.hpp" />
     <ClInclude Include="src\utils\Timer.hpp" />
@@ -48,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\cuAcc\CUDACompute.cu" />
+    <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
