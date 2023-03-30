@@ -23,17 +23,19 @@ private:
 	double outerShellIsoVal = -DINF;
 
 public:
-	//! constructor and destructor
-	ThinShells() {};
+	// constructor and destructor
+	ThinShells() {}
 
 	ThinShells(const string& filename, const int& _treeDepth) : BaseModel(filename), treeDepth(_treeDepth)
 	{
-		bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts);
+		bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts);
+		//cout << bSplineTree.allNodes[0]->depth << endl;
+		saveOctree("");
 	}
 
-	~ThinShells() {};
+	~ThinShells() {}
 
-	//ThinShells& operator=(const ThinShells& model);
+	// ThinShells& operator=(const ThinShells& model);
 
 private:
 	void cpIntersectionPoints();
@@ -49,10 +51,10 @@ private:
 public:
 	void creatShell();
 
-	//Octree& bSplineTree() { return bSplineTree; }
-	//const Octree& bSplineTree() const { return bSplineTree; }
+	// Octree& bSplineTree() { return bSplineTree; }
+	// const Octree& bSplineTree() const { return bSplineTree; }
 
-	std::array<double, 2> getShellIsoVal()  {  return { innerShellIsoVal, outerShellIsoVal }; }
+	std::array<double, 2> getShellIsoVal() { return { innerShellIsoVal, outerShellIsoVal }; }
 
 public:
 	void saveOctree(const string& filename) const;

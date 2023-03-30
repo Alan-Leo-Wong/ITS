@@ -5,6 +5,9 @@
 #include <igl\writeOBJ.h>
 #include <igl\read_triangle_mesh.h>
 
+//////////////////////
+//   Model  Utils   //
+//////////////////////
 void BaseModel::setBoundingBox(const double& scaleSize)
 {
 	V3d minV = m_V.colwise().minCoeff();
@@ -26,7 +29,7 @@ void BaseModel::setBoundingBox(const double& scaleSize)
 
 vector<V2i> BaseModel::extractEdges()
 {
-	cout << "Extracting edges from " << std::quoted(modelName) << "..." << endl;
+	cout << "Extracting edges from " << std::quoted(modelName) << endl;
 
 	vector<V2i> edges;
 	set<PII> uset;
@@ -44,7 +47,7 @@ vector<V2i> BaseModel::extractEdges()
 	for (PII it : uset)
 		edges.emplace_back(V2i(it.first, it.second));
 
-	cout << "--Number of model's edges = " << edges.size() << endl;
+	cout << "-- Number of model's edges: " << edges.size() << endl;
 	return edges;
 }
 

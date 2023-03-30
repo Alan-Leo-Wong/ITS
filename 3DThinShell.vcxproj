@@ -21,18 +21,17 @@
   <ItemGroup>
     <ClInclude Include="src\BasicDataType.h" />
     <ClInclude Include="src\BSpline.hpp" />
-    <ClInclude Include="src\CollisionDetection.h" />
     <ClInclude Include="src\BaseModel.h" />
     <ClInclude Include="src\cuAcc\CUDACompute.h" />
-    <ClInclude Include="src\cuAcc\MarchingCubes\Define.h" />
+    <ClInclude Include="src\cuAcc\MarchingCubes\MCDefine.h" />
     <ClInclude Include="src\cuAcc\MarchingCubes\LookTable.h" />
     <ClInclude Include="src\cuAcc\MarchingCubes\MarchingCubes.h" />
-    <ClInclude Include="src\MarchingCubes.hpp" />
+    <ClInclude Include="src\ModelDefine.h" />
     <ClInclude Include="src\Octree.h" />
     <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
-    <ClInclude Include="src\utils\common.hpp" />
+    <ClInclude Include="src\utils\Common.hpp" />
     <ClInclude Include="src\utils\cuda\CUDACheck.cuh" />
     <ClInclude Include="src\utils\cuda\CUDAMacro.h" />
     <ClInclude Include="src\utils\cuda\CUDAMath.hpp" />
@@ -41,7 +40,6 @@
     <ClInclude Include="src\utils\Timer.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\CollisionDetection.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\BaseModel.cpp" />
     <ClCompile Include="src\Octree.cpp" />

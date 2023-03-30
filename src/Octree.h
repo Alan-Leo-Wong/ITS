@@ -1,7 +1,5 @@
 #pragma once
 #include "BaseModel.h"
-#include "utils\String.hpp"
-#include "utils\Geometry.hpp"
 
 struct OctreeNode
 {
@@ -70,13 +68,6 @@ public:
 
 class Octree
 {
-public:
-	struct Message {
-
-	};
-	void update(Message m) {
-
-	}
 	friend class ThinShells;
 private:
 	OctreeNode* root;
@@ -95,18 +86,24 @@ public:
 	// constructor and destructor
 	Octree() {}
 
-	Octree(const int& _maxDepth, const BoundingBox& bb, const uint& nPoints) : maxDepth(_maxDepth) { createOctree(bb, nPoints); }
+	Octree(const int& _maxDepth, const BoundingBox& bb,
+		const uint& nPoints, const vector<V3d>& modelVerts) : maxDepth(_maxDepth)
+	{
+		createOctree(bb, nPoints, modelVerts);
+	}
 
 	~Octree() { delete root; root = nullptr; };
 
 public:
-	void createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d> modelVerts);
+	void createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts);
 
-	void createNode(OctreeNode*& node, const int& depth, 
-				    const V3d& width, const std::pair<V3d, V3d>& boundary, 
-					const vector<V3d> modelVerts, const vector<uint>& idxOfPoints);
+	void createNode(OctreeNode*& node, const int& depth,
+		const V3d& width, const std::pair<V3d, V3d>& boundary,
+		const vector<V3d> modelVerts, const vector<uint>& idxOfPoints);
 
-	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, const int& cornerID, map<size_t, bool>& visID);
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
+
+	Octree& operator=(const Octree&);
 
 public:
 	// save data

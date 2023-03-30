@@ -23,8 +23,8 @@ inline void initSDF(fcpw::Scene<3>& scene, const vector<V3d>& modelVerts, const 
 	scene.setObjectTypes({ {fcpw::PrimitiveType::Triangle} });
 
 	// set the vertex and triangle count of the (0th) object
-	UINT nVertices = modelVerts.size();
-	UINT nTriangles = modelFaces.size();
+	uint nVertices = modelVerts.size();
+	uint nTriangles = modelFaces.size();
 	scene.setObjectVertexCount(nVertices, 0);
 	scene.setObjectTriangleCount(nTriangles, 0);
 

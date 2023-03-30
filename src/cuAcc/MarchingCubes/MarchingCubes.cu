@@ -1,4 +1,4 @@
-#include "Define.h"
+#include "MCDefine.h"
 #include "LookTable.h"
 #include "MarchingCubes.h"
 #include "..\..\utils\String.hpp"
@@ -40,7 +40,7 @@ inline __device__ double MCKernel::computeSDF(const uint numNodes, double3 pos, 
 	double sum = 0.0;
 	for (int i = 0; i < numNodes; ++i)
 		for (int j = 0; j < 8; ++j)
-			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_allNodes[i]->corners[j], d_allNodes[i]->width, V3d(pos));
+			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_allNodes[i]->corners[j], d_allNodes[i]->width, V3d(pos.x, pos.y, pos.z));
 	return sum;
 }
 
