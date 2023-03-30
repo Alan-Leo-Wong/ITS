@@ -26,9 +26,10 @@ public:
 	// constructor and destructor
 	ThinShells() {}
 
-	ThinShells(const string& filename, const int& _treeDepth) : BaseModel(filename), treeDepth(_treeDepth)
+	ThinShells(const string& filename, const int& _treeDepth) : BaseModel(filename), treeDepth(_treeDepth),
+		bSplineTree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts)
 	{
-		bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts);
+		//bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts);
 		//cout << bSplineTree.allNodes[0]->depth << endl;
 		saveOctree("");
 	}
