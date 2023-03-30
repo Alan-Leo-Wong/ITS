@@ -142,19 +142,14 @@ inline bool list2Matrix(const std::vector<Eigen::Matrix<Scalar, Size, 1>>& V, Ei
 	}
 	// number of columns
 	int n = min_size(V);
-	if (n != max_size(V))
-	{
-		return false;
-	}
+	if (n != max_size(V)) return false;
 	assert(n != -1);
+
 	// Resize output
 	M.resize(m, n);
 
 	// Loop over rows
 	for (int i = 0; i < m; i++)
-	{
 		M.row(i) = V[i];
-	}
-
 	return true;
 }

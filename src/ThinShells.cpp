@@ -1,10 +1,12 @@
 #include "ThinShells.h"
 #include "SDFHelper.h"
 #include "BSpline.hpp"
-#include "utils\common.hpp"
+#include "utils\Common.hpp"
+#include "utils\String.hpp"
 #include "utils\cuda\CUDAMath.hpp"
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
 #include <iomanip>
+#include <Eigen\Sparse>
 
 //////////////////////
 //  Create  Shells  //
@@ -13,12 +15,12 @@ inline void ThinShells::cpIntersectionPoints()
 {
 	vector<V2i> modelEdges = extractEdges();
 	uint nModelEdges = modelEdges.size();
-	cout << "--Number of leaf nodes = " << bSplineTree.nLeafNodes << endl;;
+	cout << "-- Number of leaf nodes: " << bSplineTree.nLeafNodes << endl;;
 
 	auto leafNodes = bSplineTree.leafNodes;
 
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
-	std::cout << "Compute the intersections between mesh EDGES and nodes...\n";
+	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 	for (int i = 0; i < nModelEdges; i++)
 	{
 		Eigen::Vector2i e = modelEdges[i];
@@ -67,17 +69,18 @@ inline void ThinShells::cpIntersectionPoints()
 			}
 		}
 	}
-	cout << "--三角形边与node的交点数量：" << edgeInterPoints.size() << endl;
+
+	cout << "-- 三角形边与node的交点数量：" << edgeInterPoints.size() << endl;
+
 	allInterPoints.insert(allInterPoints.end(), edgeInterPoints.begin(), edgeInterPoints.end());
 
 	// 三角形面与node边线交（有重合点）
-	vector<V3d> faceIntersections;
-	std::cout << "Compute the intersections between mesh FACES and node EDGES..." << endl;
+	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
 	for (const auto& leafNode : leafNodes)
 	{
 		auto edges = leafNode->edges;
 
-		for (int i = 0; i < nModelEdges; i++)
+		for (int i = 0; i < nModelFaces; i++)
 		{
 			V3i f = modelFaces[i];
 			V3d p1 = modelVerts[f.x()];
@@ -105,7 +108,7 @@ inline void ThinShells::cpIntersectionPoints()
 					double interX = coefficient.x() * p1.x() + coefficient.y() * p2.x() + coefficient.z() * p3.x();
 					if (interX >= edge.first.x() && interX <= edge.second.x())
 					{
-						faceIntersections.emplace_back(V3d(interX, y, z));
+						faceInterPoints.emplace_back(V3d(interX, y, z));
 						leafNode->isInterMesh = true;
 					}
 				}
@@ -124,7 +127,7 @@ inline void ThinShells::cpIntersectionPoints()
 					double interY = coefficient.x() * p1.y() + coefficient.y() * p2.y() + coefficient.z() * p3.y();
 					if (interY >= edge.first.y() && interY <= edge.second.y())
 					{
-						faceIntersections.emplace_back(V3d(x, interY, z));
+						faceInterPoints.emplace_back(V3d(x, interY, z));
 						leafNode->isInterMesh = true;
 					}
 				}
@@ -143,7 +146,7 @@ inline void ThinShells::cpIntersectionPoints()
 					double interZ = coefficient.x() * p1.z() + coefficient.y() * p2.z() + coefficient.z() * p3.z();
 					if (interZ >= edge.first.z() && interZ <= edge.second.z())
 					{
-						faceIntersections.emplace_back(V3d(x, y, interZ));
+						faceInterPoints.emplace_back(V3d(x, y, interZ));
 						leafNode->isInterMesh = true;
 					}
 				}
@@ -152,12 +155,14 @@ inline void ThinShells::cpIntersectionPoints()
 
 		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // 筛选有交点的叶子节点
 	}
-	faceIntersections.erase(std::unique(faceIntersections.begin(), faceIntersections.end()), faceIntersections.end());
-	cout << "--三角形面与node边的交点数量：" << faceIntersections.size() << endl;
+
+	faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
+	cout << "-- 三角形面与node边的交点数量：" << faceInterPoints.size() << endl;
+
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
 
 	allInterPoints.erase(std::unique(allInterPoints.begin(), allInterPoints.end()), allInterPoints.end());
-	cout << "--总交点数量：" << allInterPoints.size() << endl;
+	cout << "-- 总交点数量：" << allInterPoints.size() << endl;
 }
 
 inline void ThinShells::cpSDFOfTreeNodes()
@@ -183,10 +188,13 @@ inline void ThinShells::cpCoefficients()
 	using Trip = Eigen::Triplet<double>;
 
 	const uint nAllNodes = bSplineTree.nAllNodes;
+	auto corner2IDs = bSplineTree.corner2IDs;
 
 	// initial matrix
 	SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
 	vector<Trip> matVal;
+
+	cout << bSplineTree.allNodes[0]->depth << endl;
 
 	for (int i = 0; i < nAllNodes; ++i)
 	{
@@ -201,7 +209,7 @@ inline void ThinShells::cpCoefficients()
 			V3d i_corner = node_i->corners[k];
 			const uint ic_row = i * 8 + k;
 
-			for (const auto& id_ck : bSplineTree.corner2IDs[i_corner])
+			for (const auto& id_ck : corner2IDs[i_corner])
 			{
 				// i_corner所在的其他节点的id和位置
 				const uint o_id = id_ck.first;
@@ -230,7 +238,7 @@ inline void ThinShells::cpCoefficients()
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
 	lscg.compute(A);
 	lambda = lscg.solve(b);
-	cout << "Residual Error: " << (A * lambda - b).norm() << endl;
+	cout << "--Residual Error: " << (A * lambda - b).norm() << endl;
 
 	//saveCoefficients(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Coefficients.txt"));
 }
@@ -279,13 +287,25 @@ inline void ThinShells::cpBSplineValue()
 
 inline void ThinShells::initBSplineTree()
 {
+	cout << "\nComputing intersection points of " << std::quoted(modelName) << "and leaf nodes...\n=====================" << endl;
 	cpIntersectionPoints();
+	cout << "=====================\n";
+	saveIntersections("", "");
 
+	cout << "\nComputing SDF of tree nodes..." << endl;
 	cpSDFOfTreeNodes();
+	cout << "=====================\n";
+	saveSDFValue("");
 
+	cout << "\nComputing coefficients..." << endl;
 	cpCoefficients();
+	cout << "=====================\n";
+	saveCoefficients("");
 
+	cout << "\nComputing B-Spline value..." << endl;
 	cpBSplineValue();
+	cout << "=====================\n";
+	saveBSplineValue("");
 }
 
 void ThinShells::creatShell()
@@ -298,10 +318,10 @@ void ThinShells::creatShell()
 //////////////////////
 void ThinShells::saveOctree(const string& filename) const
 {
+	string t_filename = filename;
 	if (filename.empty())
-		bSplineTree.saveNodeCorners2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"octree.obj"));
-	else
-		bSplineTree.saveNodeCorners2OBJFile(filename);
+		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"octree.obj");
+	bSplineTree.saveNodeCorners2OBJFile(t_filename);
 }
 
 void ThinShells::saveIntersections(const string& filename, const vector<V3d>& intersections) const
@@ -317,47 +337,61 @@ void ThinShells::saveIntersections(const string& filename, const vector<V3d>& in
 
 void ThinShells::saveIntersections(const string& filename_1, const string& filename_2) const
 {
-	cout << "Save mesh EDGES and octree Nodes...\n";
+	string t_filename = filename_1;
 	if (filename_1.empty())
-		saveIntersections(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"faceInter.xyz"), faceInterPoints);
-	else
-		saveIntersections(filename_1, edgeInterPoints);
+		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"edgeInter.xyz");
+	cout << "-- Save mesh EDGES and octree Nodes to " << std::quoted(t_filename) << endl;
+	saveIntersections(t_filename, edgeInterPoints);
 
-	cout << "Save mesh FACES and octree node EDGES...\n";
+	t_filename = filename_2;
 	if (filename_2.empty())
-		saveIntersections(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"faceInter.xyz"), faceInterPoints);
-	else
-		saveIntersections(filename_2, faceInterPoints);
+		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"faceInter.xyz");
+	cout << "-- Save mesh FACES and octree node EDGES to " << std::quoted(t_filename) << endl;
+	saveIntersections(t_filename, faceInterPoints);
 }
 
 void ThinShells::saveSDFValue(const string& filename) const
 {
-	checkDir(filename);
-	std::ofstream out(filename);
+	string t_filename = filename;
+	if (filename.empty())
+		t_filename = concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"SDFValue.txt");
+
+	checkDir(t_filename);
+	std::ofstream out(t_filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
 
+	cout << "-- Save SDF value to " << std::quoted(t_filename) << endl;
 	for (const auto& val : sdfVal)
 		out << val << endl;
-
 	out.close();
 }
 
 void ThinShells::saveCoefficients(const string& filename) const
 {
-	checkDir(filename);
-	std::ofstream out(filename);
-	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
+	string t_filename = filename;
+	if (filename.empty())
+		t_filename = concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"Coefficients.txt");
 
+	checkDir(t_filename);
+	std::ofstream out(t_filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", t_filename.c_str()); return; }
+	
+	cout << "-- Save coefficients to " << std::quoted(t_filename) << endl;
 	for (const auto& val : lambda)
 		out << val << endl;
 }
 
 void ThinShells::saveBSplineValue(const string& filename) const
 {
-	checkDir(filename);
-	std::ofstream out(filename);
-	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
+	string t_filename = filename;
+	if (filename.empty())
+		t_filename = concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"BSplineValue.txt");
 
+	checkDir(t_filename);
+	std::ofstream out(t_filename);
+	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", t_filename.c_str()); return; }
+	
+	cout << "-- Save B-Spline value to " << std::quoted(t_filename) << endl;
 	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bSplineVal << endl;
 	out.close();
 }
@@ -371,11 +405,11 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	V3d gridOrigin = modelBoundingBox.boxOrigin;
 	V3d gridWidth = modelBoundingBox.boxWidth;
 
-	if (!innerFilename.empty())
+	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
 		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 
-	if (!outerFilename.empty())
+	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
 }

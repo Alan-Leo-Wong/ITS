@@ -1,17 +1,7 @@
 #include "Octree.h"
-#include "SDFHelper.h"
-#include "BSpline.hpp"
-#include "utils\common.hpp"
-#include "MarchingCubes.hpp"
-#include <queue>
-#include <chrono>
+#include "utils\String.hpp"
 #include <numeric>
 #include <iomanip>
-#include <Windows.h>
-#include <algorithm>
-#include <Eigen\sparse>
-#include <igl\writeOBJ.h>
-#include <igl\marching_cubes.h>
 
 //////////////////////
 //      Setter      //
@@ -78,7 +68,7 @@ inline void OctreeNode::setEdges()
 //////////////////////
 //   Create  Tree   //
 //////////////////////
-void Octree::createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d> modelVerts)
+void Octree::createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts)
 {
 	vector<uint> idxOfPoints(nPoints);
 	std::iota(idxOfPoints.begin(), idxOfPoints.end(), 0); // 0~pointNum-1
@@ -143,20 +133,37 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 	}
 }
 
-// used to construct b-spline function
-inline std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, const int& cornerID, map<size_t, bool>& visID)
+/* used to construct b - spline function */
+std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID)
 {
-	auto temp = node->childs[cornerID];
+	auto temp = node->parent;
 	vector<PV3d> points;
 	vector<size_t> pointsID;
 
-	while (temp->depth + 1 != maxDepth)
+	auto getCorners = [&](OctreeNode* node)
 	{
-		visID[temp->id] = true;
-		points.emplace_back(std::make_pair(temp->corners[cornerID], temp->width));
-		pointsID.emplace_back((temp->id) * 8 + cornerID);
-		if (temp->isLeaf) break;
-		temp = temp->childs[cornerID];
+		for (int k = 0; k < 8; ++k)
+		{
+			V3d i_corner = node->corners[k];
+			for (const auto& id_ck : corner2IDs[i_corner])
+			{
+				const uint o_id = id_ck.first;
+				const uint o_k = id_ck.second;
+				const uint o_realID = o_id * 8 + o_k;
+
+				if (visID[o_realID] && fabs(allNodes[o_id]->width[0] - node->width[0]) > 1e-9) continue;
+				visID[o_realID] = true;
+
+				points.emplace_back(std::make_pair(i_corner, allNodes[o_id]->width));
+				pointsID.emplace_back(o_realID);
+			}
+		}
+	};
+
+	while (temp != nullptr)
+	{
+		getCorners(temp);
+		temp = temp->parent;
 	}
 
 	return std::make_tuple(points, pointsID);
@@ -165,7 +172,7 @@ inline std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(Octree
 //////////////////////
 //    Save  Data    //
 //////////////////////
-inline void Octree::saveDomain2OBJFile(const string& filename) const
+void Octree::saveDomain2OBJFile(const string& filename) const
 {
 	checkDir(filename);
 	std::ofstream out(filename);
@@ -196,13 +203,43 @@ inline void Octree::saveDomain2OBJFile(const string& filename) const
 	out.close();
 }
 
-inline void Octree::saveNodeCorners2OBJFile(const string& filename) const
+Octree& Octree::operator=(const Octree& tree)
+{
+	cout << "Execute Copy Assignment operator...\n";
+	root = new OctreeNode(*(tree.root)); // deep copy
+
+	maxDepth = tree.maxDepth;
+	nAllNodes = tree.nAllNodes;
+	nLeafNodes = tree.nLeafNodes;
+
+	leafNodes.resize(nLeafNodes);
+	for (int i = 0; i < nLeafNodes; ++i)
+	{
+		leafNodes[i] = new OctreeNode(*(tree.leafNodes[i]));
+		if (tree.leafNodes[i]->parent != nullptr)
+			leafNodes[i]->parent = new OctreeNode(*(tree.leafNodes[i]->parent));
+	}
+
+	allNodes.resize(nAllNodes);
+	for (int i = 0; i < nAllNodes; ++i)
+	{
+		allNodes[i] = new OctreeNode(*(tree.allNodes[i]));
+		if (tree.allNodes[i]->parent != nullptr)
+			allNodes[i]->parent = new OctreeNode(*(tree.allNodes[i]->parent));
+	}
+
+	corner2IDs = tree.corner2IDs;
+
+	return *this;
+}
+
+void Octree::saveNodeCorners2OBJFile(const string& filename) const
 {
 	checkDir(filename);
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not be opened!", filename.c_str()); return; }
 
-	cout << "leafNodes size = " << leafNodes.size() << endl;
+	//cout << "leafNodes size = " << leafNodes.size() << endl;
 	int count = -8;
 	for (const auto& leaf : leafNodes)
 	{

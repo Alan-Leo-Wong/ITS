@@ -20,25 +20,22 @@ protected:
 	uint nModelFaces = 0;
 
 public:
-	//! constructor and destructor
 	BaseModel() {};
 
-	BaseModel(const std::string& filename) { readFile(filename); }
+	BaseModel(const std::string& filename) 
+	{ 
+		readFile(filename);
+		setBoundingBox();
+	}
 
 	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
 
 	~BaseModel() {}
 
 public:
-	// 获取模型顶点接口
-	vector<V3d> getVertices() const;
-
-	vector<V3i> getFaces() const;
-
-	// edges of the mesh
 	vector<V2i> extractEdges();
 
-	void setBoundingBox(const double& scaleSize);
+	void setBoundingBox(const double& scaleSize = 0.1);
 
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;
@@ -46,22 +43,21 @@ public:
 	// 切分模型
 	std::pair<BaseModel, BaseModel> splitModelByIsoline(const vector<double>& scalarField, const double& val) const;
 
+	vector<V3d> getVertices() const;
+
+	vector<V3i> getFaces() const;
+
 public:
-	//! IO
 	void readFile(const string& filename);
 
-	// 读取off文件
 	void readOffFile(const string& filename);
 	
-	// 读取obj文件
 	void readObjFile(const string& filename);
 
-	// 写obj文件
 	void writeObjFile(const string& filename) const;
 
 	void writeObjFile(const string& filename, const vector<V3d>& V, const vector<V3i>& F) const;
 
-	// 保存纹理
 	void writeTexturedObjFile(const string& filename, const vector<PDD>& uvs) const;
 
 	void writeTexturedObjFile(const string& filename, const VXd& uvs) const;

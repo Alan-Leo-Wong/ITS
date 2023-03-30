@@ -1,8 +1,8 @@
 //#include "CollisionDetection.h"
-#include "Octree.h"
+#include "ThinShells.h"
 #include "utils\Timer.hpp"
 #include "utils\String.hpp"
-#include "utils\common.hpp"
+#include "utils\Common.hpp"
 #include "utils\CMDParser.hpp"
 
 std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** argv)
@@ -48,49 +48,34 @@ int main(int argc, char** argv)
 	CollisionDetection d;
 	d.ExtractIntersectLines(s1, s2, modelName1, modelName2, ".off", ".obj");*/
 
+	cout << "***************************************************\n";
+	cout << "**                                               **\n";
+	cout << "**            Generate 3D Thin Shells            **\n";
+	cout << "**                                               **\n";
+	cout << "***************************************************\n";
+
+	string modelName = getFileName("", "bunny.off");
+	const int treeDepth = 3;
+	cout << "-- Model: " << modelName << endl;
+	cout << "-- Octree depth: " << treeDepth << endl;
+
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
 	startTimer(&timer);
-
-	string modelName = getFileName("", "bunny.off");
-	const int maxDepth = 7;
-	cout << "Octree depth = " << maxDepth << endl;
-	const int res = 60;
-	Octree octree(maxDepth, concatFilePath((string)MODEL_DIR, (string)"bunny.off"));
-
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), treeDepth);
+	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
-	printf("Create octree spent %lf s.\n", time);
+	printf("Create shells spent %lf s.\n", time);
 
-	startTimer(&timer);
-	octree.cpIntersection();
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("Compute intersection spent %lf s.\n", time);
-
-	startTimer(&timer);
-	octree.setSDF();
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("Compute SDF spent %lf s.\n", time);
-
-	startTimer(&timer);
-	octree.cpCoefficients();
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("Compute coefficients spent %lf s.\n", time);
-
-	startTimer(&timer);
-	octree.setBSplineValue();
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("Compute B-spline value spent %lf s.\n", time);
-
-	octree.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"txt_shell.obj"));
+	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	
+	const int res = 80;
+	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
+	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
 	startTimer(&timer);
-	octree.mcVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"mc_shell.obj"), V3i(res, res, res));
+	thinShell.mcVisualization(innerShellFile, V3i(res, res, res), outerShellFile, V3i(res, res, res));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("MarchingCubes spent %lf s.\n", time);

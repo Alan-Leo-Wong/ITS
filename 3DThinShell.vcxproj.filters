@@ -36,16 +36,13 @@
     <ClInclude Include="src\BasicDataType.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\CollisionDetection.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\BaseModel.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\ThinShells.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\utils\common.hpp">
+    <ClInclude Include="src\utils\Common.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
     <ClInclude Include="src\utils\Timer.hpp">
@@ -60,9 +57,6 @@
     <ClInclude Include="src\SDFHelper.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\MarchingCubes.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\utils\String.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
@@ -75,7 +69,7 @@
     <ClInclude Include="src\Octree.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\cuAcc\MarchingCubes\Define.h">
+    <ClInclude Include="src\cuAcc\MarchingCubes\MCDefine.h">
       <Filter>头文件\cudaAcc\MarchingCubes</Filter>
     </ClInclude>
     <ClInclude Include="src\cuAcc\MarchingCubes\LookTable.h">
@@ -93,11 +87,11 @@
     <ClInclude Include="src\utils\cuda\CUDAMath.hpp">
       <Filter>头文件\utils\cuda</Filter>
     </ClInclude>
+    <ClInclude Include="src\ModelDefine.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\CollisionDetection.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
