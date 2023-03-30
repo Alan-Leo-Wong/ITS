@@ -1,8 +1,8 @@
 #include "BaseModel.h"
 #include <sstream>   // ×Ö·ûÁ÷
 #include <iomanip>   // set the precision of output data
-#include <igl/writeOBJ.h>
-#include <igl/read_triangle_mesh.h>
+#include <igl\writeOBJ.h>
+#include <igl\read_triangle_mesh.h>
 
 vector<V3d> BaseModel::getVertices()const
 {
