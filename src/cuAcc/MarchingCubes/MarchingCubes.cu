@@ -36,7 +36,7 @@ inline __device__ double3 MCKernel::vertexLerp(const double3& p_0,
 	return lerp_p;
 }
 
-inline __device__ double MCKernel::computeSDF(const int numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes) {
+inline __device__ double MCKernel::computeSDF(const uint numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes) {
 	double sum = 0.0;
 	for (int i = 0; i < numNodes; ++i)
 		for (int j = 0; j < 8; ++j)
@@ -66,7 +66,7 @@ inline __device__ uint3 MCKernel::getVoxelShift(const uint& index,
  * @param d_voxelSDF       每个 voxel 八个顶点的 sdf 值
  * @param d_isValidVoxel   判断每个 voxel 是否是合理的 voxel
  */
-__global__ void MCKernel::determineVoxelKernel(const int numNodes, OctreeNode** d_allNodes, double* d_lambda,
+__global__ void MCKernel::determineVoxelKernel(const uint numNodes, OctreeNode** d_allNodes, double* d_lambda,
 	const uint nVoxels, const double* d_isoVal, const double3* d_voxelSize,
 	const double3* d_origin, const uint3* d_res,
 	const cudaTextureObject_t nVertsTex, uint* d_nVoxelVerts,
@@ -151,7 +151,7 @@ __global__ void MCKernel::compactVoxels(const uint nVoxels,
  * @param d_triPoints           输出，保存实际 mesh 的所有点位置
  */
 __global__ void MCKernel::voxelToMeshKernel(
-	const uint nValidVoxels, const int maxVerts, const double* d_isoVal,
+	const uint nValidVoxels, const uint maxVerts, const double* d_isoVal,
 	const double3* d_voxelSize, const double3* d_origin, const uint3* d_res,
 	const uint* d_compactedVoxelArray, const cudaTextureObject_t nVertsTex,
 	const cudaTextureObject_t triTex, uint* d_voxelCubeIndex,
@@ -399,7 +399,7 @@ inline void MC::freeResources() {
 	}
 }
 
-inline void MC::launch_determineVoxelKernel(const int& numNodes,
+inline void MC::launch_determineVoxelKernel(const uint& numNodes,
 	const uint& nVoxels,
 	const double& isoVal,
 	const uint& maxVerts) {
@@ -434,7 +434,7 @@ inline void MC::launch_determineVoxelKernel(const int& numNodes,
 	allTriVertices = lastElement + lastScanElement;
 }
 
-inline void MC::launch_compactVoxelsKernel(const int& nVoxels) {
+inline void MC::launch_compactVoxelsKernel(const uint& nVoxels) {
 	CUDA_CHECK(
 		cudaMalloc((void**)&d_compactedVoxelArray, sizeof(uint) * nVoxels));
 
