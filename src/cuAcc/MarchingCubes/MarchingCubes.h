@@ -21,12 +21,12 @@ namespace MCKernel {
 		const double& sdf_0, const double& sdf_1,
 		const double& isoVal);
 
-	__device__ double computeSDF(const int numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes);
+	__device__ double computeSDF(const uint numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes);
 
 	__device__ uint3 getVoxelShift(const uint& index, const uint3& d_res);
 
 	__global__ void
-		determineVoxelKernel(const int numNodes, OctreeNode** d_allNodes, double* d_lambda,
+		determineVoxelKernel(const uint numNodes, OctreeNode** d_allNodes, double* d_lambda,
 			const uint nVoxels, const double* d_isoVal,
 			const double3* d_voxelSize, const double3* d_origin,
 			const uint3* d_res, const cudaTextureObject_t nVertsTex,
@@ -38,7 +38,7 @@ namespace MCKernel {
 		uint* d_compactedVoxelArray);
 
 	__global__ void voxelToMeshKernel(
-		const uint nValidVoxels, const int maxVerts, const double* d_isoVal,
+		const uint nValidVoxels, const uint maxVerts, const double* d_isoVal,
 		const double3* d_voxelSize, const double3* d_origin, const uint3* d_res,
 		const uint* d_compactedVoxelArray, const cudaTextureObject_t nVertsTex,
 		const cudaTextureObject_t triTex, uint* d_voxelCubeIndex,
@@ -58,11 +58,11 @@ namespace MC {
 
 	void freeResources();
 
-	void launch_determineVoxelKernel(const int& numNodes, 
+	void launch_determineVoxelKernel(const uint& numNodes, 
 		const uint& nVoxels, const double& isoVal,
 		const uint& maxVerts);
 
-	void launch_compactVoxelsKernel(const int& nVoxels);
+	void launch_compactVoxelsKernel(const uint& nVoxels);
 
 	void launch_voxelToMeshKernel(const uint& maxVerts, const uint& nVoxels);
 

@@ -209,8 +209,8 @@ vector<vector<V3d>> BaseModel::extractIsoline(const vector<double>& scalarField,
 
 std::pair<BaseModel, BaseModel> BaseModel::splitModelByIsoline(const vector<double>& scalarField, const double& val)const
 {
-	vector<V3i>faceLess;
-	vector<V3i>faceLarger;
+	vector<V3i> faceLess;
+	vector<V3i> faceLarger;
 
 	auto verts_copy = modelVerts;
 	set<int>splitedFaces;               // 需要切分的面的id的集合
@@ -473,7 +473,9 @@ vector<V3i> BaseModel::getFaces() const
 	return modelFaces;
 }
 
-//! I/O
+//////////////////////
+//    I/O: Model    //
+//////////////////////
 void BaseModel::readFile(const string& filename)
 {
 	igl::read_triangle_mesh(filename, m_V, m_F);
