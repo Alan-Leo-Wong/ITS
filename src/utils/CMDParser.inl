@@ -4,7 +4,7 @@
  * @Date: 2023-01-29 12:31:31
  * @LastEditors: WangLei
  * @LastEditTime: 2023-01-30 10:50:00
- * @FilePath: 
+ * @FilePath:
  * @Description:
  */
 #pragma once
@@ -28,8 +28,8 @@ inline void cmdLineCleanUp<bool>(bool* t) {}
 template <>
 inline void cmdLineCleanUp<char*>(char** t)
 {
-    if (*t) free(*t);
-    *t = nullptr;
+	if (*t) free(*t);
+	*t = nullptr;
 }
 
 template <>
@@ -69,13 +69,13 @@ inline bool cmdLineCopy(bool t) { return t; }
 template <>
 char* cmdLineCopy(char* t)
 {
-    return _strdup(t);
+	return _strdup(t);
 }
 #else  // !WIN
 template <>
 inline char* cmdLineCopy(char* t)
 {
-    return strdup(t);
+	return strdup(t);
 }
 #endif // WIN
 
@@ -95,13 +95,13 @@ inline double cmdLineStringToT(const char* str) { return double(atof(str)); }
 template <>
 inline char* cmdLineStringToT(const char* str)
 {
-    return _strdup(str);
+	return _strdup(str);
 }
 #else  // !WIN
 template <>
 inline char* cmdLineStringToT(const char* str)
 {
-    return strdup(str);
+	return strdup(str);
 }
 #endif // WIN32 || _WIN64
 
@@ -109,104 +109,103 @@ inline char* cmdLineStringToT(const char* str)
 // ParserInterface //
 /////////////////////
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-inline ParserInterface::ParserInterface(const char *name) : set(false)
+inline ParserInterface::ParserInterface(const char* name) : set(false)
 {
-    this->name = _strdup(name);
+	this->name = _strdup(name);
 }
 #else  // !WIN
-inline ParserInterface::ParserInterface(const char *name) : set(false)
+inline ParserInterface::ParserInterface(const char* name) : set(false)
 {
-    this->name = strdup(name);
+	this->name = strdup(name);
 }
 #endif // WIN
 
 inline ParserInterface::~ParserInterface()
 {
-    if (name)
-        free(name);
-    name = nullptr;
+	if (name) free(name);
+	name = nullptr;
 }
 
-inline int ParserInterface::read(int argc, char **argv)
+inline int ParserInterface::read(int argc, char** argv)
 {
-    set = true;
-    return 0;
+	set = true;
+	return 0;
 }
 
 //////////////////////
 // CmdLineParameter //
 //////////////////////
 template <typename T>
-CmdLineParameter<T>::CmdLineParameter(const char *name) : ParserInterface(name)
+CmdLineParameter<T>::CmdLineParameter(const char* name) : ParserInterface(name)
 {
-    value = cmdLineInitialize<T>();
+	value = cmdLineInitialize<T>();
 }
 
 template <typename T>
-CmdLineParameter<T>::CmdLineParameter(const char *name, T v) : ParserInterface(name)
+CmdLineParameter<T>::CmdLineParameter(const char* name, T v) : ParserInterface(name)
 {
-    value = cmdLineCopy<T>(v);
+	value = cmdLineCopy<T>(v);
 }
 
 template <typename T>
 CmdLineParameter<T>::~CmdLineParameter()
 {
-    cmdLineCleanUp(&value);
+	cmdLineCleanUp(&value);
 }
 
 template <typename T>
-inline int CmdLineParameter<T>::read(int argc, char **argv)
+inline int CmdLineParameter<T>::read(int argc, char** argv)
 {
-    if (argc > 0)
-    {
-        cmdLineCleanUp<T>(&value);
-        value = cmdLineStringToT<T>(argv[0]);
-        set = true;
-        return 1;
-    }
-    else
-        return 0;
+	if (argc > 0)
+	{
+		cmdLineCleanUp<T>(&value);
+		value = cmdLineStringToT<T>(argv[0]);
+		set = true;
+		return 1;
+	}
+	else
+		return 0;
 }
 
 template <>
-inline int CmdLineParameter<bool>::read(int argc, char **argv)
+inline int CmdLineParameter<bool>::read(int argc, char** argv)
 {
-    cmdLineCleanUp<bool>(&value);
-    set = value = true;
-    return 0;
+	cmdLineCleanUp<bool>(&value);
+	set = value = true;
+	return 0;
 }
 
-inline void cmdLineParse(int argc, char **argv, ParserInterface **params)
+inline void cmdLineParse(int argc, char** argv, ParserInterface** params)
 {
-    while (argc > 0)
-    {
-        if (argv[0][0] == '-' && argv[0][1] == '-')
-        {
-            ParserInterface *readable = nullptr;
-            for (int i = 0; params[i] != nullptr && readable == nullptr; i++)
-            {
-                if (!strcasecmp(params[i]->name, argv[0] + 2))
-                    readable = params[i];
-                if (i == argc)
-                    break;
-            }
-            if (readable)
-            {
-                /*{set = true; return 1;}*/
-                int j = readable->read(argc - 1, argv + 1);
-                argv += j, argc -= j;
-            }
-            else
-            {
-                printf("Invalid option: %s, options should like:\n", argv[0]);
-                for (int i = 0; params[i] != nullptr; i++)
-                    fprintf(stderr, "\t--%s\n", params[i]->name);
-            }
-        }
-        else
-        {
-            printf("Parameter name should be of the form '--%s value' or '--%s(%s must be of a bool type in this form)'\n", argv[0], argv[0], argv[0]);
-        }
-        ++argv, --argc;
-    }
+	while (argc > 0)
+	{
+		if (argv[0][0] == '-' && argv[0][1] == '-')
+		{
+			ParserInterface* readable = nullptr;
+			for (int i = 0; params[i] != nullptr && readable == nullptr; i++)
+			{
+				if (!strcasecmp(params[i]->name, argv[0] + 2))
+					readable = params[i];
+				if (i == argc)
+					break;
+			}
+			if (readable)
+			{
+				/*{set = true; return 1;}*/
+				int j = readable->read(argc - 1, argv + 1);
+				argv += j, argc -= j;
+			}
+			else
+			{
+				printf("Invalid option: %s, options should like:\n", argv[0]);
+				for (int i = 0; params[i] != nullptr; i++)
+					fprintf(stderr, "\t--%s\n", params[i]->name);
+			}
+		}
+		else
+		{
+			printf("Parameter name should be of the form '--%s value' or '--%s(%s must be of a bool type in this form)'\n", argv[0], argv[0], argv[0]);
+		}
+		++argv, --argc;
+	}
 }

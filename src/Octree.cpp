@@ -88,6 +88,21 @@ inline bool OctreeNode::isInDomain(const PV3d& q_boundary)
 //	return x * y * z;
 //}
 
+void Octree::createOctree(const BoundingBox& bb)
+{
+	const size_t pointNum = modelVerts.size();
+	vector<size_t> idxOfPoints(pointNum);
+	std::iota(idxOfPoints.begin(), idxOfPoints.end(), 0); // 0~pointNum-1
+
+	V3d width = bb.boxWidth;
+	PV3d boundary = std::make_pair(bb.boxOrigin, bb.boxEnd);
+
+	root = new OctreeNode(numNodes++, 0, width, boundary, idxOfPoints);
+	createNode(root, 0, width, boundary, idxOfPoints);
+
+	saveNodeCorners2OBJFile(concatFilePath((string)VIS_DIR, modelName, std::to_string(maxDepth), (string)"octree.obj"));
+}
+
 void Octree::createOctree(const double& scaleSize)
 {
 	const size_t pointNum = modelVerts.size();
@@ -169,7 +184,6 @@ void Octree::createNode(OctreeNode*& node, const int& depth, const V3d& width, c
 
 void Octree::cpIntersection()
 {
-	cout << "Extracting edges from " << std::quoted(modelName) << "..." << endl;
 	vector<V2i> modelEdges = extractEdges();
 	cout << "--Number of edges = " << modelEdges.size() << endl;
 	cout << "--Number of leaf nodes = " << nLeafNodes << endl;
@@ -359,9 +373,9 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 			V3d i_corner = node->corners[k];
 			for (const auto& id_ck : corner2IDs[i_corner])
 			{
-				const UINT o_id = id_ck.first;
-				const UINT o_k = id_ck.second;
-				const UINT o_realID = o_id * 8 + o_k;
+				const uint o_id = id_ck.first;
+				const uint o_k = id_ck.second;
+				const uint o_realID = o_id * 8 + o_k;
 
 				if (visID[o_realID] && fabs(allNodes[o_id]->width[0] - node->width[0]) > 1e-9) continue;
 				visID[o_realID] = true;
@@ -428,7 +442,7 @@ void Octree::cpCoefficients()
 		for (int k = 0; k < 8; ++k)
 		{
 			V3d i_corner = node_i->corners[k];
-			const UINT ic_row = i * 8 + k;
+			const uint ic_row = i * 8 + k;
 
 			/*if (8 * i + k == 9)
 			{
@@ -442,9 +456,9 @@ void Octree::cpCoefficients()
 			for (const auto& id_ck : corner2IDs[i_corner])
 			{
 				// i_corner所在的其他节点的id和位置
-				const UINT o_id = id_ck.first;
-				const UINT o_k = id_ck.second;
-				const UINT o_realID = o_id * 8 + o_k;
+				const uint o_id = id_ck.first;
+				const uint o_k = id_ck.second;
+				const uint o_realID = o_id * 8 + o_k;
 
 				if (!visID[o_realID])
 				{

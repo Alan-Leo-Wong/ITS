@@ -8,6 +8,7 @@
  * 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #pragma once
+#include "..\..\Octree.h"
 #include "..\..\utils\cuda\CUDACheck.cuh"
 #include "..\..\utils\cuda\CUDAMath.hpp"
 
@@ -20,12 +21,13 @@ namespace MCKernel {
 		const double& sdf_0, const double& sdf_1,
 		const double& isoVal);
 
-	__device__ double computeSDF(double3 pos);
+	__device__ double computeSDF(const int numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes);
 
 	__device__ uint3 getVoxelShift(const uint& index, const uint3& d_res);
 
 	__global__ void
-		determineVoxelKernel(const uint nVoxels, const double* d_isoVal,
+		determineVoxelKernel(const int numNodes, OctreeNode** d_allNodes, double* d_lambda,
+			const uint nVoxels, const double* d_isoVal,
 			const double3* d_voxelSize, const double3* d_origin,
 			const uint3* d_res, const cudaTextureObject_t nVertsTex,
 			uint* d_nVoxelVerts, uint* d_voxelCubeIndex,
@@ -49,13 +51,15 @@ namespace MC {
 	void setTextureObject(const uint& srcSizeInBytes, int* srcDev,
 		cudaTextureObject_t* texObj);
 
-	void initResources(const uint3& resolution, const uint& nVoxels,
+	void initResources(const vector<OctreeNode*> allNodes, const VXd& lambda, 
+		const uint3& resolution, const uint& nVoxels,
 		const double& isoVal, const double3& gridOrigin,
 		const double3& voxelSize, const uint& maxVerts);
 
 	void freeResources();
 
-	void launch_determineVoxelKernel(const uint& nVoxels, const double& isoVal,
+	void launch_determineVoxelKernel(const int& numNodes, 
+		const uint& nVoxels, const double& isoVal,
 		const uint& maxVerts);
 
 	void launch_compactVoxelsKernel(const int& nVoxels);
@@ -64,5 +68,7 @@ namespace MC {
 
 	void writeToOBJFile(const std::string& filename);
 
-	void marching_cubes(int argc, char** argv);
+	void marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda, 
+		const double3& gridOrigin, const double3& gridWidth,
+		const uint3& resolution, const double& isoVal, const std::string& filename);
 } // namespace MC
