@@ -32,6 +32,7 @@
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\Common.hpp" />
+    <ClInclude Include="src\utils\cuda\cuBLASCheck.cuh" />
     <ClInclude Include="src\utils\cuda\CUDACheck.cuh" />
     <ClInclude Include="src\utils\cuda\CUDAMacro.h" />
     <ClInclude Include="src\utils\cuda\CUDAMath.hpp" />
@@ -51,6 +52,7 @@
   <ItemGroup>
     <CudaCompile Include="src\cuAcc\CUDACompute.cu" />
     <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu" />
+    <CudaCompile Include="src\cuAcc\MarchingCubes\SDFCompute.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

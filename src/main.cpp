@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 	cout << "***************************************************\n";
 
 	string modelName = getFileName("", "bunny.off");
-	const int treeDepth = 3;
+	const int treeDepth = 7;
 	cout << "-- Model: " << modelName << endl;
 	cout << "-- Octree depth: " << treeDepth << endl;
 
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
-	printf("Create shells spent %lf s.\n", time);
+	printf("\nCreate shells spent %lf s.\n", time);
 
 	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 	thinShell.mcVisualization(innerShellFile, V3i(res, res, res), outerShellFile, V3i(res, res, res));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
-	printf("MarchingCubes spent %lf s.\n", time);
+	printf("\nMarchingCubes spent %lf s.\n", time);
 
 	deleteTimer(&timer);
 

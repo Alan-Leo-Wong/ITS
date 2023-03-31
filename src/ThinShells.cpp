@@ -194,8 +194,6 @@ inline void ThinShells::cpCoefficients()
 	SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
 	vector<Trip> matVal;
 
-	cout << bSplineTree.allNodes[0]->depth << endl;
-
 	for (int i = 0; i < nAllNodes; ++i)
 	{
 		auto node_i = bSplineTree.allNodes[i];
@@ -238,7 +236,8 @@ inline void ThinShells::cpCoefficients()
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
 	lscg.compute(A);
 	lambda = lscg.solve(b);
-	cout << "--Residual Error: " << (A * lambda - b).norm() << endl;
+
+	cout << "-- Residual Error: " << (A * lambda - b).norm() << endl;
 
 	//saveCoefficients(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Coefficients.txt"));
 }
@@ -292,7 +291,7 @@ inline void ThinShells::initBSplineTree()
 	cout << "=====================\n";
 	saveIntersections("", "");
 
-	cout << "\nComputing SDF of tree nodes..." << endl;
+	cout << "\nComputing discrete SDF of tree nodes..." << endl;
 	cpSDFOfTreeNodes();
 	cout << "=====================\n";
 	saveSDFValue("");
@@ -406,12 +405,20 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	V3d gridWidth = modelBoundingBox.boxWidth;
 
 	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
+	{
+		cout << "\nExtract inner shell by MarchingCubes..." << endl;
 		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
-
+		cout << "=====================\n";
+	}
+		
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
+	{
+		cout << "\nExtract outer shell by MarchingCubes..." << endl;
 		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
+		cout << "=====================\n";
+	}
 }
 
 void ThinShells::textureVisualization(const string& filename) const

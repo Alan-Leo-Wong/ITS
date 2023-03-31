@@ -2,8 +2,21 @@
 
 namespace MC {
 
-#ifndef NTHREADS
-#  define NTHREADS 256
+// 用于kernel: prepareMatrix
+#ifndef P_NTHREADS_X
+#  define P_NTHREADS_X 64
+#endif // !P_NTHREADS_X
+#ifndef P_NTHREADS_Y
+#  define P_NTHREADS_Y 16
+#endif // !P_NTHREADS_Y
+
+// 用于kernel: determine和tomesh
+#ifndef V_NTHREADS
+#  define V_NTHREADS 256
 #endif // !NTHREADS
+
+#ifndef MAX_NUM_STREAMS
+#  define MAX_NUM_STREAMS 4 // 用于处理行方向--voxel的最大分块数
+#endif // !MAX_NUM_STREAMS
 
 } // namespace MC

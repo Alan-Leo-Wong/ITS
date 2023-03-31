@@ -1,7 +1,41 @@
-//#include "CUDACompute.h"
+#include "CUDACompute.h"
+#include <vector>
 //#include "utils.hpp"
 //#include <cuda/std/limits>
-//
+
+void launch_BLASRowSumReduce(const cudaStream_t& stream,
+	const int& rows,
+	const int& columns,
+	double* d_matrix,
+	double* d_res)
+{
+	cublasOperation_t transa = CUBLAS_OP_N;
+	cublasOperation_t transb = CUBLAS_OP_N;
+
+	const double alpha = 1.0;
+	const double beta = 0.0;
+
+	const int lda = 1;
+	const int ldb = columns;
+	const int ldc = lda;
+
+	cublasHandle_t cublasH = nullptr;
+	CUBLAS_CHECK(cublasCreate(&cublasH));
+
+	if (stream != nullptr)
+		CUBLAS_CHECK(cublasSetStream(cublasH, stream));
+
+	std::vector<double> identityVector(columns, (double)1.0); // 全1的向量
+	double* d_vec;
+	CUDA_CHECK(cudaMalloc((void**)&d_vec, sizeof(double) * columns));
+	CUDA_CHECK(cudaMemcpyAsync(d_vec, identityVector.data(), sizeof(double) * columns, cudaMemcpyHostToDevice, stream));
+
+	CUBLAS_CHECK(cublasDgemm(cublasH, transa, transb, 1, rows, columns, &alpha, d_vec, lda, d_matrix, ldb, &beta, d_res, ldc));
+
+	CUBLAS_CHECK(cublasDestroy(cublasH));
+	CUDA_CHECK(cudaFree(d_vec));
+}
+
 //__global__ void intersectionKernel(const MXd d_V,
 //	const V2i* d_modelEdges,
 //	const OctreeNode** d_leafNodes,

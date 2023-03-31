@@ -90,6 +90,9 @@
     <ClInclude Include="src\ModelDefine.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\utils\cuda\cuBLASCheck.cuh">
+      <Filter>头文件\utils\cuda</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -116,6 +119,9 @@
     </CudaCompile>
     <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu">
       <Filter>源文件\cudaAcc\MarchingCubes</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\cuAcc\MarchingCubes\SDFCompute.cu">
+      <Filter>头文件\cudaAcc\MarchingCubes</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>
