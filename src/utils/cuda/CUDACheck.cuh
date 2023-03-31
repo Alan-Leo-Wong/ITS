@@ -20,7 +20,6 @@
     } while (0);
 
 #define getLastCudaError(msg) __getLastCudaError(msg, __FILE__, __LINE__)
-
 inline void __getLastCudaError(const char* errorMessage, const char* file, const int line)
 {
 	const cudaError_t error_code = cudaGetLastError();

@@ -21,17 +21,20 @@ namespace MCKernel {
 		const double& sdf_0, const double& sdf_1,
 		const double& isoVal);
 
-	__device__ double computeSDF(const uint numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes);
+	__device__ double computeSDF(const uint numNodes, double3 pos, double* d_lambda, V3d* d_nodeCorners, V3d* d_nodeWidth);
 
 	__device__ uint3 getVoxelShift(const uint& index, const uint3& d_res);
 
+	__global__ void prepareMatrixKernel(const uint nVoxelElems, const uint nAllNodes, 
+		const uint* d_voxelOffset, const uint3* d_res, double* d_lambda, 
+		double3* d_origin, double3* d_voxelSize,
+		V3d* d_nodeCorners, V3d* d_nodeWidth, double* d_voxelMatrix);
+
 	__global__ void
-		determineVoxelKernel(const uint numNodes, OctreeNode** d_allNodes, double* d_lambda,
-			const uint nVoxels, const double* d_isoVal,
-			const double3* d_voxelSize, const double3* d_origin,
-			const uint3* d_res, const cudaTextureObject_t nVertsTex,
+		determineVoxelKernel(const uint nVoxels, const double* d_isoVal,
+			const cudaTextureObject_t nVertsTex,
 			uint* d_nVoxelVerts, uint* d_voxelCubeIndex,
-			double* d_voxelSDF, uint* d_isValidVoxel);
+			double* d_voxelSDF, uint* d_isValidVoxelArray);
 
 	__global__ void compactVoxels(const uint nVoxels, const uint* d_isValidVoxel,
 		const uint* d_nValidVoxelsScan,
@@ -46,21 +49,68 @@ namespace MCKernel {
 } // namespace MCKernel
 
 namespace MC {
+	// host
+	namespace {
+		uint nAllNodes = 0;
+
+		uint allTriVertices = 0, nValidVoxels = 0;
+
+		double3* h_triPoints = nullptr; // output
+	} // namespace
+
+	// device
+	namespace {
+		V3d* d_nodeCorners = nullptr;
+		V3d* d_nodeWidth = nullptr;
+
+		double* d_lambda = nullptr;
+
+		uint3* d_res = nullptr;
+		double* d_isoVal = nullptr;
+
+		uint* d_nVoxelVertsArray = nullptr;
+		uint* d_nVoxelVertsScan = nullptr;
+
+		uint* d_isValidVoxelArray = nullptr;
+		uint* d_nValidVoxelsScan = nullptr;
+
+		double3* d_gridOrigin = nullptr;
+		double3* d_voxelSize = nullptr;
+
+		double* d_voxelSDF = nullptr;
+		uint* d_voxelCubeIndex = nullptr;
+
+		uint* d_compactedVoxelArray = nullptr;
+
+		int* d_triTable = nullptr;
+		int* d_nVertsTable = nullptr;
+
+		// textures containing look-up tables
+		cudaTextureObject_t triTex;
+		cudaTextureObject_t nVertsTex;
+
+		double3* d_triPoints = nullptr; // output
+	} // namespace
+} // namespace MC
+
+namespace MC {
 	void d_thrustExclusiveScan(const uint& nElems, uint* input, uint* output);
 
 	void setTextureObject(const uint& srcSizeInBytes, int* srcDev,
 		cudaTextureObject_t* texObj);
 
-	void initResources(const vector<OctreeNode*> allNodes, const VXd& lambda, 
+	void initResources(const vector<OctreeNode*> allNodes, const VXd& lambda,
 		const uint3& resolution, const uint& nVoxels,
 		const double& isoVal, const double3& gridOrigin,
 		const double3& voxelSize, const uint& maxVerts);
 
 	void freeResources();
 
-	void launch_determineVoxelKernel(const uint& numNodes, 
-		const uint& nVoxels, const double& isoVal,
-		const uint& maxVerts);
+	void launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& voxelOffset, const cudaStream_t& stream, double* d_voxelMatrix);
+
+	void launch_computSDFKernel(const uint& nVoxels);
+
+	void launch_determineVoxelKernel(const uint& nVoxels, const double& isoVal, const uint& maxVerts);
 
 	void launch_compactVoxelsKernel(const uint& nVoxels);
 
@@ -68,7 +118,7 @@ namespace MC {
 
 	void writeToOBJFile(const std::string& filename);
 
-	void marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda, 
+	void marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda,
 		const double3& gridOrigin, const double3& gridWidth,
 		const uint3& resolution, const double& isoVal, const std::string& filename);
 } // namespace MC

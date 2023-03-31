@@ -36,17 +36,21 @@ inline __device__ double3 MCKernel::vertexLerp(const double3& p_0,
 	return lerp_p;
 }
 
-inline __device__ double MCKernel::computeSDF(const uint numNodes, double3 pos, double* d_lambda, OctreeNode** d_allNodes) {
+inline __device__ double MCKernel::computeSDF(const uint numNodes, double3 pos, double* d_lambda,
+	V3d* d_nodeCorners, V3d* d_nodeWidth) {
 	double sum = 0.0;
 	for (int i = 0; i < numNodes; ++i)
+	{
+		V3d width = d_nodeWidth[i];
 		for (int j = 0; j < 8; ++j)
-			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_allNodes[i]->corners[j], d_allNodes[i]->width, V3d(pos.x, pos.y, pos.z));
+			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_nodeCorners[i * 8 + j], width, V3d(pos.x, pos.y, pos.z));
+	}
+
 	return sum;
 }
 
-inline __device__ uint3 MCKernel::getVoxelShift(const uint& index,
+__device__ uint3 MCKernel::getVoxelShift(const uint& index,
 	const uint3& d_res) {
-	// TODO
 	uint x = index % d_res.x;
 	uint y = index % (d_res.x * d_res.y) / d_res.x;
 	uint z = index / (d_res.x * d_res.y);
@@ -54,53 +58,34 @@ inline __device__ uint3 MCKernel::getVoxelShift(const uint& index,
 }
 
 /**
- * @brief 计算每个体素的sdf值和确定分布情况
+ * @brief 通过每个体素的sdf值确定分布情况
  *
- * @param nVoxels          voxel的总数量 = res_x * res_y * res_z
- * @param voxelSize        每个 voxel 的大小
- * @param d_isoVal         isosurface value
- * @param d_origin         MC算法被执行的初始区域原点坐标
- * @param d_res            分辨率
- * @param d_nVoxelVerts    经过 cube index 映射后每个 voxel 内应含点的数量
- * @param d_VoxelCubeIndex 每个 voxel 内 sdf 分布所对应的 cube index
- * @param d_voxelSDF       每个 voxel 八个顶点的 sdf 值
- * @param d_isValidVoxel   判断每个 voxel 是否是合理的 voxel
+ * @param nVoxels             voxel的总数量 = res_x * res_y * res_z
+ * @param d_isoVal            isosurface value
+ * @param nVertsTex           存储lookTabel对应数据的纹理对象
+ * @param d_nVoxelVerts       经过 cube index 映射后每个 voxel 内应含点的数量
+ * @param d_VoxelCubeIndex    每个 voxel 内 sdf 分布所对应的 cube index
+ * @param d_voxelSDF          每个 voxel 八个顶点的 sdf 值
+ * @param d_isValidVoxelArray 判断每个 voxel 是否是合理的 voxel
  */
-__global__ void MCKernel::determineVoxelKernel(const uint numNodes, OctreeNode** d_allNodes, double* d_lambda,
-	const uint nVoxels, const double* d_isoVal, const double3* d_voxelSize,
-	const double3* d_origin, const uint3* d_res,
-	const cudaTextureObject_t nVertsTex, uint* d_nVoxelVerts,
-	uint* d_voxelCubeIndex, double* d_voxelSDF, uint* d_isValidVoxel) {
+__global__ void MCKernel::determineVoxelKernel(const uint nVoxels,
+	const double* d_isoVal,
+	const cudaTextureObject_t nVertsTex,
+	uint* d_nVoxelVerts,
+	uint* d_voxelCubeIndex,
+	double* d_voxelSDF,
+	uint* d_isValidVoxelArray) {
 	uint bid = blockIdx.y * gridDim.x + blockIdx.x;
 	uint tid = bid * blockDim.x + threadIdx.x;
 
 	if (tid < nVoxels) {
 		double isoVal = *d_isoVal;
 
-		uint3 voxelShift = getVoxelShift(tid, *d_res);
-		double3 origin = *d_origin;
-		double3 voxelSize = *d_voxelSize;
-		double3 voxelPos; // voxel 原点坐标
-
-		voxelPos.x = origin.x + voxelShift.x * voxelSize.x;
-		voxelPos.y = origin.y + voxelShift.y * voxelSize.y;
-		voxelPos.z = origin.z + voxelShift.z * voxelSize.z;
-
-		double3 corners[8];
-		corners[0] = voxelPos;
-		corners[1] = voxelPos + make_double3(0, voxelSize.y, 0);
-		corners[2] = voxelPos + make_double3(voxelSize.x, voxelSize.y, 0);
-		corners[3] = voxelPos + make_double3(voxelSize.x, 0, 0);
-		corners[4] = voxelPos + make_double3(0, 0, voxelSize.z);
-		corners[5] = voxelPos + make_double3(0, voxelSize.y, voxelSize.z);
-		corners[6] = voxelPos + make_double3(voxelSize.x, voxelSize.y, voxelSize.z);
-		corners[7] = voxelPos + make_double3(voxelSize.x, 0, voxelSize.z);
-
 		double sdf[8];
-		for (int i = 0; i < 8; ++i) {
-			sdf[i] = computeSDF(numNodes, corners[i], d_lambda, d_allNodes);
-			d_voxelSDF[tid * 8 + i] = sdf[i];
-		}
+
+#pragma unroll
+		for (int i = 0; i < 8; ++i)
+			sdf[i] = d_voxelSDF[tid * 8 + i];
 
 		int cubeIndex = 0;
 		cubeIndex = (uint(sdf[0] < isoVal)) | (uint(sdf[1] < isoVal) << 1) |
@@ -110,7 +95,7 @@ __global__ void MCKernel::determineVoxelKernel(const uint numNodes, OctreeNode**
 
 		int nVerts = tex1Dfetch<int>(nVertsTex, cubeIndex);
 		d_nVoxelVerts[tid] = nVerts;
-		d_isValidVoxel[tid] = nVerts > 0;
+		d_isValidVoxelArray[tid] = nVerts > 0;
 		d_voxelCubeIndex[tid] = cubeIndex;
 	}
 }
@@ -150,8 +135,7 @@ __global__ void MCKernel::compactVoxels(const uint nVoxels,
  * @param d_nVertsScanned       所有合理 voxel 的点数量前缀和
  * @param d_triPoints           输出，保存实际 mesh 的所有点位置
  */
-__global__ void MCKernel::voxelToMeshKernel(
-	const uint nValidVoxels, const uint maxVerts, const double* d_isoVal,
+__global__ void MCKernel::voxelToMeshKernel(const uint nValidVoxels, const uint maxVerts, const double* d_isoVal,
 	const double3* d_voxelSize, const double3* d_origin, const uint3* d_res,
 	const uint* d_compactedVoxelArray, const cudaTextureObject_t nVertsTex,
 	const cudaTextureObject_t triTex, uint* d_voxelCubeIndex,
@@ -231,47 +215,6 @@ __global__ void MCKernel::voxelToMeshKernel(
 	}
 }
 
-namespace MC {
-	// host
-	namespace {
-		uint allTriVertices = 0, nValidVoxels = 0;
-
-		double3* h_triPoints = nullptr; // output
-	} // namespace
-
-	// device
-	namespace {
-		OctreeNode** d_allNodes;
-		double* d_lambda;
-
-		uint3* d_res = nullptr;
-		double* d_isoVal = nullptr;
-
-		uint* d_nVoxelVertsArray = nullptr;
-		uint* d_nVoxelVertsScan = nullptr;
-
-		uint* d_isValidVoxelArray = nullptr;
-		uint* d_nValidVoxelsScan = nullptr;
-
-		double3* d_gridOrigin = nullptr;
-		double3* d_voxelSize = nullptr;
-
-		double* d_voxelSDF = nullptr;
-		uint* d_voxelCubeIndex = nullptr;
-
-		uint* d_compactedVoxelArray = nullptr;
-
-		int* d_triTable = nullptr;
-		int* d_nVertsTable = nullptr;
-
-		// textures containing look-up tables
-		cudaTextureObject_t triTex;
-		cudaTextureObject_t nVertsTex;
-
-		double3* d_triPoints = nullptr; // output
-	} // namespace
-} // namespace MC
-
 inline void MC::d_thrustExclusiveScan(const uint& nElems, uint* input,
 	uint* output) {
 	thrust::exclusive_scan(thrust::device_ptr<uint>(input),
@@ -308,16 +251,21 @@ inline void MC::initResources(const vector<OctreeNode*> allNodes, const VXd& lam
 	const double3& voxelSize, const uint& maxVerts) {
 	// host
 		{
+			nAllNodes = allNodes.size();
 			h_triPoints = (double3*)malloc(sizeof(double3) * maxVerts);
-			// printf("h_triPoints = %d\n", h_triPoints);
 		}
 
 		// device
 		{
-			CUDA_CHECK(cudaMalloc((void**)&d_allNodes, sizeof(OctreeNode*) * allNodes.size()));
-			CUDA_CHECK(cudaMemcpy(d_allNodes, allNodes.data(), sizeof(OctreeNode*) * allNodes.size(), cudaMemcpyHostToDevice));
+			CUDA_CHECK(cudaMalloc((void**)&d_nodeCorners, sizeof(V3d) * nAllNodes * 8));
+			CUDA_CHECK(cudaMalloc((void**)&d_nodeWidth, sizeof(V3d) * nAllNodes));
+			for (int i = 0; i < nAllNodes; ++i)
+			{
+				CUDA_CHECK(cudaMemcpy(d_nodeCorners + i * 8, allNodes[i]->corners, sizeof(V3d) * 8, cudaMemcpyHostToDevice));
+				CUDA_CHECK(cudaMemcpy(d_nodeWidth + i, &(allNodes[i]->width), sizeof(V3d), cudaMemcpyHostToDevice));
+			}
 
-			CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows()));
+			CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows())); // lambda.rows() == nAllNodes * 8
 			CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice));
 
 			CUDA_CHECK(cudaMalloc((void**)&d_res, sizeof(uint3)));
@@ -370,11 +318,13 @@ inline void MC::freeResources() {
 
 	// device
 	{
-		CUDA_CHECK(cudaFree(d_allNodes));
+		CUDA_CHECK(cudaFree(d_nodeCorners));
+		CUDA_CHECK(cudaFree(d_nodeWidth));
+
 		CUDA_CHECK(cudaFree(d_lambda));
 
-
 		CUDA_CHECK(cudaFree(d_res));
+		CUDA_CHECK(cudaFree(d_isoVal));
 
 		CUDA_CHECK(cudaFree(d_nVoxelVertsArray));
 		CUDA_CHECK(cudaFree(d_nVoxelVertsScan);)
@@ -388,6 +338,8 @@ inline void MC::freeResources() {
 		CUDA_CHECK(cudaFree(d_voxelSDF));
 		CUDA_CHECK(cudaFree(d_voxelCubeIndex));
 
+		CUDA_CHECK(cudaFree(d_compactedVoxelArray));
+
 		CUDA_CHECK(cudaFree(d_triTable));
 		CUDA_CHECK(cudaFree(d_nVertsTable));
 
@@ -399,21 +351,20 @@ inline void MC::freeResources() {
 	}
 }
 
-inline void MC::launch_determineVoxelKernel(const uint& numNodes,
-	const uint& nVoxels,
+inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
 	const double& isoVal,
 	const uint& maxVerts) {
-	dim3 nThreads(NTHREADS, 1, 1);
+	dim3 nThreads(V_NTHREADS, 1, 1);
 	dim3 nBlocks((nVoxels + nThreads.x - 1) / nThreads.x, 1, 1);
 	while (nBlocks.x > 65535) {
 		nBlocks.x /= 2;
 		nBlocks.y *= 2;
 	}
 
-	MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (
-		numNodes, d_allNodes, d_lambda, nVoxels, d_isoVal, d_voxelSize, d_gridOrigin, d_res, nVertsTex,
+	MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (nVoxels, d_isoVal, nVertsTex, 
 		d_nVoxelVertsArray, d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);
 	getLastCudaError("Kernel: 'determineVoxelKernel' failed!\n");
+	cudaDeviceSynchronize();
 
 	d_thrustExclusiveScan(nVoxels, d_nVoxelVertsArray, d_nVoxelVertsScan);
 	d_thrustExclusiveScan(nVoxels, d_isValidVoxelArray, d_nValidVoxelsScan);
@@ -438,7 +389,7 @@ inline void MC::launch_compactVoxelsKernel(const uint& nVoxels) {
 	CUDA_CHECK(
 		cudaMalloc((void**)&d_compactedVoxelArray, sizeof(uint) * nVoxels));
 
-	dim3 nThreads(NTHREADS, 1, 1);
+	dim3 nThreads(V_NTHREADS, 1, 1);
 	dim3 nBlocks((nVoxels + nThreads.x - 1) / nThreads.x, 1, 1);
 	while (nBlocks.x > 65535) {
 		nBlocks.x /= 2;
@@ -452,7 +403,7 @@ inline void MC::launch_compactVoxelsKernel(const uint& nVoxels) {
 
 inline void MC::launch_voxelToMeshKernel(const uint& maxVerts,
 	const uint& nVoxels) {
-	dim3 nThreads(NTHREADS, 1, 1);
+	dim3 nThreads(V_NTHREADS, 1, 1);
 	dim3 nBlocks((nValidVoxels + nThreads.x - 1) / nThreads.x, 1, 1);
 	while (nBlocks.x > 65535) {
 		nBlocks.x /= 2;
@@ -478,8 +429,8 @@ inline void MC::writeToOBJFile(const std::string& filename) {
 		return;
 	}
 
-	printf("The number of mesh's vertices = %d\n", allTriVertices);
-	printf("The number of mesh's faces = %d\n", allTriVertices / 3);
+	printf("-- The number of mesh's vertices = %d\n", allTriVertices);
+	printf("-- The number of mesh's faces = %d\n", allTriVertices / 3);
 	for (int i = 0; i < allTriVertices; i += 3) {
 		const int faceIdx = i;
 
@@ -524,9 +475,9 @@ void MC::marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda,
 
 	initResources(allNodes, lambda, resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
 
-	launch_determineVoxelKernel(allNodes.size(), nVoxels, isoVal, maxVerts);
+	launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
 	if (allTriVertices == 0) {
-		printf("There is no valid vertices...\n");
+		printf("-- MC: There is no valid vertices...\n");
 		return;
 	}
 
@@ -537,10 +488,10 @@ void MC::marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda,
 	end = system_clock::now();
 	duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = system_clock::to_time_t(end);
-	std::cout << "Finished computation at " << std::ctime(&end_time)
-		<< "Elapsed time: " << elapsed_seconds.count() << "s\n----------\n";
+	std::cout << "-- MarchingCubes finished computation at " << std::ctime(&end_time)
+		<< "-- Elapsed time: " << elapsed_seconds.count() << " s\n";
 
-	std::cout << "Write to obj..." << std::endl;
+	std::cout << "-- Write to obj..." << std::endl;
 	writeToOBJFile(filename);
 
 	freeResources();
