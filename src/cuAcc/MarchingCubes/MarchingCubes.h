@@ -106,9 +106,9 @@ namespace MC {
 
 	void freeResources();
 
-	void launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& voxelOffset, const cudaStream_t& stream, double* d_voxelMatrix);
+	void launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNodes, const uint& voxelOffset, const cudaStream_t& stream, double* d_voxelMatrix);
 
-	void launch_computSDFKernel(const uint& nVoxels);
+	void launch_computSDFKernel(const uint& nVoxels, const uint& nAllNodes);
 
 	void launch_determineVoxelKernel(const uint& nVoxels, const double& isoVal, const uint& maxVerts);
 

@@ -69,7 +69,7 @@ __global__ void MCKernel::prepareMatrixKernel(const uint nVoxelElems,
 	}
 }
 
-void MC::launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& voxelOffset, const cudaStream_t& stream, double* d_voxelMatrix)
+void MC::launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNodes, const uint& voxelOffset, const cudaStream_t& stream, double* d_voxelMatrix)
 {
 	uint* d_voxelOffset = nullptr;
 	CUDA_CHECK(cudaMalloc((void**)&d_voxelOffset, sizeof(uint)));
@@ -88,11 +88,10 @@ void MC::launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& voxelOf
 	MCKernel::prepareMatrixKernel << <nBlocks, nThreads >> > (nVoxelElems, nAllNodes,
 		d_voxelOffset, d_res, d_lambda, d_gridOrigin,
 		d_voxelSize, d_nodeCorners, d_nodeWidth, d_voxelMatrix);
-
-	CUDA_CHECK(cudaFree(d_voxelOffset));
+	getLastCudaError("Kernel: 'prepareMatrixKernel' failed!\n");
 }
 
-void MC::launch_computSDFKernel(const uint& nVoxels)
+void MC::launch_computSDFKernel(const uint& nVoxels, const uint& nAllNodes)
 {
 	cudaStream_t streams[MAX_NUM_STREAMS];
 	for (int i = 0; i < MAX_NUM_STREAMS; ++i)
@@ -107,7 +106,7 @@ void MC::launch_computSDFKernel(const uint& nVoxels)
 
 		double* d_voxelMatrix = nullptr;
 
-		launch_prepareMatrixKernel(nVoxelElems, voxelOffset, streams[i], d_voxelMatrix);
+		launch_prepareMatrixKernel(nVoxelElems, nAllNodes, voxelOffset, streams[i], d_voxelMatrix);
 
 		launch_BLASRowSumReduce(streams[i], nVoxelElems * 8, nAllNodes * 8, d_voxelMatrix, d_voxelSDF + voxelOffset * 8);
 
