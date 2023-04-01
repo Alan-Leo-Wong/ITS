@@ -1,25 +1,26 @@
 #include "MCDefine.h"
 #include "MarchingCubes.h"
 #include "..\CUDACompute.h"
+//#include "..\..\utils\cuda\cuBLASCheck.cuh"
 #include "..\..\BSpline.hpp"
 #include <device_launch_parameters.h>
 
 /**
  * @brief 准备用于计算 sdf 的矩阵
  *
- * @param nVoxelElems   等于每个 stream 下 voxel 的数目 nVoxelElems * 8，每个 stream 中 voxel 的顶点数
- * @param nAllNodes     等于 nAllNodes * 8，所有节点的顶点数
- * @param d_voxelOffset 当前流中 voxel 相对于所有 voxel 的偏移量
- * @param d_res         分辨率
- * @param d_lambda      B样条系数
- * @param d_origin      MC算法被执行的初始区域原点坐标
- * @param d_voxelSize   每个 voxel 的大小
- * @param d_nodeCorners 每个八叉树节点的顶点
- * @param d_nodeWidth   每个八叉树节点的宽度
- * @param d_voxelMatrix output matrix
+ * @param nVoxelElemCorners   等于每个 stream 下 voxel 的数目 nVoxelElems * 8，每个 stream 中 voxel 的顶点数
+ * @param nAllNodeCorners     等于 nAllNodes * 8，所有节点的顶点数
+ * @param d_voxelOffset       当前流中 voxel 相对于所有 voxel 的偏移量
+ * @param d_res               分辨率
+ * @param d_lambda            B样条系数
+ * @param d_origin            MC算法被执行的初始区域原点坐标
+ * @param d_voxelSize         每个 voxel 的大小
+ * @param d_nodeCorners       每个八叉树节点的顶点
+ * @param d_nodeWidth         每个八叉树节点的宽度
+ * @param d_voxelMatrix       output matrix
  */
-__global__ void MCKernel::prepareMatrixKernel(const uint nVoxelElems,
-	const uint nAllNodes,
+__global__ void MCKernel::prepareMatrixKernel(const uint nVoxelElemCorners,
+	const uint nAllNodeCorners,
 	const uint* d_voxelOffset,
 	const uint3* d_res,
 	double* d_lambda,
@@ -32,9 +33,9 @@ __global__ void MCKernel::prepareMatrixKernel(const uint nVoxelElems,
 	uint tx = blockIdx.x * blockDim.x + threadIdx.x;
 	uint ty = blockIdx.y * blockDim.y + threadIdx.y;
 
-	if (tx < nAllNodes && ty < nVoxelElems)
+	if (tx < nAllNodeCorners && ty < nVoxelElemCorners)
 	{
-		const uint voxel = ty + (*d_voxelOffset);
+		const uint voxel = ty / 8 + (*d_voxelOffset);
 
 		uint3 voxelShift = getVoxelShift(voxel, *d_res);
 		double3 origin = *d_origin;
@@ -45,31 +46,26 @@ __global__ void MCKernel::prepareMatrixKernel(const uint nVoxelElems,
 		voxelPos.y = origin.y + voxelShift.y * voxelSize.y;
 		voxelPos.z = origin.z + voxelShift.z * voxelSize.z;
 
-		// corners of current voxel
-		double3 corners[8];
-		corners[0] = voxelPos;
-		corners[1] = voxelPos + make_double3(0, voxelSize.y, 0);
-		corners[2] = voxelPos + make_double3(voxelSize.x, voxelSize.y, 0);
-		corners[3] = voxelPos + make_double3(voxelSize.x, 0, 0);
-		corners[4] = voxelPos + make_double3(0, 0, voxelSize.z);
-		corners[5] = voxelPos + make_double3(0, voxelSize.y, voxelSize.z);
-		corners[6] = voxelPos + make_double3(voxelSize.x, voxelSize.y, voxelSize.z);
-		corners[7] = voxelPos + make_double3(voxelSize.x, 0, voxelSize.z);
+		const uint voxelCorerOffset = ty % 8;
+		double3 voxelCorner = voxelPos;
 
-		V3d width = d_nodeWidth[tx];
+		if (voxelCorerOffset == 0) voxelCorner += make_double3(0, 0, 0);
+		else if (voxelCorerOffset == 1) voxelCorner += make_double3(0, voxelSize.y, 0);
+		else if (voxelCorerOffset == 2) voxelCorner += make_double3(voxelSize.x, voxelSize.y, 0);
+		else if (voxelCorerOffset == 3) voxelCorner += make_double3(voxelSize.x, 0, 0);
+		else if (voxelCorerOffset == 4) voxelCorner += make_double3(0, 0, voxelSize.z);
+		else if (voxelCorerOffset == 5) voxelCorner += make_double3(0, voxelSize.y, voxelSize.z);
+		else if (voxelCorerOffset == 6) voxelCorner += make_double3(voxelSize.x, voxelSize.y, voxelSize.z);
+		else if (voxelCorerOffset == 7) voxelCorner += make_double3(voxelSize.x, 0, voxelSize.z);
 
-		for (int k = 0; k < 8; ++k)
-		{
-			const int nodeCornerIdx = tx * 8 + k;
-			double3 corner = corners[nodeCornerIdx];
-			const int idx = (voxel + k) * nAllNodes * 8 + nodeCornerIdx;
+		V3d width = d_nodeWidth[tx / 8];
+		const uint idx = ty * nAllNodeCorners + tx;
 
-			d_voxelMatrix[idx] = d_lambda[nodeCornerIdx] * BaseFunction4Point(d_nodeCorners[nodeCornerIdx], width, V3d(corner.x, corner.y, corner.z));
-		}
+		d_voxelMatrix[idx] = d_lambda[tx] * BaseFunction4Point(d_nodeCorners[tx], width, V3d(voxelCorner.x, voxelCorner.y, voxelCorner.z));
 	}
 }
 
-void MC::launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNodes, const uint& voxelOffset, const cudaStream_t& stream, double* d_voxelMatrix)
+void MC::launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNodes, const uint& voxelOffset, const cudaStream_t& stream, double*& d_voxelMatrix)
 {
 	uint* d_voxelOffset = nullptr;
 	CUDA_CHECK(cudaMalloc((void**)&d_voxelOffset, sizeof(uint)));
@@ -83,15 +79,16 @@ void MC::launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNod
 
 	dim3 nThreads(P_NTHREADS_X, P_NTHREADS_Y, 1);
 	assert(P_NTHREADS_X * P_NTHREADS_Y <= 1024, "P_NTHREADS_X * P_NTHREADS_Y is larger than 1024!\n");
-	dim3 nBlocks((nAllNodes + nThreads.x - 1) / nThreads.x, (nVoxelElems + nThreads.y - 1) / nThreads.y, 1);
+	dim3 nBlocks((nAllNodeCorners + nThreads.x - 1) / nThreads.x, (nVoxelElemCorners + nThreads.y - 1) / nThreads.y, 1);
 
-	MCKernel::prepareMatrixKernel << <nBlocks, nThreads >> > (nVoxelElems, nAllNodes,
+	MCKernel::prepareMatrixKernel << <nBlocks, nThreads >> > (nVoxelElemCorners, nAllNodeCorners,
 		d_voxelOffset, d_res, d_lambda, d_gridOrigin,
 		d_voxelSize, d_nodeCorners, d_nodeWidth, d_voxelMatrix);
 	getLastCudaError("Kernel: 'prepareMatrixKernel' failed!\n");
+
 }
 
-void MC::launch_computSDFKernel(const uint& nVoxels, const uint& nAllNodes)
+void MC::launch_computSDFKernel(const uint& nVoxels)
 {
 	cudaStream_t streams[MAX_NUM_STREAMS];
 	for (int i = 0; i < MAX_NUM_STREAMS; ++i)
@@ -113,8 +110,6 @@ void MC::launch_computSDFKernel(const uint& nVoxels, const uint& nAllNodes)
 		CUDA_CHECK(cudaFree(d_voxelMatrix));
 	}
 
-	for (int i = 0; i < MAX_NUM_STREAMS; i++)
-		cudaStreamSynchronize(streams[i]);
 	for (int i = 0; i < MAX_NUM_STREAMS; ++i)
 		CUDA_CHECK(cudaStreamDestroy(streams[i]));
 }

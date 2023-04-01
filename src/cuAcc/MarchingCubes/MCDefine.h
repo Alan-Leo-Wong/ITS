@@ -3,10 +3,10 @@
 namespace MC {
 
 // ”√”⁄kernel: prepareMatrix
-#ifndef P_NTHREADS_X
+#ifndef P_NTHREADS_X // node corner
 #  define P_NTHREADS_X 64
 #endif // !P_NTHREADS_X
-#ifndef P_NTHREADS_Y
+#ifndef P_NTHREADS_Y // voxel corner
 #  define P_NTHREADS_Y 16
 #endif // !P_NTHREADS_Y
 

@@ -9,18 +9,62 @@
 #include <device_launch_parameters.h>
 #include <driver_types.h>
 #include <fstream>
-#include <functional>
 #include <texture_types.h>
 #include <thrust\device_vector.h>
 #include <thrust\scan.h>
 #include <vector_functions.h>
 #include <vector_types.h>
 
-inline __device__ double3 MCKernel::vertexLerp(const double3& p_0,
-	const double3& p_1,
-	const double& sdf_0,
-	const double& sdf_1,
-	const double& isoVal) {
+namespace MC {
+	// host
+	//namespace {
+	uint nAllNodes = 0;
+
+	uint allTriVertices = 0, nValidVoxels = 0;
+
+	double3* h_triPoints = nullptr; // output
+	//} // namespace
+
+	// device
+	//namespace {
+	V3d* d_nodeCorners = nullptr;
+	V3d* d_nodeWidth = nullptr;
+
+	double* d_lambda = nullptr;
+
+	uint3* d_res = nullptr;
+	double* d_isoVal = nullptr;
+
+	uint* d_nVoxelVertsArray = nullptr;
+	uint* d_nVoxelVertsScan = nullptr;
+
+	uint* d_isValidVoxelArray = nullptr;
+	uint* d_nValidVoxelsScan = nullptr;
+
+	double3* d_gridOrigin = nullptr;
+	double3* d_voxelSize = nullptr;
+
+	double* d_voxelSDF = nullptr;
+	uint* d_voxelCubeIndex = nullptr;
+
+	uint* d_compactedVoxelArray = nullptr;
+
+	int* d_triTable = nullptr;
+	int* d_nVertsTable = nullptr;
+
+	// textures containing look-up tables
+	cudaTextureObject_t triTex;
+	cudaTextureObject_t nVertsTex;
+
+	double3* d_triPoints = nullptr; // output
+	//} // namespace
+} // namespace MC
+
+inline __device__ double3 MCKernel::vertexLerp(const double3 p_0,
+	const double3 p_1,
+	const double sdf_0,
+	const double sdf_1,
+	const double isoVal) {
 	if (abs(isoVal - sdf_0) < 1e-6)
 		return p_0;
 	if (abs(isoVal - sdf_1) < 1e-6)
@@ -36,25 +80,25 @@ inline __device__ double3 MCKernel::vertexLerp(const double3& p_0,
 	return lerp_p;
 }
 
-inline __device__ double MCKernel::computeSDF(const uint numNodes, double3 pos, double* d_lambda,
-	V3d* d_nodeCorners, V3d* d_nodeWidth) {
+__device__ uint3 MCKernel::getVoxelShift(const uint index,
+	const uint3 d_res) {
+	uint x = index % d_res.x;
+	uint y = index % (d_res.x * d_res.y) / d_res.x;
+	uint z = index / (d_res.x * d_res.y);
+	return make_uint3(x, y, z);
+}
+
+inline __device__ double MCKernel::computeSDF(const uint nAllNodes, const V3d* d_nodeCorners,
+	const V3d* d_nodeWidth, const double* d_lambda, double3 pos)
+{
 	double sum = 0.0;
-	for (int i = 0; i < numNodes; ++i)
+	for (int i = 0; i < nAllNodes; ++i)
 	{
 		V3d width = d_nodeWidth[i];
 		for (int j = 0; j < 8; ++j)
 			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_nodeCorners[i * 8 + j], width, V3d(pos.x, pos.y, pos.z));
 	}
-
 	return sum;
-}
-
-__device__ uint3 MCKernel::getVoxelShift(const uint& index,
-	const uint3& d_res) {
-	uint x = index % d_res.x;
-	uint y = index % (d_res.x * d_res.y) / d_res.x;
-	uint z = index / (d_res.x * d_res.y);
-	return make_uint3(x, y, z);
 }
 
 /**
@@ -101,6 +145,73 @@ __global__ void MCKernel::determineVoxelKernel(const uint nVoxels,
 }
 
 /**
+ * @brief 计算每个体素的sdf值以及确定分布情况
+ *
+ * @param nVoxels             voxel的总数量 = res_x * res_y * res_z
+ * @param d_isoVal            isosurface value
+ * @param d_origin            MC算法被执行的初始区域原点坐标
+ * @param d_voxelSize         每个 voxel 的大小
+ * @param d_res               分辨率
+ * @param d_nodeCorners       格子顶点
+ * @param d_nodeWidth         格子宽度
+ * @param d_lambda            格子宽度
+ * @param nVertsTex           存储lookTabel对应数据的纹理对象
+ * @param d_nVoxelVertsArray  经过 cube index 映射后每个 voxel 内应含点的数量的数组
+ * @param d_VoxelCubeIndex    每个 voxel 内 sdf 分布所对应的 cube index
+ * @param d_voxelSDF          每个 voxel 八个顶点的 sdf 值
+ * @param d_isValidVoxelArray 判断每个 voxel 是否是合理的 voxel
+ */
+__global__ void MCKernel::determineVoxelKernel_2(const uint nVoxels, const uint nAllNodes, const double* d_isoVal,
+	const double3* d_origin, const double3* d_voxelSize, const uint3* d_res, const V3d* d_nodeCorners,
+	const V3d* d_nodeWidth, const double* d_lambda, const cudaTextureObject_t nVertsTex, uint* d_nVoxelVertsArray,
+	uint* d_voxelCubeIndex, double* d_voxelSDF, uint* d_isValidVoxelArray)
+{
+	uint bid = blockIdx.y * gridDim.x + blockIdx.x;
+	uint tid = bid * blockDim.x + threadIdx.x;
+
+	if (tid < nVoxels) {
+		double isoVal = *d_isoVal;
+
+		uint3 voxelShift = getVoxelShift(tid, *d_res);
+		double3 origin = *d_origin;
+		double3 voxelSize = *d_voxelSize;
+		double3 voxelPos; // voxel 原点坐标
+
+		voxelPos.x = origin.x + voxelShift.x * voxelSize.x;
+		voxelPos.y = origin.y + voxelShift.y * voxelSize.y;
+		voxelPos.z = origin.z + voxelShift.z * voxelSize.z;
+
+		double3 corners[8];
+		corners[0] = voxelPos;
+		corners[1] = voxelPos + make_double3(0, voxelSize.y, 0);
+		corners[2] = voxelPos + make_double3(voxelSize.x, voxelSize.y, 0);
+		corners[3] = voxelPos + make_double3(voxelSize.x, 0, 0);
+		corners[4] = voxelPos + make_double3(0, 0, voxelSize.z);
+		corners[5] = voxelPos + make_double3(0, voxelSize.y, voxelSize.z);
+		corners[6] = voxelPos + make_double3(voxelSize.x, voxelSize.y, voxelSize.z);
+		corners[7] = voxelPos + make_double3(voxelSize.x, 0, voxelSize.z);
+
+		double sdf[8];
+		for (int i = 0; i < 8; ++i)
+		{
+			sdf[i] = computeSDF(nAllNodes, d_nodeCorners, d_nodeWidth, d_lambda, corners[i]);
+			d_voxelSDF[tid * 8 + i] = sdf[i];
+		}
+
+		int cubeIndex = 0;
+		cubeIndex = (uint(sdf[0] < isoVal)) | (uint(sdf[1] < isoVal) << 1) |
+			(uint(sdf[2] < isoVal) << 2) | (uint(sdf[3] < isoVal) << 3) |
+			(uint(sdf[4] < isoVal) << 4) | (uint(sdf[5] < isoVal) << 5) |
+			(uint(sdf[6] < isoVal) << 6) | (uint(sdf[7] < isoVal) << 7);
+
+		int nVerts = tex1Dfetch<int>(nVertsTex, cubeIndex);
+		d_nVoxelVertsArray[tid] = nVerts;
+		d_isValidVoxelArray[tid] = nVerts > 0;
+		d_voxelCubeIndex[tid] = cubeIndex;
+	}
+}
+
+/**
  * @brief compact voxel array
  *
  * @param nVoxels               voxel的总数量 = res_x * res_y * res_z
@@ -124,7 +235,7 @@ __global__ void MCKernel::compactVoxels(const uint nVoxels,
  *
  * @param maxVerts              MC算法包含的最多的可能点数量
  * @param nValidVoxels          合理的 voxel的总数量 = res_x * res_y * res_z
- * @param voxelSize             每个 voxel 的大小
+ * @param d_voxelSize           每个 voxel 的大小
  * @param d_isoVal              isosurface value
  * @param d_origin              MC算法被执行的初始区域原点坐标
  * @param d_res                 分辨率
@@ -258,6 +369,7 @@ inline void MC::initResources(const vector<OctreeNode*> allNodes, const VXd& lam
 		// device
 		{
 			CUDA_CHECK(cudaMalloc((void**)&d_nodeCorners, sizeof(V3d) * nAllNodes * 8));
+
 			CUDA_CHECK(cudaMalloc((void**)&d_nodeWidth, sizeof(V3d) * nAllNodes));
 			for (int i = 0; i < nAllNodes; ++i)
 			{
@@ -361,8 +473,11 @@ inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
 		nBlocks.y *= 2;
 	}
 
-	MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (nVoxels, d_isoVal, nVertsTex,
-		d_nVoxelVertsArray, d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);
+	/*MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (nVoxels, d_isoVal, nVertsTex,
+		d_nVoxelVertsArray, d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);*/
+	MCKernel::determineVoxelKernel_2 << <nBlocks, nThreads >> > (nVoxels, nAllNodes, d_isoVal, d_gridOrigin,
+		d_voxelSize, d_res, d_nodeCorners, d_nodeWidth, d_lambda, nVertsTex, d_nVoxelVertsArray, 
+		d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);
 	getLastCudaError("Kernel: 'determineVoxelKernel' failed!\n");
 	cudaDeviceSynchronize();
 
@@ -475,7 +590,7 @@ void MC::marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda,
 
 	initResources(allNodes, lambda, resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
 
-	launch_computSDFKernel(nVoxels, nAllNodes);
+	//launch_computSDFKernel(nVoxels);
 
 	launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
 	if (allTriVertices == 0) {
