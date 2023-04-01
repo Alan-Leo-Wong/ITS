@@ -361,7 +361,7 @@ inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
 		nBlocks.y *= 2;
 	}
 
-	MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (nVoxels, d_isoVal, nVertsTex, 
+	MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (nVoxels, d_isoVal, nVertsTex,
 		d_nVoxelVertsArray, d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);
 	getLastCudaError("Kernel: 'determineVoxelKernel' failed!\n");
 	cudaDeviceSynchronize();
@@ -474,6 +474,8 @@ void MC::marching_cubes(const vector<OctreeNode*> allNodes, const VXd& lambda,
 	start = system_clock::now();
 
 	initResources(allNodes, lambda, resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
+
+	launch_computSDFKernel(nVoxels, nAllNodes);
 
 	launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
 	if (allTriVertices == 0) {
