@@ -114,14 +114,14 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="src\cuAcc\CUDACompute.cu">
-      <Filter>源文件\cudaAcc</Filter>
-    </CudaCompile>
     <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu">
       <Filter>源文件\cudaAcc\MarchingCubes</Filter>
     </CudaCompile>
     <CudaCompile Include="src\cuAcc\MarchingCubes\SDFCompute.cu">
-      <Filter>头文件\cudaAcc\MarchingCubes</Filter>
+      <Filter>源文件\cudaAcc\MarchingCubes</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\cuAcc\CUDACompute.cu">
+      <Filter>源文件\cudaAcc</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

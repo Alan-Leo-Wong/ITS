@@ -4,7 +4,7 @@
 #include <iostream>
 // v2一定要放在api前面
 #include <cublas_v2.h>
-#include <cublas_api.h>
+//#include <cublas_api.h>
 
 #define CUBLAS_CHECK(call)                                                      \
     do                                                                        \
