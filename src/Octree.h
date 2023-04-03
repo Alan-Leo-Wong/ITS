@@ -80,11 +80,15 @@ private:
 	vector<OctreeNode*> allNodes;
 	vector<vector<OctreeNode*>> inDmNodes;
 
+	vector<OctreeNode*> d_leafNodes; // 存储最深层的叶子节点
+
 	map<V3d, vector<PUII>> corner2IDs;
+
+	std::unordered_map<size_t, bool> visNodeId;
 
 public:
 	// constructor and destructor
-	Octree() {}
+	Octree() { root = nullptr; }
 
 	Octree(const int& _maxDepth, const BoundingBox& bb,
 		const uint& nPoints, const vector<V3d>& modelVerts) : maxDepth(_maxDepth)
@@ -94,12 +98,19 @@ public:
 
 	~Octree() { delete root; root = nullptr; };
 
+private:
+	int getOffset(const size_t& queryNodeId);
+
+	void getSurfaceNodeId(int needNode[3]);
+
 public:
 	void createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts);
 
 	void createNode(OctreeNode*& node, const int& depth,
 		const V3d& width, const std::pair<V3d, V3d>& boundary,
 		const vector<V3d> modelVerts, const vector<uint>& idxOfPoints);
+
+	void createSurfaceNode(OctreeNode*& node);
 
 	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
 
