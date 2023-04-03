@@ -2,6 +2,7 @@
 #include "utils\String.hpp"
 #include <numeric>
 #include <iomanip>
+#include <queue>
 
 //////////////////////
 //      Setter      //
@@ -99,6 +100,7 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 		node->setEdges();
 		nLeafNodes++;
 		leafNodes.emplace_back(node);
+		if (depth + 1 >= maxDepth) d_leafNodes.emplace_back(node);
 		return;
 	}
 
@@ -167,6 +169,76 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 	}
 
 	return std::make_tuple(points, pointsID);
+}
+
+// 建立模型表面的格子
+void Octree::createSurfaceNode(OctreeNode*& node)
+{
+	std::queue<size_t> q;
+	for (auto node : d_leafNodes)
+		q.push(node->id);
+
+	enum OFFSET
+	{
+		LEFT_BOTTOM_BACK,
+		LEFT_BOTTOM_FRONT,
+		RIGHT_BOTTOM_BACK,
+		RIGHT_BOTTOM_FRONT,
+		LEFT_UPPER_BACK,
+		LEFT_UPPER_FRONT,
+		RIGHT_UPPER_BACK,
+		RIGHT_UPPER_FRONT,
+	};
+
+	// 沿表面扩散
+	while (!q.empty())
+	{
+		auto queryNodeId = q.front();
+		q.pop();
+
+		if (visNodeId[queryNodeId]) continue;
+
+		// 得到其在父亲内是哪一个偏移节点
+		OFFSET offset = (OFFSET)getOffset(queryNodeId);
+		// 得到需要建立的三个nodeId(通过找父亲以及定值)
+		int needNodeId[3] = { -1 };
+		getSurfaceNodeId(needNodeId);
+		switch (offset)
+		{
+		case LEFT_BOTTOM_BACK:
+			break;
+
+		case LEFT_BOTTOM_FRONT:
+			break;
+
+		case RIGHT_BOTTOM_BACK:
+			break;
+
+		case RIGHT_BOTTOM_FRONT:
+			break;
+
+		case LEFT_UPPER_BACK:
+			break;
+
+		case LEFT_UPPER_FRONT:
+			break;
+
+		case RIGHT_UPPER_BACK:
+			break;
+
+		case RIGHT_UPPER_FRONT:
+			break;
+		}
+
+		// 判断是否建立过
+		for (const auto nodeId : needNodeId)
+		{
+			if (!visNodeId[nodeId])
+			{
+				// create node
+			}
+		}
+	}
 }
 
 //////////////////////
