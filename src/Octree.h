@@ -4,7 +4,7 @@
 struct OctreeNode
 {
 public:
-	uint id;
+	size_t id;
 
 	int depth;
 	V3d width;
@@ -30,7 +30,18 @@ public:
 		isInterMesh = false;
 	}
 
-	OctreeNode(const int& _id, const int& _depth, const V3d& _width, const PV3d& _boundary, const std::vector<uint>& _idxOfPoints)
+	OctreeNode(const size_t& _id, const int& _depth, const V3d& _width, const PV3d& _boundary)
+	{
+		id = _id;
+		parent = nullptr;
+		depth = _depth;
+		width = _width;
+		boundary = _boundary;
+		isLeaf = true;
+		isInterMesh = false;
+	}
+	
+	OctreeNode(const size_t& _id, const int& _depth, const V3d& _width, const PV3d& _boundary, const std::vector<uint>& _idxOfPoints)
 	{
 		id = _id;
 		parent = nullptr;
@@ -71,6 +82,7 @@ class Octree
 	friend class ThinShells;
 private:
 	OctreeNode* root;
+	V3d treeOrigin;
 
 	int maxDepth = -1;
 	uint nAllNodes = 0;
@@ -85,6 +97,8 @@ private:
 	map<V3d, vector<PUII>> corner2IDs;
 
 	std::unordered_map<size_t, bool> visNodeId;
+	std::unordered_map<size_t, OctreeNode*> id2Node; // 得到id后构建对应的node，后期将改成仅用于可视化——因为其实实际上只要让d_leafNodes存储所有表面附近的叶子节点id，
+													 // 然后得到对应node的坐标和大小（这时候id2Node这个map就需要改成id to {coord,width}的映射了），就可以定义基函数了
 
 public:
 	// constructor and destructor
@@ -98,11 +112,6 @@ public:
 
 	~Octree() { delete root; root = nullptr; };
 
-private:
-	int getOffset(const size_t& queryNodeId);
-
-	void getSurfaceNodeId(int needNode[3]);
-
 public:
 	void createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts);
 
@@ -110,11 +119,9 @@ public:
 		const V3d& width, const std::pair<V3d, V3d>& boundary,
 		const vector<V3d> modelVerts, const vector<uint>& idxOfPoints);
 
-	void createSurfaceNode(OctreeNode*& node);
+	void createSurfaceNode(const V3d& leafWidth);
 
 	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
-
-	Octree& operator=(const Octree&);
 
 public:
 	// save data
