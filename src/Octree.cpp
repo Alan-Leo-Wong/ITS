@@ -72,20 +72,31 @@ inline void OctreeNode::setEdges()
 void Octree::createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts)
 {
 	vector<uint> idxOfPoints(nPoints);
-	std::iota(idxOfPoints.begin(), idxOfPoints.end(), 0); // 0~pointNum-1
+	std::iota(idxOfPoints.begin(), idxOfPoints.end(), 0); // 0 ~ nPoints-1
 
 	V3d width = bb.boxWidth;
 	PV3d boundary = std::make_pair(bb.boxOrigin, bb.boxEnd);
+	treeOrigin = bb.boxOrigin;
 
-	root = new OctreeNode(nAllNodes++, 0, width, boundary, idxOfPoints);
+	root = new OctreeNode(0, 0, width, boundary, idxOfPoints);
+
 	createNode(root, 0, width, boundary, modelVerts, idxOfPoints);
+
+	if (!d_leafNodes.empty() && maxDepth > 2) createSurfaceNode(d_leafNodes[0]->width);
 }
+
+#define GET_CYCLE_BIT(x, n, N)  ((((x) >> (N - n)) | ((x) << (n))) & ((1 << (N)) - 1)) // 得到N位二进制数左移n位后的循环码: (x >> (N - n)) | (x << n)
+#define GET_CHILD_ID(x, y)	    (((x) << 3) + (y >= (0x4) ? ((0x4) | GET_CYCLE_BIT(y - (0x4), 1, 2)) : (GET_CYCLE_BIT(y, 1, 2))) + 1) // x为parent, y为offset(0<=x<=7)
 
 inline void Octree::createNode(OctreeNode*& node, const int& depth,
 	const V3d& width, const std::pair<V3d, V3d>& boundary,
 	const vector<V3d> modelVerts, const vector<uint>& idxOfPoints)
 {
+	id2Node[node->id] = node;
+
 	allNodes.emplace_back(node);
+	nAllNodes++;
+
 	node->setCorners();
 	node->setCornersIdx(corner2IDs);
 
@@ -119,6 +130,7 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 	}
 
 	V3d childWidth = width * 0.5;
+	const size_t id = node->id;
 	for (int i = 0; i < 8; i++)
 	{
 		const int xOffset = i & 1;
@@ -128,10 +140,161 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 		V3d childEnd = childBeg + childWidth;
 		PV3d childBoundary = { childBeg, childEnd };
 
-		node->childs[i] = new OctreeNode(nAllNodes++, depth + 1, childWidth, childBoundary, childPointsIdx[i]);
+		node->childs[i] = new OctreeNode(GET_CHILD_ID(id, i), depth + 1, childWidth, childBoundary, childPointsIdx[i]);
 		node->childs[i]->parent = node;
 
 		createNode(node->childs[i], depth + 1, childWidth, childBoundary, modelVerts, childPointsIdx[i]);
+	}
+}
+
+#define GET_OFFSET(x)                ((x - 1) & (0x7))			 // 得到节点x(x>=1)的最后三位，代表x在父节点中的偏移位置
+/*
+* 000 - bottom back  left
+* 111 - up     front right
+*/
+#define GET_PARENT_ID(x)             ((x - 1) >> 3)				 // 得到已有的节点x找到对应的父节点(x>=1)
+
+#define GET_CROSS_EDGE_VAL_0(subDepth)  ()
+#define GET_CROSS_EDGE_VAL_1(subDepth)  ()
+#define GET_CROSS_EDGE_VAL_2(subDepth)  ()
+
+// 建立模型表面的格子
+inline void Octree::createSurfaceNode(const V3d& leafWidth)
+{
+	std::queue<size_t> q;
+	for (auto node : d_leafNodes)
+		q.push(node->id);
+
+	enum OFFSET
+	{
+		BOTTOM_BACK_LEFT,
+		BOTTOM_BACK_RIGHT,
+		BOTTOM_FRONT_LEFT,
+		BOTTOM_FRONT_RIGHT,
+		UPPER_BACK_LEFT,
+		UPPER_BACK_RIGHT,
+		UPPER_FRONT_LEFT,
+		UPPER_FRONT_RIGHT
+	};
+
+	enum CROSS_EDGE
+	{
+		TO_RIGHT,
+		TO_LEFT,
+
+		TO_DOWN,
+		TO_UP,
+
+		TO_FRONT,
+		TO_BACK,
+	};
+
+	auto getCrossEdgeVal = [=](const int& i, const int& crossEdgeKind, const int& subDepth)->long long
+	{
+		long long val = (crossEdgeKind & 1) ? -1 : 1;
+		if (i == 0) val *= GET_CROSS_EDGE_VAL_0(subDepth);
+		else if (i == 1) val *= GET_CROSS_EDGE_VAL_1(subDepth);
+		else if (i == 2) val *= GET_CROSS_EDGE_VAL_2(subDepth);
+		return val;
+	};
+
+	auto getSurfaceNodeId = [&](const int& offset, const size_t& queryNodeId, size_t needNodeId[3])
+	{
+		int t_offset = offset;
+
+		int fatherId = GET_PARENT_ID(queryNodeId);
+		if (!fatherId) return; // 保证queryNode至少位于第2层及以下
+		int fatherOffset = GET_OFFSET(fatherId);
+		for (int i = 0; i < 3; ++i, t_offset >>= 1)
+		{
+			int queryBit = ~(t_offset & 1);
+			int t_fatherId = fatherId, t_fatherOffset = fatherOffset;
+			int subDepth = 0;
+
+			// 当queryNode的某个父节点fatherNode在其父节点中的偏移量fatherOffset的第i位与queryBit(表示了queryNode待寻找的周围节点的反方向)一致时
+			// 我们就可以计算待寻找的queryNode周围节点id了
+			while ((t_fatherOffset >> i & 1) != queryBit)
+			{
+				t_fatherId = GET_PARENT_ID(t_fatherId);
+				if (!t_fatherId) { subDepth = 0; break; }
+
+				t_fatherOffset = GET_OFFSET(t_fatherId);
+				++subDepth;
+			}
+
+			CROSS_EDGE kind = CROSS_EDGE(i * 2 + queryBit);
+			if (subDepth >= 1) needNodeId[i] = getCrossEdgeVal(i, kind, subDepth);
+		}
+	};
+
+	const size_t stNodeId = std::pow(8, maxDepth - 2);
+	// 判断是否穿过表面
+	auto isCrossSurface = [=](const int& nodeId, const V3d& width)->bool
+	{
+		// 得到nodeId对应的八个顶点
+		/*const size_t nodeParentOffset = ((nodeId - stNodeId) & 0x000) + 1;
+		const size_t x_offset = ;*/
+	};
+
+	// 沿表面扩散
+	while (!q.empty())
+	{
+		auto queryNodeId = q.front();
+		q.pop();
+
+		if (visNodeId[queryNodeId]) continue;
+		visNodeId[queryNodeId] = true;
+
+		// 得到其在父亲内是哪一个偏移节点
+		OFFSET offset = (OFFSET)GET_OFFSET(queryNodeId);
+		// 得到需要建立的三个nodeId(通过找父亲以及定值)
+		size_t needNodeId[3] = { 0 };
+		getSurfaceNodeId(offset, queryNodeId, needNodeId);
+
+		// 判断是否建立过且sdf值有正有负
+		for (const auto nodeId : needNodeId)
+		{
+			if (visNodeId[nodeId] && !isCrossSurface(nodeId, leafWidth)) continue;
+
+			// create node
+			vector<size_t> parents;
+			int parentNodeId = GET_PARENT_ID(nodeId);
+			parents.emplace_back(parentNodeId); // 逐渐向上遍历树，找到所有父节点
+			while (id2Node[parentNodeId] == nullptr)
+			{
+				parentNodeId = GET_PARENT_ID(nodeId);
+				parents.emplace_back(parentNodeId);
+			}
+
+			for (size_t j = parents.size() - 1; j >= 0; --j)
+			{
+				const size_t parentId = parents[j];
+				OctreeNode* node = id2Node[parentId];
+
+				const V3d b_beg = node->boundary.first;
+				const V3d b_end = node->boundary.second;
+				const V3d childWidth = (b_end - b_beg) * 0.5;
+				const int depth = node->depth;
+				const size_t id = node->id;
+
+				for (int i = 0; i < 8; i++)
+				{
+					const int xOffset = i & 1;
+					const int yOffset = (i >> 1) & 1;
+					const int zOffset = (i >> 2) & 1;
+					V3d childBeg = b_beg + V3d(xOffset * childWidth.x(), yOffset * childWidth.y(), zOffset * childWidth.z());
+					V3d childEnd = childBeg + childWidth;
+					PV3d childBoundary = { childBeg, childEnd };
+
+					const int childId = GET_CHILD_ID(id, i);
+					node->childs[i] = new OctreeNode(childId, depth + 1, childWidth, childBoundary);
+					node->childs[i]->parent = node;
+					id2Node[childId] = node->childs[i];
+				}
+			}
+
+			q.push(nodeId);
+		}
 	}
 }
 
@@ -171,76 +334,6 @@ std::tuple<vector<PV3d>, vector<size_t>> Octree::setInDomainPoints(OctreeNode* n
 	return std::make_tuple(points, pointsID);
 }
 
-// 建立模型表面的格子
-void Octree::createSurfaceNode(OctreeNode*& node)
-{
-	std::queue<size_t> q;
-	for (auto node : d_leafNodes)
-		q.push(node->id);
-
-	enum OFFSET
-	{
-		LEFT_BOTTOM_BACK,
-		LEFT_BOTTOM_FRONT,
-		RIGHT_BOTTOM_BACK,
-		RIGHT_BOTTOM_FRONT,
-		LEFT_UPPER_BACK,
-		LEFT_UPPER_FRONT,
-		RIGHT_UPPER_BACK,
-		RIGHT_UPPER_FRONT,
-	};
-
-	// 沿表面扩散
-	while (!q.empty())
-	{
-		auto queryNodeId = q.front();
-		q.pop();
-
-		if (visNodeId[queryNodeId]) continue;
-
-		// 得到其在父亲内是哪一个偏移节点
-		OFFSET offset = (OFFSET)getOffset(queryNodeId);
-		// 得到需要建立的三个nodeId(通过找父亲以及定值)
-		int needNodeId[3] = { -1 };
-		getSurfaceNodeId(needNodeId);
-		switch (offset)
-		{
-		case LEFT_BOTTOM_BACK:
-			break;
-
-		case LEFT_BOTTOM_FRONT:
-			break;
-
-		case RIGHT_BOTTOM_BACK:
-			break;
-
-		case RIGHT_BOTTOM_FRONT:
-			break;
-
-		case LEFT_UPPER_BACK:
-			break;
-
-		case LEFT_UPPER_FRONT:
-			break;
-
-		case RIGHT_UPPER_BACK:
-			break;
-
-		case RIGHT_UPPER_FRONT:
-			break;
-		}
-
-		// 判断是否建立过
-		for (const auto nodeId : needNodeId)
-		{
-			if (!visNodeId[nodeId])
-			{
-				// create node
-			}
-		}
-	}
-}
-
 //////////////////////
 //    Save  Data    //
 //////////////////////
@@ -273,36 +366,6 @@ void Octree::saveDomain2OBJFile(const string& filename) const
 		out << "l " << 7 + count << " " << 8 + count << endl;
 	}
 	out.close();
-}
-
-Octree& Octree::operator=(const Octree& tree)
-{
-	cout << "Execute Copy Assignment operator...\n";
-	root = new OctreeNode(*(tree.root)); // deep copy
-
-	maxDepth = tree.maxDepth;
-	nAllNodes = tree.nAllNodes;
-	nLeafNodes = tree.nLeafNodes;
-
-	leafNodes.resize(nLeafNodes);
-	for (int i = 0; i < nLeafNodes; ++i)
-	{
-		leafNodes[i] = new OctreeNode(*(tree.leafNodes[i]));
-		if (tree.leafNodes[i]->parent != nullptr)
-			leafNodes[i]->parent = new OctreeNode(*(tree.leafNodes[i]->parent));
-	}
-
-	allNodes.resize(nAllNodes);
-	for (int i = 0; i < nAllNodes; ++i)
-	{
-		allNodes[i] = new OctreeNode(*(tree.allNodes[i]));
-		if (tree.allNodes[i]->parent != nullptr)
-			allNodes[i]->parent = new OctreeNode(*(tree.allNodes[i]->parent));
-	}
-
-	corner2IDs = tree.corner2IDs;
-
-	return *this;
 }
 
 void Octree::saveNodeCorners2OBJFile(const string& filename) const
