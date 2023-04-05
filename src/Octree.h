@@ -5,10 +5,12 @@ struct OctreeNode
 {
 public:
 	size_t id;
-
 	int depth;
+
 	V3d width;
 	V3d corners[8];
+	V3d sdf[8];
+
 	PV3d boundary;            // <back/bottom/left, front/top/right>	
 	vector<PV3d> edges;       // used to compute intersection between mesh's faces and node's edges
 	vector<uint> idxOfPoints; // index of points 

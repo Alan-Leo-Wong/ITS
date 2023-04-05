@@ -158,6 +158,18 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 #define GET_CROSS_EDGE_VAL_1(subDepth)  ()
 #define GET_CROSS_EDGE_VAL_2(subDepth)  ()
 
+// 用于自下向上得到nodeId对应的原点坐标
+V3d getNodeCoord(const size_t& nodeId, const V3d& width)
+{
+	if (nodeId <= 0) return V3d(0, 0, 0);
+	int offset = GET_OFFSET(nodeId);
+	V3d res = V3d(0, 0, 0);
+	if (offset != 0) { res(1) = 1; offset >>= 1; }
+	if (offset != 0) { res(0) = 1; offset >>= 1; }
+	if (offset != 0) { res(2) = 1; offset >>= 1; }
+	return res * width + getNodeCoord(GET_PARENT_ID(nodeId), width * 2.0);
+}
+
 // 建立模型表面的格子
 inline void Octree::createSurfaceNode(const V3d& leafWidth)
 {
@@ -227,13 +239,26 @@ inline void Octree::createSurfaceNode(const V3d& leafWidth)
 		}
 	};
 
-	const size_t stNodeId = std::pow(8, maxDepth - 2);
 	// 判断是否穿过表面
-	auto isCrossSurface = [=](const int& nodeId, const V3d& width)->bool
+	/*
+	* @param width: d_leafNodes宽度
+	*/
+	auto isCrossSurface = [=](const int& nodeId, const V3d& leafWidth, double sdf[8])->bool
 	{
-		// 得到nodeId对应的八个顶点
-		/*const size_t nodeParentOffset = ((nodeId - stNodeId) & 0x000) + 1;
-		const size_t x_offset = ;*/
+		// 得到nodeId对应的原点位置
+		V3d coord = treeOrigin + getNodeCoord(nodeId, leafWidth);
+		sdf[0] = ;
+		bool flag = sdf[0] > .0;
+		for (int i = 1; i < 8; i++)
+		{
+			const int xOffset = i & 1;
+			const int yOffset = (i >> 1) & 1;
+			const int zOffset = (i >> 2) & 1;
+			V3d corner = coord + V3d(xOffset * leafWidth.x(), yOffset * leafWidth.y(), zOffset * leafWidth.z());
+			sdf[i] = ;
+			flag ^= (sdf[i] > .0);
+		}
+		return flag;
 	};
 
 	// 沿表面扩散
@@ -254,17 +279,21 @@ inline void Octree::createSurfaceNode(const V3d& leafWidth)
 		// 判断是否建立过且sdf值有正有负
 		for (const auto nodeId : needNodeId)
 		{
-			if (visNodeId[nodeId] && !isCrossSurface(nodeId, leafWidth)) continue;
+			if (visNodeId[nodeId]) continue;
+
+			double sdf[8];
+			if (!isCrossSurface(nodeId, leafWidth, sdf)) continue;
 
 			// create node
 			vector<size_t> parents;
 			int parentNodeId = GET_PARENT_ID(nodeId);
-			parents.emplace_back(parentNodeId); // 逐渐向上遍历树，找到所有父节点
+			// 逐渐向上遍历树，找到所有没建立的父节点以及第一个建立出来的父节点
 			while (id2Node[parentNodeId] == nullptr)
 			{
 				parentNodeId = GET_PARENT_ID(nodeId);
 				parents.emplace_back(parentNodeId);
 			}
+			parents.emplace_back(parentNodeId);
 
 			for (size_t j = parents.size() - 1; j >= 0; --j)
 			{
@@ -289,10 +318,15 @@ inline void Octree::createSurfaceNode(const V3d& leafWidth)
 					const int childId = GET_CHILD_ID(id, i);
 					node->childs[i] = new OctreeNode(childId, depth + 1, childWidth, childBoundary);
 					node->childs[i]->parent = node;
+					//node->childs[i]->setCorners();
 					id2Node[childId] = node->childs[i];
 				}
 			}
 
+			// set corners
+			id2Node[nodeId]->setCorners();
+			// copy sdf
+			memcpy(id2Node[nodeId]->sdf, sdf, sizeof(double) * 8);
 			q.push(nodeId);
 		}
 	}
