@@ -1,6 +1,7 @@
 #pragma once
 #include "Octree.h"
 #include "BaseModel.h"
+#include "SDFHelper.h"
 
 class ThinShells : public BaseModel
 {
@@ -14,10 +15,10 @@ private:
 	vector<OctreeNode*> interLeafNodes;
 
 private:
+	fcpw::Scene<3> scene;
 	VXd sdfVal;
 	VXd lambda;
 	VXd bSplineVal;
-
 private:
 	double innerShellIsoVal = -DINF;
 	double outerShellIsoVal = -DINF;
@@ -29,6 +30,8 @@ public:
 	ThinShells(const string& filename, const int& _treeDepth) : BaseModel(filename), treeDepth(_treeDepth),
 		bSplineTree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts)
 	{
+		initSDF(scene, modelVerts, modelFaces);
+		refineSurfaceTree();
 		//bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts);
 		//cout << bSplineTree.allNodes[0]->depth << endl;
 		saveOctree("");
@@ -39,6 +42,8 @@ public:
 	// ThinShells& operator=(const ThinShells& model);
 
 private:
+	void refineSurfaceTree();
+
 	void cpIntersectionPoints();
 
 	void cpSDFOfTreeNodes();

@@ -1,15 +1,16 @@
 #pragma once
 #include "BaseModel.h"
+#include <unordered_map>
 
 struct OctreeNode
 {
 public:
 	size_t id;
-	int depth;
 
+	int depth;
 	V3d width;
 	V3d corners[8];
-	V3d sdf[8];
+	double sdf[8];
 
 	PV3d boundary;            // <back/bottom/left, front/top/right>	
 	vector<PV3d> edges;       // used to compute intersection between mesh's faces and node's edges
@@ -79,6 +80,14 @@ public:
 	//bool isInDomain(const PV3d& q_boundary); // whether in otherNode's domain
 };
 
+#define GET_CYCLE_BIT(x, n, N)  ((((x) >> (N - n)) | ((x) << (n))) & ((1 << (N)) - 1)) // 得到N位二进制数左移n位后的循环码: (x >> (N - n)) | (x << n)
+#define GET_CHILD_ID(x, y)	    (((x) << 3) + (y >= (0x4) ? ((0x4) | GET_CYCLE_BIT(y - (0x4), 1, 2)) : (GET_CYCLE_BIT(y, 1, 2))) + 1) // x为parent, y为offset(0<=x<=7)
+#define GET_OFFSET(x)           ((x - 1) & (0x7))			 // 得到节点x(x>=1)的最后三位，代表x在父节点中的偏移位置
+/*
+* 000 - bottom back  left
+* 111 - up     front right
+*/
+#define GET_PARENT_ID(x)        ((x - 1) >> 3)				 // 得到已有的节点x找到对应的父节点(x>=1)
 class Octree
 {
 	friend class ThinShells;
@@ -98,9 +107,19 @@ private:
 
 	map<V3d, vector<PUII>> corner2IDs;
 
-	std::unordered_map<size_t, bool> visNodeId;
-	std::unordered_map<size_t, OctreeNode*> id2Node; // 得到id后构建对应的node，后期将改成仅用于可视化——因为其实实际上只要让d_leafNodes存储所有表面附近的叶子节点id，
-													 // 然后得到对应node的坐标和大小（这时候id2Node这个map就需要改成id to {coord,width}的映射了），就可以定义基函数了
+	std::unordered_map<size_t, int> visNodeId;
+	// 得到id后构建对应的node，后期将改成仅用于可视化——因为其实实际上只要让d_leafNodes存储所有表面附近的叶子节点id，
+	 // 然后得到对应node的坐标和大小（这时候id2Node这个map就需要改成id to {coord,width}的映射了），就可以定义基函数了
+	std::unordered_map<size_t, OctreeNode*> id2Node; 
+
+private:
+	void createNode(OctreeNode*& node, const int& depth,
+		const V3d& width, const std::pair<V3d, V3d>& boundary,
+		const vector<V3d> modelVerts, const vector<uint>& idxOfPoints);
+
+	V3d getNodeCoord(const size_t& nodeId, const V3d& width);
+
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
 
 public:
 	// constructor and destructor
@@ -116,14 +135,6 @@ public:
 
 public:
 	void createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts);
-
-	void createNode(OctreeNode*& node, const int& depth,
-		const V3d& width, const std::pair<V3d, V3d>& boundary,
-		const vector<V3d> modelVerts, const vector<uint>& idxOfPoints);
-
-	void createSurfaceNode(const V3d& leafWidth);
-
-	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(OctreeNode* node, map<size_t, bool>& visID);
 
 public:
 	// save data

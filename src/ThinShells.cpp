@@ -1,16 +1,235 @@
 #include "ThinShells.h"
-#include "SDFHelper.h"
 #include "BSpline.hpp"
 #include "utils\Common.hpp"
 #include "utils\String.hpp"
 #include "utils\cuda\CUDAMath.hpp"
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
+#include <queue>
 #include <iomanip>
 #include <Eigen\Sparse>
 
 //////////////////////
 //  Create  Shells  //
 //////////////////////
+// idx: subdepth
+constexpr size_t EDGE_VAL_LR[] = { 1, 7, 55, 439, 3511, 28087, 224695, 1797559, 14380471 };
+constexpr size_t EDGE_VAL_BF[] = { 2, 14, 110, 878, 7022, 56174, 449390, 3595118, 28760942 };
+constexpr size_t EDGE_VAL_BU[] = { 4, 28, 220, 1756, 14044, 112348, 898780, 7190236, 57521884 };
+void ThinShells::refineSurfaceTree()
+{
+	if (bSplineTree.d_leafNodes.empty() || treeDepth <= 2) return;
+
+	const V3d d_leafNodeWidth = bSplineTree.d_leafNodes[0]->width;
+	const V3d treeOrigin = bSplineTree.treeOrigin;
+	auto& nAllNodes = bSplineTree.nAllNodes;
+	auto& allNodes = bSplineTree.allNodes;
+	auto& nLeafNodes = bSplineTree.nLeafNodes;
+	auto& leafNodes = bSplineTree.leafNodes;
+	auto& d_leafNodes = bSplineTree.d_leafNodes;
+	auto& id2Node = bSplineTree.id2Node;
+	auto& visNodeId = bSplineTree.visNodeId;
+
+	std::queue<size_t> q;
+	for (auto node : d_leafNodes)
+	{
+		//if (fabs(node->boundary.first.x() + 34.6) < 1e-3 &&
+		//	fabs(node->boundary.first.y() + 44.7991) < 1e-3 &&
+		//	fabs(node->boundary.first.z() - 16.5) < 1e-3
+		//	/* &&
+		//	node->boundary.second == V3d(31.400000000, -28.299094000, 0.000000000)*/)
+		//{
+		//	cout << node->boundary.second.transpose() << endl;
+		//	cout << node->id << endl;
+		//}
+		if (node->id == 124)
+		{
+			cout << node->boundary.first.transpose() << endl;
+			cout << node->boundary.second.transpose() << endl;
+		}
+		q.push(node->id);
+	}
+
+	enum CROSS_EDGE
+	{
+		TO_RIGHT,
+		TO_LEFT,
+
+		TO_DOWN,
+		TO_UP,
+
+		TO_FRONT,
+		TO_BACK,
+	};
+
+	auto getCrossEdgeCost = [=](const int& i, const int& crossEdgeKind, const int& subDepth)->long long
+	{
+		long long val = (crossEdgeKind & 1) ? -1 : 1;
+		if (i == 0) val *= EDGE_VAL_LR[subDepth];
+		else if (i == 1) val *= EDGE_VAL_BF[subDepth];
+		else if (i == 2) val *= EDGE_VAL_BU[subDepth];
+		return val;
+	};
+
+	auto getNeightborNodeId = [&](const int& offset, const size_t& queryNodeId, size_t neighbors[6])
+	{
+		int t_offset = offset;
+
+		int fatherId = GET_PARENT_ID(queryNodeId);
+		//if (!fatherId) return; // 保证queryNode至少位于第2层及以下
+		int fatherOffset = GET_OFFSET(fatherId);
+		for (int i = 0; i < 3; ++i, t_offset >>= 1)
+		{
+			int queryBit = ((t_offset & 1) + 1) % 2;
+			int t_fatherId = fatherId, t_fatherOffset = fatherOffset;
+			int subDepth = 1;
+
+			// 当queryNode的某个父节点fatherNode在其父节点中的偏移量fatherOffset的第i位与queryBit(表示了queryNode待寻找的周围节点的反方向)一致时
+			// 我们就可以计算待寻找的queryNode周围节点id了
+			while ((t_fatherOffset >> i & 1) != queryBit)
+			{
+				t_fatherId = GET_PARENT_ID(t_fatherId);
+				if (!t_fatherId) { subDepth = 0; break; }
+
+				t_fatherOffset = GET_OFFSET(t_fatherId);
+				++subDepth;
+			}
+
+			CROSS_EDGE kind = CROSS_EDGE(i * 2 + queryBit);
+			if (subDepth >= 1) neighbors[i] = queryNodeId + getCrossEdgeCost(i, kind, subDepth);
+			neighbors[i + 3] = queryNodeId + getCrossEdgeCost(i, (kind + 1) % 2 + i * 2, 0);
+		}
+	};
+
+	// 判断是否穿过表面
+	/*
+	* @param width: d_leafNodes宽度
+	*/
+	auto isCrossSurface = [=](const int& nodeId, double sdf[8])->bool
+	{
+		// 得到nodeId对应的原点位置
+		V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
+		sdf[0] = getSignedDistance(originCorner, scene);
+		bool flag = sdf[0] > .0;
+		for (int i = 1; i < 8; i++)
+		{
+			const int xOffset = i & 1;
+			const int yOffset = (i >> 1) & 1;
+			const int zOffset = (i >> 2) & 1;
+			V3d offsetCorner = originCorner + V3d(xOffset * d_leafNodeWidth.x(), yOffset * d_leafNodeWidth.y(), zOffset * d_leafNodeWidth.z());
+			sdf[i] = getSignedDistance(offsetCorner, scene);
+			flag ^= (sdf[i] > .0);
+		}
+		return flag;
+	};
+
+	// 蔓延
+	while (!q.empty())
+	{
+		auto queryNodeId = q.front();
+		q.pop();
+
+		if (visNodeId[queryNodeId] >= 2) continue;
+		visNodeId[queryNodeId]++;
+
+		// 得到其在父亲内是哪一个偏移节点
+		int offset = GET_OFFSET(queryNodeId);
+		// 得到需要建立的六个nodeId(通过找父亲以及定值)
+		size_t neighbors[6] = { 0 };
+		getNeightborNodeId(offset, queryNodeId, neighbors);
+
+		// 判断needNode是否建立过且是否穿过表面，若没建立且穿过表面则建立
+		for (const auto& nodeId : neighbors)
+		{
+			// nodeId == 0 代表 nodeId 这个邻居节点并不存在
+			// visNodeId[nodeId] >= 1代表已经在队列中或者已经出过队了
+			if (queryNodeId == 124) cout << "neighbor: " << nodeId << endl;
+
+			if (!nodeId || visNodeId[nodeId] >= 1) continue;
+			visNodeId[nodeId]++;
+			q.push(nodeId);
+			double sdf[8];
+			if (nodeId == 131) cout << 111 << endl;
+			//if (!isCrossSurface(nodeId, sdf)) continue;
+
+			//// create node
+			//vector<size_t> parents;
+			//int parentNodeId = GET_PARENT_ID(queryNodeId);
+			//// 逐渐向上遍历树，找到所有没建立的父节点以及第一个建立出来的父节点
+			//while (id2Node[parentNodeId] == nullptr && parentNodeId != 0)
+			//{
+			//	parents.emplace_back(parentNodeId);
+			//	parentNodeId = GET_PARENT_ID(parentNodeId);
+			//}
+			//parents.emplace_back(parentNodeId);
+			//// 自上向下建立节点
+			//for (auto it = parents.rbegin(); it != parents.rend(); ++it)
+			//{
+			//	const size_t parentId = *it;
+			//	OctreeNode* node = id2Node[parentId];
+			//	/*if (node == nullptr)
+			//	{
+			//		printf("parentId = %lld\n", parentId);
+			//	}*/
+			//	node->isLeaf = false;
+			//
+			//	const V3d b_beg = node->boundary.first;
+			//	const V3d b_end = node->boundary.second;
+			//	const V3d childWidth = (b_end - b_beg) * 0.5;
+			//	const size_t id = node->id;
+			//	const int depth = node->depth;
+			//
+			//	node->childs.resize(8);
+			//	for (int i = 0; i < 8; i++)
+			//	{
+			//		const int xOffset = i & 1;
+			//		const int yOffset = (i >> 1) & 1;
+			//		const int zOffset = (i >> 2) & 1;
+			//		V3d childBeg = b_beg + V3d(xOffset * childWidth.x(), yOffset * childWidth.y(), zOffset * childWidth.z());
+			//		V3d childEnd = childBeg + childWidth;
+			//		PV3d childBoundary = { childBeg, childEnd };
+			//
+			//		const size_t childId = GET_CHILD_ID(id, i);
+			//		node->childs[i] = new OctreeNode(childId, depth + 1, childWidth, childBoundary);
+			//		node->childs[i]->parent = node;
+			//		//node->childs[i]->setCorners();
+			//		id2Node[childId] = node->childs[i];
+			//
+			//		/*nLeafNodes++;
+			//		leafNodes.emplace_back(node->childs[i]);
+			//
+			//		nAllNodes++;
+			//		allNodes.emplace_back(node->childs[i]);*/
+			//	}
+			//}
+			V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
+			OctreeNode* node = new OctreeNode(nodeId, bSplineTree.maxDepth - 1, d_leafNodeWidth, { originCorner, originCorner + d_leafNodeWidth });
+			id2Node[nodeId] = node;
+			// copy sdf
+			memcpy(id2Node[nodeId]->sdf, sdf, sizeof(double) * 8);
+			id2Node[nodeId]->setEdges();
+			id2Node[nodeId]->setCorners();
+			d_leafNodes.emplace_back(id2Node[nodeId]);
+		}
+
+		//if (queryNodeId == 334)
+		//{
+		//	// create node
+		//	vector<size_t> parents;
+		//	int parentNodeId = GET_PARENT_ID(queryNodeId);
+		//	// 逐渐向上遍历树，找到所有没建立的父节点以及第一个建立出来的父节点
+		//	while (parentNodeId != 0)
+		//	{
+		//		parents.emplace_back(parentNodeId);
+		//		parentNodeId = GET_PARENT_ID(parentNodeId);
+		//	}
+		//	parents.emplace_back(parentNodeId);
+
+		//	for (auto parent : parents)
+		//		cout << "parent: " << parent << endl;
+		//}
+	}
+}
+
 inline void ThinShells::cpIntersectionPoints()
 {
 	vector<V2i> modelEdges = extractEdges();
@@ -170,9 +389,6 @@ inline void ThinShells::cpSDFOfTreeNodes()
 	const uint nAllNodes = bSplineTree.nAllNodes;
 
 	// initialize a 3d scene
-	fcpw::Scene<3> scene;
-	initSDF(scene, modelVerts, modelFaces);
-
 	sdfVal.resize(nAllNodes * 8);
 	//sdfVal.resize(nLeafNodes * 8);
 
@@ -374,7 +590,7 @@ void ThinShells::saveCoefficients(const string& filename) const
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", t_filename.c_str()); return; }
-	
+
 	cout << "-- Save coefficients to " << std::quoted(t_filename) << endl;
 	for (const auto& val : lambda)
 		out << val << endl;
@@ -389,7 +605,7 @@ void ThinShells::saveBSplineValue(const string& filename) const
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
 	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", t_filename.c_str()); return; }
-	
+
 	cout << "-- Save B-Spline value to " << std::quoted(t_filename) << endl;
 	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bSplineVal << endl;
 	out.close();
@@ -411,7 +627,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 		cout << "=====================\n";
 	}
-		
+
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{
 		cout << "\nExtract outer shell by MarchingCubes..." << endl;

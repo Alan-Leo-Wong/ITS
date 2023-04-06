@@ -11,6 +11,7 @@
 using uint = unsigned int;
 
 constexpr double DINF = (std::numeric_limits<double>::max)();
+constexpr int INF = (std::numeric_limits<int>::max)();
 
 using V3d = Eigen::Vector3d;
 using V2i = Eigen::Vector2i;
