@@ -9,10 +9,6 @@ inline double getSignedDistance(const V3d& queryPoint, const fcpw::Scene<3>& sce
 	// perform a closest point query
 	fcpw::Interaction<3> interaction;
 	scene.findClosestPoint(queryPoint, interaction);
-	/*cout << "p = " << interaction.p << endl;
-	cout << "d = " << interaction.d << endl;
-	cout << "n = " << interaction.n << endl;*/
-	//cout << "¾àÀë = " << interaction.signedDistance(queryPoint) << endl;
 	return interaction.signedDistance(queryPoint);
 }
 

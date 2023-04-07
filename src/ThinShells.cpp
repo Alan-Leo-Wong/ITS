@@ -7,6 +7,7 @@
 #include <queue>
 #include <iomanip>
 #include <Eigen\Sparse>
+#include <igl\signed_distance.h>
 
 //////////////////////
 //  Create  Shells  //
@@ -29,6 +30,92 @@ void ThinShells::refineSurfaceTree()
 	auto& id2Node = bSplineTree.id2Node;
 	auto& visNodeId = bSplineTree.visNodeId;
 
+	// 判断是否穿过表面
+	/*
+	* @param width: d_leafNodes宽度
+	*/
+	auto isNodeCrossSurface = [=](OctreeNode* node)->bool
+	{
+		//// 得到nodeId对应的原点位置
+		//MXd corners(8, 3);
+		//for (int i = 0; i < 8; ++i)
+		//	corners.row(i) = node->corners[i];
+		//VXd S, B;
+		//{
+		//	VXi I;
+		//	MXd C, N;
+		//	igl::signed_distance(corners, m_V, m_F, igl::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
+		//}
+		//node->sdf[0] = S(0);
+		//bool ref = (node->sdf[0]) > 0;
+		//bool flag = false;
+		//for (int i = 1; i < 8; i++)
+		//{
+		//	node->sdf[i] = S(i);
+		//	if (!flag && ((node->sdf[i] < 0) == ref)) flag = true;
+		//}
+
+		V3d originCorner = node->corners[0];
+		node->sdf[0] = getSignedDistance(originCorner, scene);
+		
+		bool ref = (node->sdf[0]) > 0;
+		bool flag = false;
+		for (int i = 1; i < 8; i++)
+		{
+			node->sdf[i] = getSignedDistance(node->corners[i], scene);
+			if (!flag && ((node->sdf[i] < 0) == ref)) flag = true;
+		}
+		return (!flag && node->idxOfPoints.empty()); // 如果node不包含点且没有穿过表面，则删除
+	};
+	auto isCrossSurface = [=](const size_t& nodeId, double sdf[8])->bool
+	{
+		//MXd corners(8, 3);
+		//// 得到nodeId对应的原点位置
+		//V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
+		//corners.row(0) = originCorner;
+		//for (int i = 1; i < 8; i++)
+		//{
+		//	const int xOffset = i & 1;
+		//	const int yOffset = (i >> 1) & 1;
+		//	const int zOffset = (i >> 2) & 1;
+		//	V3d offsetCorner = originCorner + V3d(xOffset * d_leafNodeWidth.x(), yOffset * d_leafNodeWidth.y(), zOffset * d_leafNodeWidth.z());
+		//	corners.row(i) = offsetCorner;
+		//}
+		//VXd S, B;
+		//{
+		//	VXi I;
+		//	MXd C, N;
+		//	igl::signed_distance(corners, m_V, m_F, igl::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
+		//}
+		//sdf[0] = S(0);
+		//bool ref = (sdf[0]) > 0;
+		//bool flag = false;
+		//for (int i = 1; i < 8; i++)
+		//{
+		//	sdf[i] = S(i);
+		//	if (!flag && ((sdf[i] < 0) == ref)) flag = true;
+		//}
+
+		// 得到nodeId对应的原点位置
+		V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
+		sdf[0] = getSignedDistance(originCorner, scene);
+		bool ref = sdf[0] > 0;
+		bool flag = false;
+		for (int i = 1; i < 8; i++)
+		{
+			const int xOffset = i & 1;
+			const int yOffset = (i >> 1) & 1;
+			const int zOffset = (i >> 2) & 1;
+			V3d offsetCorner = originCorner + V3d(xOffset * d_leafNodeWidth.x(), yOffset * d_leafNodeWidth.y(), zOffset * d_leafNodeWidth.z());
+
+			sdf[i] = getSignedDistance(offsetCorner, scene);
+			if (!flag && ((sdf[i] < 0) == ref)) flag = true;
+		}
+		return flag;
+	};
+
+	std::erase_if(d_leafNodes, isNodeCrossSurface);
+
 	std::queue<size_t> q;
 	for (auto node : d_leafNodes)
 	{
@@ -41,11 +128,11 @@ void ThinShells::refineSurfaceTree()
 		//	cout << node->boundary.second.transpose() << endl;
 		//	cout << node->id << endl;
 		//}
-		if (node->id == 124)
+		/*if (node->id == 73)
 		{
 			cout << node->boundary.first.transpose() << endl;
 			cout << node->boundary.second.transpose() << endl;
-		}
+		}*/
 		q.push(node->id);
 	}
 
@@ -100,29 +187,7 @@ void ThinShells::refineSurfaceTree()
 		}
 	};
 
-	// 判断是否穿过表面
-	/*
-	* @param width: d_leafNodes宽度
-	*/
-	auto isCrossSurface = [=](const int& nodeId, double sdf[8])->bool
-	{
-		// 得到nodeId对应的原点位置
-		V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
-		sdf[0] = getSignedDistance(originCorner, scene);
-		bool flag = sdf[0] > .0;
-		for (int i = 1; i < 8; i++)
-		{
-			const int xOffset = i & 1;
-			const int yOffset = (i >> 1) & 1;
-			const int zOffset = (i >> 2) & 1;
-			V3d offsetCorner = originCorner + V3d(xOffset * d_leafNodeWidth.x(), yOffset * d_leafNodeWidth.y(), zOffset * d_leafNodeWidth.z());
-			sdf[i] = getSignedDistance(offsetCorner, scene);
-			flag ^= (sdf[i] > .0);
-		}
-		return flag;
-	};
-
-	// 蔓延
+	// 漫延
 	while (!q.empty())
 	{
 		auto queryNodeId = q.front();
@@ -140,16 +205,18 @@ void ThinShells::refineSurfaceTree()
 		// 判断needNode是否建立过且是否穿过表面，若没建立且穿过表面则建立
 		for (const auto& nodeId : neighbors)
 		{
+			/*if (queryNodeId == 124)
+				cout << "neighbor: " << nodeId << endl;*/
 			// nodeId == 0 代表 nodeId 这个邻居节点并不存在
 			// visNodeId[nodeId] >= 1代表已经在队列中或者已经出过队了
-			if (queryNodeId == 124) cout << "neighbor: " << nodeId << endl;
-
 			if (!nodeId || visNodeId[nodeId] >= 1) continue;
 			visNodeId[nodeId]++;
 			q.push(nodeId);
+
+			//if (nodeId == 131) 
+			//	cout << 111 << endl;
 			double sdf[8];
-			if (nodeId == 131) cout << 111 << endl;
-			//if (!isCrossSurface(nodeId, sdf)) continue;
+			if (!isCrossSurface(nodeId, sdf)) continue;
 
 			//// create node
 			//vector<size_t> parents;
