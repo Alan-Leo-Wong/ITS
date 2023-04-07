@@ -149,11 +149,11 @@ V3d Octree::getNodeCoord(const size_t& nodeId, const V3d& width)
 	int offset = GET_OFFSET(nodeId);
 	Eigen::Array3d a_res = Eigen::Array3d(0, 0, 0);
 	Eigen::Array3d a_width = Eigen::Array3d(width);
-	if (offset != 0) a_res(1) = 1; 
+	if (offset != 0 && (offset & 1)) a_res(1) = 1;
 	offset >>= 1;
-	if (offset != 0) a_res(0) = 1; 
+	if (offset != 0 && (offset & 1)) a_res(0) = 1;
 	offset >>= 1;
-	if (offset != 0) a_res(2) = 1;
+	if (offset != 0 && (offset & 1)) a_res(2) = 1;
 
 	return V3d(a_res * a_width) + getNodeCoord(GET_PARENT_ID(nodeId), width * 2.0);
 }

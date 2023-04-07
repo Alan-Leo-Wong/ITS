@@ -103,7 +103,7 @@ private:
 	vector<OctreeNode*> allNodes;
 	vector<vector<OctreeNode*>> inDmNodes;
 
-	vector<OctreeNode*> d_leafNodes; // 存储最深层的叶子节点
+	vector<OctreeNode*> d_leafNodes; // 存储最深层的且穿过表面的叶子节点
 
 	map<V3d, vector<PUII>> corner2IDs;
 

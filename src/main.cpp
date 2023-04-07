@@ -54,8 +54,8 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "switchmec.obj");
-	const int treeDepth = 4;
+	string modelName = getFileName("", "bunny.off");
+	const int treeDepth = 7;
 	cout << "-- Model: " << modelName << endl;
 	cout << "-- Octree depth: " << treeDepth << endl;
 
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"switchmec.obj"), treeDepth);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), treeDepth);
 	//thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
