@@ -456,8 +456,8 @@ inline void ThinShells::cpSDFOfTreeNodes()
 	const uint nAllNodes = bSplineTree.nAllNodes;
 
 	// initialize a 3d scene
-	//sdfVal.resize(nAllNodes * 8);
-	sdfVal.resize(nAllNodes * 8 + allInterPoints.size());
+	sdfVal.resize(nAllNodes * 8);
+	//sdfVal.resize(nAllNodes * 8 + allInterPoints.size());
 	sdfVal.setZero();
 	//sdfVal.resize(nLeafNodes * 8);
 
@@ -477,8 +477,8 @@ inline void ThinShells::cpCoefficients()
 	auto corner2IDs = bSplineTree.corner2IDs;
 
 	// initial matrix
-	//SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
-	SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
+	SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
+	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
 	for (int i = 0; i < nAllNodes; ++i)
@@ -513,7 +513,7 @@ inline void ThinShells::cpCoefficients()
 		}
 	}
 
-	for (int i = 0; i < allInterPoints.size(); ++i)
+	/*for (int i = 0; i < allInterPoints.size(); ++i)
 	{
 		for (int j = 0; j < nAllNodes; ++j)
 		{
@@ -523,7 +523,7 @@ inline void ThinShells::cpCoefficients()
 				matVal.emplace_back(Trip(nAllNodes * 8 + i, j * 8 + k, val));
 			}
 		}
-	}
+	}*/
 
 	sm.setFromTriplets(matVal.begin(), matVal.end());
 	//sm.makeCompressed();
