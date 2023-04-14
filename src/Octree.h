@@ -74,6 +74,7 @@ public:
 	void setCorners();
 
 	void setCornersIdx(map<V3d, vector<PUII>>& corner2IDs);
+	void setCornersIdx(map<V3d, vector<PUII>>& corner2IDs, const uint& _id);
 
 	//double BaseFunction4Point(const V3d& p);
 
@@ -105,7 +106,7 @@ private:
 
 	vector<OctreeNode*> d_leafNodes; // 存储最深层的且穿过表面的叶子节点
 
-	map<V3d, vector<PUII>> corner2IDs;
+	map<V3d, vector<PUII>> corner2IDs; // 这里的id与建立自适应表面的八叉树使用的id不同，它的id等于当前建的格子数，从0开始
 
 	std::unordered_map<size_t, int> visNodeId;
 	// 得到id后构建对应的node，后期将改成仅用于可视化——因为其实实际上只要让d_leafNodes存储所有表面附近的叶子节点id，

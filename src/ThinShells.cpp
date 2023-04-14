@@ -57,7 +57,7 @@ void ThinShells::refineSurfaceTree()
 
 		V3d originCorner = node->corners[0];
 		node->sdf[0] = getSignedDistance(originCorner, scene);
-		
+
 		bool ref = (node->sdf[0]) > 0;
 		bool flag = false;
 		for (int i = 1; i < 8; i++)
@@ -207,8 +207,8 @@ void ThinShells::refineSurfaceTree()
 		{
 			/*if (queryNodeId == 124)
 				cout << "neighbor: " << nodeId << endl;*/
-			// nodeId == 0 代表 nodeId 这个邻居节点并不存在
-			// visNodeId[nodeId] >= 1代表已经在队列中或者已经出过队了
+				// nodeId == 0 代表 nodeId 这个邻居节点并不存在
+				// visNodeId[nodeId] >= 1代表已经在队列中或者已经出过队了
 			if (!nodeId || visNodeId[nodeId] >= 1) continue;
 			visNodeId[nodeId]++;
 			q.push(nodeId);
@@ -456,7 +456,9 @@ inline void ThinShells::cpSDFOfTreeNodes()
 	const uint nAllNodes = bSplineTree.nAllNodes;
 
 	// initialize a 3d scene
-	sdfVal.resize(nAllNodes * 8);
+	//sdfVal.resize(nAllNodes * 8);
+	sdfVal.resize(nAllNodes * 8 + allInterPoints.size());
+	sdfVal.setZero();
 	//sdfVal.resize(nLeafNodes * 8);
 
 	for (int i = 0; i < nAllNodes; ++i)
@@ -470,16 +472,18 @@ inline void ThinShells::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
+	const auto allNodes = bSplineTree.allNodes;
 	const uint nAllNodes = bSplineTree.nAllNodes;
 	auto corner2IDs = bSplineTree.corner2IDs;
 
 	// initial matrix
-	SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
+	//SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
+	SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
 	for (int i = 0; i < nAllNodes; ++i)
 	{
-		auto node_i = bSplineTree.allNodes[i];
+		auto node_i = allNodes[i];
 		//auto node_i = leafNodes[i];
 		map<size_t, bool> visID;
 		auto [inDmPoints, inDmPointsID] = bSplineTree.setInDomainPoints(node_i, visID);
@@ -508,6 +512,19 @@ inline void ThinShells::cpCoefficients()
 			}
 		}
 	}
+
+	for (int i = 0; i < allInterPoints.size(); ++i)
+	{
+		for (int j = 0; j < nAllNodes; ++j)
+		{
+			for (int k = 0; k < 8; ++k)
+			{
+				double val = BaseFunction4Point(allNodes[j]->corners[k], allNodes[j]->width, allInterPoints[i]);
+				matVal.emplace_back(Trip(nAllNodes * 8 + i, j * 8 + k, val));
+			}
+		}
+	}
+
 	sm.setFromTriplets(matVal.begin(), matVal.end());
 	//sm.makeCompressed();
 

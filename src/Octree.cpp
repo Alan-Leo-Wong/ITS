@@ -32,6 +32,12 @@ inline void OctreeNode::setCornersIdx(map<V3d, vector<PUII>>& corner2IDs)
 		corner2IDs[corners[k]].emplace_back(std::make_pair(id, k));
 }
 
+inline void OctreeNode::setCornersIdx(map<V3d, vector<PUII>>& corner2IDs, const uint& _id)
+{
+	for (int k = 0; k < 8; ++k)
+		corner2IDs[corners[k]].emplace_back(std::make_pair(_id, k));
+}
+
 inline void OctreeNode::setEdges()
 {
 	// X
@@ -89,11 +95,11 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 {
 	id2Node[node->id] = node;
 
+	node->setCorners();
+	node->setCornersIdx(corner2IDs, nAllNodes);
+
 	allNodes.emplace_back(node);
 	nAllNodes++;
-
-	node->setCorners();
-	node->setCornersIdx(corner2IDs);
 
 	vector<vector<uint>> childPointsIdx(8);
 
