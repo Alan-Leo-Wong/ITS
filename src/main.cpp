@@ -64,12 +64,12 @@ int main(int argc, char** argv)
 
 	startTimer(&timer);
 	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), treeDepth);
-	//thinShell.creatShell();
+	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
 	printf("\nCreate shells spent %lf s.\n", time);
 
-	/*thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
+	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	
 	const int res = 80;
 	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 	thinShell.mcVisualization(innerShellFile, V3i(res, res, res), outerShellFile, V3i(res, res, res));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
-	printf("\nMarchingCubes spent %lf s.\n", time);*/
+	printf("\nMarchingCubes spent %lf s.\n", time);
 
 	deleteTimer(&timer);
 

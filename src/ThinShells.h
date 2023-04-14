@@ -31,7 +31,7 @@ public:
 		bSplineTree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts)
 	{
 		initSDF(scene, modelVerts, modelFaces);
-		refineSurfaceTree();
+		//refineSurfaceTree();
 		//bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts);
 		//cout << bSplineTree.allNodes[0]->depth << endl;
 		saveOctree("");
