@@ -61,6 +61,9 @@ private:
 	vector<node_vertex_type> nodeVertexArray;
 	vector<node_edge_type> fineNodeEdgeArray;
 
+	size_t numNodeVerts = 0;
+	size_t numFineNodeEdges = 0;
+
 private:
 	void meshVoxelize(const size_t& nModelTris,
 		const Eigen::Vector3i* d_surfaceVoxelGridSize,
@@ -76,22 +79,24 @@ private:
 	void constructNodeAtrributes(const thrust::device_vector<size_t>& d_esumTreeNodesArray,
 		thrust::device_vector<SVONode>& d_SVONodeArray);
 
-public:
-	_CUDA_HOST_CALL_ SparseVoxelOctree() : treeDepth(0) {}
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(const uint32_t nodeIdx, std::map<V3d, size_t>& nodeVertex2Idx);
 
-	_CUDA_HOST_CALL_ SparseVoxelOctree(const std::string& filename, const Eigen::Vector3i& _gridSize) :
+public:
+	SparseVoxelOctree() : treeDepth(0) {}
+
+	SparseVoxelOctree(const Eigen::Vector3i& _gridSize) :
 		treeDepth(0), surfaceVoxelGridSize(_gridSize) {}
 
-	_CUDA_HOST_CALL_ SparseVoxelOctree(const int& _grid_x, const int& _grid_y, const int& _grid_z) :
+	SparseVoxelOctree(const int& _grid_x, const int& _grid_y, const int& _grid_z) :
 		treeDepth(0), surfaceVoxelGridSize(Eigen::Vector3i(_grid_x, _grid_y, _grid_z)) {}
 
 public:
-	_CUDA_GENERAL_CALL_ void createOctree(const size_t& nModelTris, const AABox<Eigen::Vector3d>& modelBBox, const std::string& base_filename);
+	void createOctree(const size_t& nModelTris, const AABox<Eigen::Vector3d>& modelBBox, const std::string& base_filename);
 
 public:
 	// save data
-	_CUDA_GENERAL_CALL_ void saveTree(const std::string& base_filename);
+	void saveSVO(const std::string& filename) const;
 
-	_CUDA_GENERAL_CALL_ void saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const vector<uint32_t>& voxelArray,
-		const std::string& base_filename, const double& width);
+	void saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const vector<uint32_t>& voxelArray,
+		const std::string& base_filename, const double& width) const;
 };

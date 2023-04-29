@@ -373,7 +373,7 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const AABox<Eigen
 		getLastCudaError("Kernel 'compactArray' launch failed!\n");
 		vector<uint32_t> h_pactCNodeArray(numCNodes, 0);
 		CUDA_CHECK(cudaMemcpy(h_pactCNodeArray.data(), d_pactCNodeArray.data().get(), sizeof(uint32_t) * numCNodes, cudaMemcpyDeviceToHost));
-		
+
 		if (treeDepth == 1)
 		{
 			numVoxels = numCNodes;
@@ -637,11 +637,11 @@ void SparseVoxelOctree::constructNodeVertexAndEdge(thrust::device_vector<SVONode
 
 	cudaStreamSynchronize(streams[0]);
 	auto vertNewEnd = thrust::unique(d_nodeVertArray.begin(), d_nodeVertArray.end(), uniqueVert<node_vertex_type>());
-	const size_t numVerts = vertNewEnd - d_nodeVertArray.begin();
-	resizeThrust(d_nodeVertArray, numVerts);
-	nodeVertexArray.resize(numVerts);
+	numNodeVerts = vertNewEnd - d_nodeVertArray.begin();
+	resizeThrust(d_nodeVertArray, numNodeVerts);
+	nodeVertexArray.resize(numNodeVerts);
 	CUDA_CHECK(cudaMemcpy(nodeVertexArray.data(), d_nodeVertArray.data().get(),
-		sizeof(node_vertex_type) * numVerts, cudaMemcpyDeviceToHost));
+		sizeof(node_vertex_type) * numNodeVerts, cudaMemcpyDeviceToHost));
 
 	//cudaStreamSynchronize(streams[1]);
 	//auto edgeNewEnd = thrust::unique(d_nodeEdgeArray.begin(), d_nodeEdgeArray.end(), uniqueEdge<node_edge_type>()); // error
@@ -652,11 +652,11 @@ void SparseVoxelOctree::constructNodeVertexAndEdge(thrust::device_vector<SVONode
 	//	sizeof(node_edge_type) * numEdges, cudaMemcpyDeviceToHost));
 	cudaStreamSynchronize(streams[1]);
 	auto edgeNewEnd = thrust::unique(d_fineNodeEdgeArray.begin(), d_fineNodeEdgeArray.end(), uniqueEdge<node_edge_type>()); // error
-	const size_t numEdges = edgeNewEnd - d_fineNodeEdgeArray.begin();
-	resizeThrust(d_fineNodeEdgeArray, numEdges);
-	fineNodeEdgeArray.resize(numEdges);
+	numFineNodeEdges = edgeNewEnd - d_fineNodeEdgeArray.begin();
+	resizeThrust(d_fineNodeEdgeArray, numFineNodeEdges);
+	fineNodeEdgeArray.resize(numFineNodeEdges);
 	CUDA_CHECK(cudaMemcpy(fineNodeEdgeArray.data(), d_fineNodeEdgeArray.data().get(),
-		sizeof(node_edge_type) * numEdges, cudaMemcpyDeviceToHost));
+		sizeof(node_edge_type) * numFineNodeEdges, cudaMemcpyDeviceToHost));
 
 	for (int i = 0; i < 2; ++i) CUDA_CHECK(cudaStreamDestroy(streams[i]));
 }
@@ -669,14 +669,50 @@ void SparseVoxelOctree::constructNodeAtrributes(const thrust::device_vector<size
 	constructNodeVertexAndEdge(d_SVONodeArray);
 }
 
-void SparseVoxelOctree::saveTree(const std::string& base_filename)
+std::tuple<vector<PV3d>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t nodeIdx, std::map<V3d, size_t>& nodeVertex2Idx)
 {
-	std::string outputFile = base_filename + std::string("_") + std::to_string(treeDepth) + std::string("_tree.obj");
-	std::ofstream output(outputFile.c_str(), std::ios::out);
+	auto parentIdx = svoNodeArray[nodeIdx].parent;
+	vector<PV3d> dm_points;
+	vector<size_t> dm_pointsIdx;
+
+	auto getCorners = [&](const SVONode& node)
+	{
+		const V3d nodeOrigin = node.origin;
+		const double nodeWidth = node.width;
+
+		for (int k = 0; k < 8; ++k)
+		{
+			const int xOffset = k & 1;
+			const int yOffset = (k >> 1) & 1;
+			const int zOffset = (k >> 2) & 1;
+
+			V3d corner = nodeOrigin + nodeWidth * V3d(xOffset, yOffset, zOffset);
+
+			dm_points.emplace_back(std::make_pair(corner, nodeWidth));
+			dm_pointsIdx.emplace_back(nodeVertex2Idx[corner]);
+		}
+	};
+
+	while (parentIdx != UINT_MAX)
+	{
+		const auto& svoNode = svoNodeArray[parentIdx];
+		getCorners(svoNode);
+		parentIdx = svoNode.parent;
+	}
+
+	return std::make_tuple(dm_points, dm_pointsIdx);
+}
+
+//////////////////////
+//  I/O: Save Data  //
+//////////////////////
+void SparseVoxelOctree::saveSVO(const std::string& filename) const
+{
+	std::ofstream output(filename.c_str(), std::ios::out);
 	assert(output);
 
 #ifndef SILENT
-	fprintf(stdout, "[I/O] Writing octree data in obj format to file %s \n", outputFile.c_str());
+	fprintf(stdout, "[I/O] Writing octree data in obj format to file %s \n", filename.c_str());
 	// Write stats
 	size_t voxels_seen = 0;
 	const size_t write_stats_25 = numTreeNodes / 4.0f;
@@ -702,7 +738,7 @@ void SparseVoxelOctree::saveTree(const std::string& base_filename)
 }
 
 void SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const vector<uint32_t>& voxelArray,
-	const std::string& base_filename, const double& width)
+	const std::string& base_filename, const double& width) const
 {
 	std::string filename_output = base_filename + std::string("_voxel.obj");
 	std::ofstream output(filename_output.c_str(), std::ios::out);

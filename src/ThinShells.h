@@ -3,12 +3,11 @@
 #include "Octree.h"
 #include "BaseModel.h"
 #include "SDFHelper.h"
+#include "utils\String.hpp"
 
 class ThinShells : public BaseModel
 {
 private:
-	Octree bSplineTree;
-
 	SparseVoxelOctree svo;
 
 	int treeDepth;
@@ -16,13 +15,12 @@ private:
 	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
 	vector<V3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
 	vector<V3d> allInterPoints;  // All intersection points of octree node and mesh
-	vector<OctreeNode*> interLeafNodes;
 
 private:
-	fcpw::Scene<3> scene;
 	VXd sdfVal;
 	VXd lambda;
 	VXd bSplineVal;
+
 private:
 	double innerShellIsoVal = -DINF;
 	double outerShellIsoVal = -DINF;
@@ -31,14 +29,19 @@ public:
 	// constructor and destructor
 	ThinShells() {}
 
-	ThinShells(const string& filename, const int& _treeDepth) : BaseModel(filename), treeDepth(_treeDepth),
-		bSplineTree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts)
+	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z) : 
+		BaseModel(filename), svo(_grid_x, _grid_y, _grid_z)
 	{
-		initSDF(scene, modelVerts, modelFaces);
-		//refineSurfaceTree();
-		//bSplineTree = Octree(_treeDepth, modelBoundingBox, nModelVerts, modelVerts);
-		//cout << bSplineTree.allNodes[0]->depth << endl;
-		saveOctree("");
+		svo.createOctree(nModelTris, modelBoundingBox, filename);
+		treeDepth = svo.treeDepth;
+		saveTree("");
+	}
+
+	ThinShells(const string& filename, const V3i& _grid) : BaseModel(filename), svo(_grid)
+	{
+		svo.createOctree(nModelTris, modelBoundingBox, filename);
+		treeDepth = svo.treeDepth;
+		saveTree("");
 	}
 
 	~ThinShells() {}
@@ -46,8 +49,6 @@ public:
 	// ThinShells& operator=(const ThinShells& model);
 
 private:
-	void refineSurfaceTree();
-
 	//void cpIntersectionPoints();
 	void cpIntersectionPoints();
 
@@ -68,7 +69,7 @@ public:
 	std::array<double, 2> getShellIsoVal() { return { innerShellIsoVal, outerShellIsoVal }; }
 
 public:
-	void saveOctree(const string& filename) const;
+	void saveTree(const string& filename) const;
 
 	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 

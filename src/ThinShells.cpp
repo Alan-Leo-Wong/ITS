@@ -6,6 +6,7 @@
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
 #include <queue>
 #include <iomanip>
+#include <numeric>
 #include <Eigen\Sparse>
 #include <igl\signed_distance.h>
 
@@ -24,7 +25,7 @@ inline void ThinShells::cpIntersectionPoints()
 	const vector<node_edge_type>& fineNodeEdges = svo.fineNodeEdgeArray;
 
 	// 只需要求三角形与最底层节点的交点
-	
+
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 	for (int i = 0; i < nModelEdges; i++)
@@ -111,18 +112,20 @@ inline void ThinShells::cpIntersectionPoints()
 
 inline void ThinShells::cpSDFOfTreeNodes()
 {
-	const uint nAllNodes = bSplineTree.nAllNodes;
+	const auto& nodeVertexArray = svo.nodeVertexArray;
+	const size_t& numNodeVerts = svo.numNodeVerts;
+	MXd pointsMat(numNodeVerts, 3);
+	for (int i = 0; i < numNodeVerts; ++i) pointsMat.row(i) = nodeVertexArray[i].first;
 
-	// initialize a 3d scene
-	sdfVal.resize(nAllNodes * 8);
-	//sdfVal.resize(nAllNodes * 8 + allInterPoints.size());
-	sdfVal.setZero();
-	//sdfVal.resize(nLeafNodes * 8);
-
-	for (int i = 0; i < nAllNodes; ++i)
-		//for (int i = 0; i < nLeafNodes; ++i)
-		for (int k = 0; k < 8; ++k)
-			sdfVal(i * 8 + k) = getSignedDistance(bSplineTree.allNodes[i]->corners[k], scene);
+	VXd S;
+	{
+		VXi I;
+		MXd C, N;
+		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
+		// Convert distances to binary inside-outside data --> aliasing artifacts
+		sdfVal = S;
+		std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? 1 : (b < 0 ? -1 : 0)); });
+	}
 }
 
 inline void ThinShells::cpCoefficients()
@@ -130,44 +133,38 @@ inline void ThinShells::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
-	const auto allNodes = bSplineTree.allNodes;
-	const uint nAllNodes = bSplineTree.nAllNodes;
-	auto corner2IDs = bSplineTree.corner2IDs;
+	const vector<node_vertex_type>& nodeVertexArray = svo.nodeVertexArray;
+	const size_t numNodeVertex = nodeVertexArray.size();
+	vector<size_t> nodeVertexIdx(numNodeVertex);
+	std::iota(nodeVertexIdx.begin(), nodeVertexIdx.end(), numNodeVertex);
+
+	std::map<V3d, size_t> nodeVertex2Idx;
+	std::transform(nodeVertexIdx.begin(), nodeVertexIdx.end(), nodeVertexArray.begin(),
+		std::inserter(nodeVertex2Idx, nodeVertex2Idx.end()),
+		[](const node_vertex_type& val, size_t i) {
+			return std::make_pair(val.first, i);
+		});
 
 	// initial matrix
-	SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
+	SpMat sm(numNodeVertex, numNodeVertex); // A
 	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
-	for (int i = 0; i < nAllNodes; ++i)
+	for (int i = 0; i < numNodeVertex; ++i)
 	{
-		auto node_i = allNodes[i];
-		//auto node_i = leafNodes[i];
-		map<size_t, bool> visID;
-		auto [inDmPoints, inDmPointsID] = bSplineTree.setInDomainPoints(node_i, visID);
+		V3d i_nodeVertex = nodeVertexArray[i].first;
+		uint32_t i_fromNodeIdx = nodeVertexArray[i].second;
+
+		matVal.emplace_back(Trip(i, i, 1)); // self
+
+		auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, nodeVertex2Idx);
 		const int nInDmPoints = inDmPoints.size();
 
-		for (int k = 0; k < 8; ++k)
+		for (int k = 0; k < nInDmPoints; ++k)
 		{
-			V3d i_corner = node_i->corners[k];
-			const uint ic_row = i * 8 + k;
-
-			for (const auto& id_ck : corner2IDs[i_corner])
-			{
-				// i_corner所在的其他节点的id和位置
-				const uint o_id = id_ck.first;
-				const uint o_k = id_ck.second;
-				const uint o_realID = o_id * 8 + o_k;
-
-				if (!visID[o_realID]) matVal.emplace_back(Trip(ic_row, o_realID, 1));
-			}
-
-			for (int j = 0; j < nInDmPoints; ++j)
-			{
-				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
-				assert(inDmPointsID[j] < nAllNodes * 8, "index of col > nAllNodes * 8!");
-				if (val != 0) matVal.emplace_back(Trip(ic_row, inDmPointsID[j], val));
-			}
+			double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
+			assert(inDmPointsIdx[k] < numNodeVertex, "index of col > nAllNodes * 8!");
+			if (val != 0) matVal.emplace_back(Trip(i, inDmPointsIdx[k], val));
 		}
 	}
 
@@ -202,23 +199,22 @@ inline void ThinShells::cpCoefficients()
 
 inline void ThinShells::cpBSplineValue()
 {
-	const uint nAllNodes = bSplineTree.nAllNodes;
-
 	const uint nInterPoints = allInterPoints.size();
-	const uint nInterLeafNodes = interLeafNodes.size();
 
 	bSplineVal.resize(nModelVerts + nInterPoints);
 	bSplineVal.setZero();
 
+	const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
+	const vector<node_vertex_type>& nodeVertexArray = svo.nodeVertexArray;
+	const size_t numNodeVertex = nodeVertexArray.size();
 	for (int i = 0; i < nModelVerts; ++i)
 	{
-		V3d modelPoint = modelVerts[i];
-
-		for (int j = 0; j < nAllNodes; ++j)
+		const V3d& modelVert = modelVerts[i];
+		for (int j = 0; j < numNodeVertex; ++j)
 		{
-			auto node = bSplineTree.allNodes[j];
-			for (int k = 0; k < 8; k++)
-				bSplineVal[i] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, modelPoint));
+			V3d nodeVert = nodeVertexArray[j].first;
+			uint32_t nodeIdx = nodeVertexArray[j].second;
+			bSplineVal[i] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, modelVert));
 		}
 	}
 
@@ -226,13 +222,12 @@ inline void ThinShells::cpBSplineValue()
 	for (int i = 0; i < nInterPoints; ++i)
 	{
 		cnt = i + nModelVerts;
-		V3d interPoint = allInterPoints[i];
-
-		for (int j = 0; j < nAllNodes; ++j)
+		const V3d& interPoint = allInterPoints[i];
+		for (int j = 0; j < numNodeVertex; ++j)
 		{
-			auto node = bSplineTree.allNodes[j];
-			for (int k = 0; k < 8; k++)
-				bSplineVal[cnt] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, interPoint));
+			V3d nodeVert = nodeVertexArray[j].first;
+			uint32_t nodeIdx = nodeVertexArray[j].second;
+			bSplineVal[cnt] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, interPoint));
 		}
 	}
 
@@ -273,12 +268,12 @@ void ThinShells::creatShell()
 //////////////////////
 //  I/O: Save Data  //
 //////////////////////
-void ThinShells::saveOctree(const string& filename) const
+void ThinShells::saveTree(const string& filename) const
 {
 	string t_filename = filename;
-	if (filename.empty())
-		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"octree.obj");
-	bSplineTree.saveNodeCorners2OBJFile(t_filename);
+	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"_svo.obj");
+
+	svo.saveSVO(t_filename);
 }
 
 void ThinShells::saveIntersections(const string& filename, const vector<V3d>& intersections) const
@@ -364,16 +359,16 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 
 	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
 	{
-		cout << "\nExtract inner shell by MarchingCubes..." << endl;
-		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		cout << "\n[MC] Extract inner shell by MarchingCubes..." << endl;
+		MC::marching_cubes(svo.nodeVertexArray, svo.svoNodeArray, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 		cout << "=====================\n";
 	}
 
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{
-		cout << "\nExtract outer shell by MarchingCubes..." << endl;
-		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		cout << "\n[MC] Extract outer shell by MarchingCubes..." << endl;
+		MC::marching_cubes(svo.nodeVertexArray, svo.svoNodeArray, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
 		cout << "=====================\n";
 	}
