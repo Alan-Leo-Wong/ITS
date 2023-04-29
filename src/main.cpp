@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 	cout << "***************************************************\n";
 
 	string modelName = getFileName("", "bunny.off");
-	const int treeDepth = 7;
+	const int treeDepth = 5;
 	cout << "-- Model: " << modelName << endl;
 	cout << "-- Octree depth: " << treeDepth << endl;
 
