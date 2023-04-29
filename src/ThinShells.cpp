@@ -12,437 +12,95 @@
 //////////////////////
 //  Create  Shells  //
 //////////////////////
-// idx: subdepth
-constexpr size_t EDGE_VAL_LR[] = { 1, 7, 55, 439, 3511, 28087, 224695, 1797559, 14380471 };
-constexpr size_t EDGE_VAL_BF[] = { 2, 14, 110, 878, 7022, 56174, 449390, 3595118, 28760942 };
-constexpr size_t EDGE_VAL_BU[] = { 4, 28, 220, 1756, 14044, 112348, 898780, 7190236, 57521884 };
-void ThinShells::refineSurfaceTree()
-{
-	if (bSplineTree.d_leafNodes.empty() || treeDepth <= 2) return;
-
-	const V3d d_leafNodeWidth = bSplineTree.d_leafNodes[0]->width;
-	const V3d treeOrigin = bSplineTree.treeOrigin;
-	auto& nAllNodes = bSplineTree.nAllNodes;
-	auto& allNodes = bSplineTree.allNodes;
-	auto& nLeafNodes = bSplineTree.nLeafNodes;
-	auto& leafNodes = bSplineTree.leafNodes;
-	auto& d_leafNodes = bSplineTree.d_leafNodes;
-	auto& id2Node = bSplineTree.id2Node;
-	auto& visNodeId = bSplineTree.visNodeId;
-
-	// 判断是否穿过表面
-	/*
-	* @param width: d_leafNodes宽度
-	*/
-	auto isNodeCrossSurface = [=](OctreeNode* node)->bool
-	{
-		//// 得到nodeId对应的原点位置
-		//MXd corners(8, 3);
-		//for (int i = 0; i < 8; ++i)
-		//	corners.row(i) = node->corners[i];
-		//VXd S, B;
-		//{
-		//	VXi I;
-		//	MXd C, N;
-		//	igl::signed_distance(corners, m_V, m_F, igl::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
-		//}
-		//node->sdf[0] = S(0);
-		//bool ref = (node->sdf[0]) > 0;
-		//bool flag = false;
-		//for (int i = 1; i < 8; i++)
-		//{
-		//	node->sdf[i] = S(i);
-		//	if (!flag && ((node->sdf[i] < 0) == ref)) flag = true;
-		//}
-
-		V3d originCorner = node->corners[0];
-		node->sdf[0] = getSignedDistance(originCorner, scene);
-
-		bool ref = (node->sdf[0]) > 0;
-		bool flag = false;
-		for (int i = 1; i < 8; i++)
-		{
-			node->sdf[i] = getSignedDistance(node->corners[i], scene);
-			if (!flag && ((node->sdf[i] < 0) == ref)) flag = true;
-		}
-		return (!flag && node->idxOfPoints.empty()); // 如果node不包含点且没有穿过表面，则删除
-	};
-	auto isCrossSurface = [=](const size_t& nodeId, double sdf[8])->bool
-	{
-		//MXd corners(8, 3);
-		//// 得到nodeId对应的原点位置
-		//V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
-		//corners.row(0) = originCorner;
-		//for (int i = 1; i < 8; i++)
-		//{
-		//	const int xOffset = i & 1;
-		//	const int yOffset = (i >> 1) & 1;
-		//	const int zOffset = (i >> 2) & 1;
-		//	V3d offsetCorner = originCorner + V3d(xOffset * d_leafNodeWidth.x(), yOffset * d_leafNodeWidth.y(), zOffset * d_leafNodeWidth.z());
-		//	corners.row(i) = offsetCorner;
-		//}
-		//VXd S, B;
-		//{
-		//	VXi I;
-		//	MXd C, N;
-		//	igl::signed_distance(corners, m_V, m_F, igl::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
-		//}
-		//sdf[0] = S(0);
-		//bool ref = (sdf[0]) > 0;
-		//bool flag = false;
-		//for (int i = 1; i < 8; i++)
-		//{
-		//	sdf[i] = S(i);
-		//	if (!flag && ((sdf[i] < 0) == ref)) flag = true;
-		//}
-
-		// 得到nodeId对应的原点位置
-		V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
-		sdf[0] = getSignedDistance(originCorner, scene);
-		bool ref = sdf[0] > 0;
-		bool flag = false;
-		for (int i = 1; i < 8; i++)
-		{
-			const int xOffset = i & 1;
-			const int yOffset = (i >> 1) & 1;
-			const int zOffset = (i >> 2) & 1;
-			V3d offsetCorner = originCorner + V3d(xOffset * d_leafNodeWidth.x(), yOffset * d_leafNodeWidth.y(), zOffset * d_leafNodeWidth.z());
-
-			sdf[i] = getSignedDistance(offsetCorner, scene);
-			if (!flag && ((sdf[i] < 0) == ref)) flag = true;
-		}
-		return flag;
-	};
-
-	std::erase_if(d_leafNodes, isNodeCrossSurface);
-
-	std::queue<size_t> q;
-	for (auto node : d_leafNodes)
-	{
-		//if (fabs(node->boundary.first.x() + 34.6) < 1e-3 &&
-		//	fabs(node->boundary.first.y() + 44.7991) < 1e-3 &&
-		//	fabs(node->boundary.first.z() - 16.5) < 1e-3
-		//	/* &&
-		//	node->boundary.second == V3d(31.400000000, -28.299094000, 0.000000000)*/)
-		//{
-		//	cout << node->boundary.second.transpose() << endl;
-		//	cout << node->id << endl;
-		//}
-		/*if (node->id == 73)
-		{
-			cout << node->boundary.first.transpose() << endl;
-			cout << node->boundary.second.transpose() << endl;
-		}*/
-		q.push(node->id);
-	}
-
-	enum CROSS_EDGE
-	{
-		TO_RIGHT,
-		TO_LEFT,
-
-		TO_DOWN,
-		TO_UP,
-
-		TO_FRONT,
-		TO_BACK,
-	};
-
-	auto getCrossEdgeCost = [=](const int& i, const int& crossEdgeKind, const int& subDepth)->long long
-	{
-		long long val = (crossEdgeKind & 1) ? -1 : 1;
-		if (i == 0) val *= EDGE_VAL_LR[subDepth];
-		else if (i == 1) val *= EDGE_VAL_BF[subDepth];
-		else if (i == 2) val *= EDGE_VAL_BU[subDepth];
-		return val;
-	};
-
-	auto getNeightborNodeId = [&](const int& offset, const size_t& queryNodeId, size_t neighbors[6])
-	{
-		int t_offset = offset;
-
-		int fatherId = GET_PARENT_ID(queryNodeId);
-		//if (!fatherId) return; // 保证queryNode至少位于第2层及以下
-		int fatherOffset = GET_OFFSET(fatherId);
-		for (int i = 0; i < 3; ++i, t_offset >>= 1)
-		{
-			int queryBit = ((t_offset & 1) + 1) % 2;
-			int t_fatherId = fatherId, t_fatherOffset = fatherOffset;
-			int subDepth = 1;
-
-			// 当queryNode的某个父节点fatherNode在其父节点中的偏移量fatherOffset的第i位与queryBit(表示了queryNode待寻找的周围节点的反方向)一致时
-			// 我们就可以计算待寻找的queryNode周围节点id了
-			while ((t_fatherOffset >> i & 1) != queryBit)
-			{
-				t_fatherId = GET_PARENT_ID(t_fatherId);
-				if (!t_fatherId) { subDepth = 0; break; }
-
-				t_fatherOffset = GET_OFFSET(t_fatherId);
-				++subDepth;
-			}
-
-			CROSS_EDGE kind = CROSS_EDGE(i * 2 + queryBit);
-			if (subDepth >= 1) neighbors[i] = queryNodeId + getCrossEdgeCost(i, kind, subDepth);
-			neighbors[i + 3] = queryNodeId + getCrossEdgeCost(i, (kind + 1) % 2 + i * 2, 0);
-		}
-	};
-
-	// 漫延
-	while (!q.empty())
-	{
-		auto queryNodeId = q.front();
-		q.pop();
-
-		if (visNodeId[queryNodeId] >= 2) continue;
-		visNodeId[queryNodeId]++;
-
-		// 得到其在父亲内是哪一个偏移节点
-		int offset = GET_OFFSET(queryNodeId);
-		// 得到需要建立的六个nodeId(通过找父亲以及定值)
-		size_t neighbors[6] = { 0 };
-		getNeightborNodeId(offset, queryNodeId, neighbors);
-
-		// 判断needNode是否建立过且是否穿过表面，若没建立且穿过表面则建立
-		for (const auto& nodeId : neighbors)
-		{
-			/*if (queryNodeId == 124)
-				cout << "neighbor: " << nodeId << endl;*/
-				// nodeId == 0 代表 nodeId 这个邻居节点并不存在
-				// visNodeId[nodeId] >= 1代表已经在队列中或者已经出过队了
-			if (!nodeId || visNodeId[nodeId] >= 1) continue;
-			visNodeId[nodeId]++;
-			q.push(nodeId);
-
-			//if (nodeId == 131) 
-			//	cout << 111 << endl;
-			double sdf[8];
-			if (!isCrossSurface(nodeId, sdf)) continue;
-
-			//// create node
-			//vector<size_t> parents;
-			//int parentNodeId = GET_PARENT_ID(queryNodeId);
-			//// 逐渐向上遍历树，找到所有没建立的父节点以及第一个建立出来的父节点
-			//while (id2Node[parentNodeId] == nullptr && parentNodeId != 0)
-			//{
-			//	parents.emplace_back(parentNodeId);
-			//	parentNodeId = GET_PARENT_ID(parentNodeId);
-			//}
-			//parents.emplace_back(parentNodeId);
-			//// 自上向下建立节点
-			//for (auto it = parents.rbegin(); it != parents.rend(); ++it)
-			//{
-			//	const size_t parentId = *it;
-			//	OctreeNode* node = id2Node[parentId];
-			//	/*if (node == nullptr)
-			//	{
-			//		printf("parentId = %lld\n", parentId);
-			//	}*/
-			//	node->isLeaf = false;
-			//
-			//	const V3d b_beg = node->boundary.first;
-			//	const V3d b_end = node->boundary.second;
-			//	const V3d childWidth = (b_end - b_beg) * 0.5;
-			//	const size_t id = node->id;
-			//	const int depth = node->depth;
-			//
-			//	node->childs.resize(8);
-			//	for (int i = 0; i < 8; i++)
-			//	{
-			//		const int xOffset = i & 1;
-			//		const int yOffset = (i >> 1) & 1;
-			//		const int zOffset = (i >> 2) & 1;
-			//		V3d childBeg = b_beg + V3d(xOffset * childWidth.x(), yOffset * childWidth.y(), zOffset * childWidth.z());
-			//		V3d childEnd = childBeg + childWidth;
-			//		PV3d childBoundary = { childBeg, childEnd };
-			//
-			//		const size_t childId = GET_CHILD_ID(id, i);
-			//		node->childs[i] = new OctreeNode(childId, depth + 1, childWidth, childBoundary);
-			//		node->childs[i]->parent = node;
-			//		//node->childs[i]->setCorners();
-			//		id2Node[childId] = node->childs[i];
-			//
-			//		/*nLeafNodes++;
-			//		leafNodes.emplace_back(node->childs[i]);
-			//
-			//		nAllNodes++;
-			//		allNodes.emplace_back(node->childs[i]);*/
-			//	}
-			//}
-			V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
-			OctreeNode* node = new OctreeNode(nodeId, bSplineTree.maxDepth - 1, d_leafNodeWidth, { originCorner, originCorner + d_leafNodeWidth });
-			id2Node[nodeId] = node;
-			// copy sdf
-			memcpy(id2Node[nodeId]->sdf, sdf, sizeof(double) * 8);
-			id2Node[nodeId]->setEdges();
-			id2Node[nodeId]->setCorners();
-			d_leafNodes.emplace_back(id2Node[nodeId]);
-		}
-
-		//if (queryNodeId == 334)
-		//{
-		//	// create node
-		//	vector<size_t> parents;
-		//	int parentNodeId = GET_PARENT_ID(queryNodeId);
-		//	// 逐渐向上遍历树，找到所有没建立的父节点以及第一个建立出来的父节点
-		//	while (parentNodeId != 0)
-		//	{
-		//		parents.emplace_back(parentNodeId);
-		//		parentNodeId = GET_PARENT_ID(parentNodeId);
-		//	}
-		//	parents.emplace_back(parentNodeId);
-
-		//	for (auto parent : parents)
-		//		cout << "parent: " << parent << endl;
-		//}
-	}
-}
-
 inline void ThinShells::cpIntersectionPoints()
 {
 	vector<V2i> modelEdges = extractEdges();
 	uint nModelEdges = modelEdges.size();
-	cout << "-- Number of leaf nodes: " << bSplineTree.nLeafNodes << endl;;
 
-	auto leafNodes = bSplineTree.leafNodes;
+	const size_t& numFineNodes = svo.numFineNodes;
+	cout << "-- Number of level-0 nodes: " << numFineNodes << endl;;
 
+	const vector<SVONode>& nodeArray = svo.svoNodeArray;
+	const vector<node_edge_type>& fineNodeEdges = svo.fineNodeEdgeArray;
+
+	// 只需要求三角形与最底层节点的交点
+	
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 	for (int i = 0; i < nModelEdges; i++)
 	{
 		Eigen::Vector2i e = modelEdges[i];
-		V3d p1 = m_V.row(e.x());
-		V3d p2 = m_V.row(e.y());
-		V3d dir = p2 - p1;
+		V3d p1 = m_V.row(e.x()); V3d p2 = m_V.row(e.y());
+		V3d modelEdgeDir = p2 - p1;
 
-		for (auto node : leafNodes)
+		for (int j = 0; j < numFineNodes; ++j)
 		{
-			V3d lbbCorner = node->boundary.first;
-			V3d width = node->width;
+			V3d lbbCorner = nodeArray[j].origin;
+			double width = nodeArray[j].width;
 
 			// back plane
 			double back_t = DINF;
-			if (dir.x() != 0)
-				back_t = (lbbCorner.x() - p1.x()) / dir.x();
+			if (modelEdgeDir.x() != 0)
+				back_t = (lbbCorner.x() - p1.x()) / modelEdgeDir.x();
 			// left plane
 			double left_t = DINF;
-			if (dir.y() != 0)
-				left_t = (lbbCorner.y() - p1.y()) / dir.y();
+			if (modelEdgeDir.y() != 0)
+				left_t = (lbbCorner.y() - p1.y()) / modelEdgeDir.y();
 			// bottom plane
 			double bottom_t = DINF;
-			if (dir.z() != 0)
-				bottom_t = (lbbCorner.z() - p1.z()) / dir.z();
+			if (modelEdgeDir.z() != 0)
+				bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
 
 			if (isInRange(.0, 1.0, back_t) &&
-				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + back_t * dir).y()) &&
-				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + back_t * dir).z()))
+				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
+				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + back_t * dir);
-				node->isInterMesh = true;
+				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, left_t) &&
-				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + left_t * dir).x()) &&
-				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + left_t * dir).z()))
+				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
+				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + left_t * dir);
-				node->isInterMesh = true;
+				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, bottom_t) &&
-				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + bottom_t * dir).x()) &&
-				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + bottom_t * dir).y()))
+				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
+				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
 			{
-				edgeInterPoints.emplace_back(p1 + bottom_t * dir);
-				node->isInterMesh = true;
+				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
 			}
 		}
 	}
 
 	cout << "-- 三角形边与node的交点数量：" << edgeInterPoints.size() << endl;
-
 	allInterPoints.insert(allInterPoints.end(), edgeInterPoints.begin(), edgeInterPoints.end());
 
 	// 三角形面与node边线交（有重合点）
 	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
-	for (const auto& leafNode : leafNodes)
+	for (const auto& tri : modelTris)
 	{
-		auto edges = leafNode->edges;
-
-		for (int i = 0; i < nModelFaces; i++)
+		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
+		V3d triNormal = tri.normal; double triDir = tri.dir;
+		for (const auto& nodeEdge : fineNodeEdges)
 		{
-			V3i f = modelFaces[i];
-			V3d p1 = modelVerts[f.x()];
-			V3d p2 = modelVerts[f.y()];
-			V3d p3 = modelVerts[f.z()];
-			Eigen::Matrix3d faceMatrix;
-			faceMatrix << p1.x(), p2.x(), p3.x(),
-				p1.y(), p2.y(), p3.y(),
-				p1.z(), p2.z(), p3.z();
-			V3d maxElement = faceMatrix.rowwise().maxCoeff();
-			V3d minElement = faceMatrix.rowwise().minCoeff();
+			thrust_edge_type edge = nodeEdge.first;
+			V3d edgeDir = edge.second - edge.first;
 
-			Triangle t(p1, p2, p3);
+			if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
 
-			for (int j = 0; j < 4; ++j)
-			{
-				auto edge = edges[j];
-				double y = edge.first.y();
-				double z = edge.first.z();
-				if (maxElement.x() <= edge.first.x() || minElement.x() >= edge.second.x()) continue;
-				if (minElement.y() >= y || maxElement.y() <= y || minElement.z() >= z || maxElement.z() <= z) continue;
-				V3d coefficient = t.cpCoefficientOfTriangle(y, z, 1);
-				if (coefficient.x() > 0)
-				{
-					double interX = coefficient.x() * p1.x() + coefficient.y() * p2.x() + coefficient.z() * p3.x();
-					if (interX >= edge.first.x() && interX <= edge.second.x())
-					{
-						faceInterPoints.emplace_back(V3d(interX, y, z));
-						leafNode->isInterMesh = true;
-					}
-				}
-			}
+			double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
+			if (t <= 0. || t >= 1.) continue;
+			V3d interPoint = edge.first + edgeDir * t;
 
-			for (int j = 4; j < 8; ++j)
-			{
-				auto edge = edges[j];
-				double x = edge.first.x();
-				double z = edge.first.z();
-				if (maxElement.y() <= edge.first.y() || minElement.y() >= edge.second.y()) continue;
-				if (minElement.x() >= x || maxElement.x() <= x || minElement.z() >= z || maxElement.z() <= z) continue;
-				V3d coefficient = t.cpCoefficientOfTriangle(z, x, 2);
-				if (coefficient.x() > 0)
-				{
-					double interY = coefficient.x() * p1.y() + coefficient.y() * p2.y() + coefficient.z() * p3.y();
-					if (interY >= edge.first.y() && interY <= edge.second.y())
-					{
-						faceInterPoints.emplace_back(V3d(x, interY, z));
-						leafNode->isInterMesh = true;
-					}
-				}
-			}
+			if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
+			if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
+			if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
 
-			for (int j = 8; j < 11; ++j)
-			{
-				auto edge = edges[j];
-				double x = edge.first.x();
-				double y = edge.first.y();
-				if (maxElement.z() <= edge.first.z() || minElement.z() >= edge.second.z()) continue;
-				if (minElement.x() >= x || maxElement.x() <= x || minElement.y() >= y || maxElement.y() <= y) continue;
-				V3d coefficient = t.cpCoefficientOfTriangle(x, y, 0);
-				if (coefficient.x() > 0)
-				{
-					double interZ = coefficient.x() * p1.z() + coefficient.y() * p2.z() + coefficient.z() * p3.z();
-					if (interZ >= edge.first.z() && interZ <= edge.second.z())
-					{
-						faceInterPoints.emplace_back(V3d(x, y, interZ));
-						leafNode->isInterMesh = true;
-					}
-				}
-			}
+			faceInterPoints.emplace_back(interPoint);
 		}
-
-		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // 筛选有交点的叶子节点
 	}
 
-	faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
+	//faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
 	cout << "-- 三角形面与node边的交点数量：" << faceInterPoints.size() << endl;
 
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());

@@ -126,7 +126,7 @@ public:
 	// constructor and destructor
 	Octree() { root = nullptr; }
 
-	Octree(const int& _maxDepth, const BoundingBox& bb,
+	Octree(const int& _maxDepth, const AABox<Eigen::Vector3d>& bb,
 		const uint& nPoints, const vector<V3d>& modelVerts) : maxDepth(_maxDepth)
 	{
 		createOctree(bb, nPoints, modelVerts);
@@ -135,7 +135,7 @@ public:
 	~Octree() { delete root; root = nullptr; };
 
 public:
-	void createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts);
+	void createOctree(const AABox<Eigen::Vector3d>& bb, const uint& nPoints, const vector<V3d>& modelVerts);
 
 public:
 	// save data

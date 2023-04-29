@@ -11,31 +11,34 @@ protected:
 
 	vector<V3d> modelVerts;
 	vector<V3i> modelFaces;
+	vector<Triangle<Eigen::Vector3d>> modelTris;
 
 protected:
 	string modelName;
-	BoundingBox modelBoundingBox;
+	AABox<Eigen::Vector3d> modelBoundingBox;
 
 	uint nModelVerts = 0;
-	uint nModelFaces = 0;
+	uint nModelTris = 0;
 
 public:
 	BaseModel() {};
 
+	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
+
 	BaseModel(const std::string& filename) 
 	{ 
 		readFile(filename);
-		setBoundingBox();
+		setUniformBoundingBox();
 	}
-
-	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
 
 	~BaseModel() {}
 
 public:
 	vector<V2i> extractEdges();
 
-	void setBoundingBox(const double& scaleSize = 0.1);
+	void setBoundingBox(const double& scaleSize = 1);
+
+	void setUniformBoundingBox();
 
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;

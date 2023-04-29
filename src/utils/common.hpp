@@ -1,5 +1,19 @@
 #pragma once
+#include "..\..\Config.h"
 #include "cuda\CUDAMacro.h"
+
+namespace detail {
+	template <class T, T... inds, class F>
+	constexpr _CUDA_GENERAL_CALL_ _FORCE_INLINE_ void
+		loop(std::integer_sequence<T, inds...>, F&& f) {
+		(f(std::integral_constant<T, inds>{}), ...);
+	}
+
+	template <class T, T count, class F>
+	constexpr _CUDA_GENERAL_CALL_ _FORCE_INLINE_ void Loop(F&& f) {
+		loop(std::make_integer_sequence<T, count>{}, std::forward<F>(f));
+	}
+} // namespace detail
 
 // used to check colums
 template<typename T>
@@ -79,13 +93,13 @@ inline int max_size(const std::vector<Eigen::Matrix<Scalar, Size, 1>>& V)
 }
 
 template <typename T>
-CUDA_CALLABLE_MEMBER
+_CUDA_GENERAL_CALL_
 inline bool isInRange(const double& l, const double& r, const T& query) {
 	return l <= query && query <= r;
 }
 
 template <typename... T>
-CUDA_CALLABLE_MEMBER
+_CUDA_GENERAL_CALL_
 inline bool isInRange(const double& l, const double& r, const T &...query) {
 	return isInRange(query...);
 }

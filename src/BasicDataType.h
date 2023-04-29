@@ -6,13 +6,16 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <stdint.h>
 #include <Eigen\dense>
 
 using uint = unsigned int;
 
 constexpr double DINF = (std::numeric_limits<double>::max)();
+constexpr double FINF = (std::numeric_limits<float>::max)();
 constexpr int INF = (std::numeric_limits<int>::max)();
 
+using V3f = Eigen::Vector3f;
 using V3d = Eigen::Vector3d;
 using V2i = Eigen::Vector2i;
 using V3i = Eigen::Vector3i;

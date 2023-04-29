@@ -75,7 +75,7 @@ inline void OctreeNode::setEdges()
 //////////////////////
 //   Create  Tree   //
 //////////////////////
-void Octree::createOctree(const BoundingBox& bb, const uint& nPoints, const vector<V3d>& modelVerts)
+void Octree::createOctree(const AABox<Eigen::Vector3d>& bb, const uint& nPoints, const vector<V3d>& modelVerts)
 {
 	vector<uint> idxOfPoints(nPoints);
 	std::iota(idxOfPoints.begin(), idxOfPoints.end(), 0); // 0 ~ nPoints-1

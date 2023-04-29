@@ -13,18 +13,36 @@ void BaseModel::setBoundingBox(const double& scaleSize)
 	V3d minV = m_V.colwise().minCoeff();
 	V3d maxV = m_V.colwise().maxCoeff();
 
-	// 保证外围格子是空的
-	// bounding box
-	V3d b_beg = minV - (maxV - minV) * scaleSize;
-	V3d b_end = maxV + (maxV - minV) * scaleSize;
-	V3d diff = b_end - b_beg;
-	double max_diff = diff.maxCoeff();
-	b_end = b_beg + V3d(max_diff, max_diff, max_diff);
+	modelBoundingBox = AABox(minV, maxV);
+}
 
-	PV3d boundary = std::make_pair(b_beg, b_end);
-	V3d width = b_end - b_beg;
+void BaseModel::setUniformBoundingBox()
+{
+	V3d minV = m_V.colwise().minCoeff();
+	V3d maxV = m_V.colwise().maxCoeff();
 
-	modelBoundingBox = BoundingBox(b_beg, b_end);
+	modelBoundingBox = AABox<V3d>(minV, maxV); // initialize answer
+	Eigen::Vector3f lengths = maxV - minV; // check length of given bbox in every direction
+	float max_length = fmaxf(lengths.x(), fmaxf(lengths.y(), lengths.z())); // find max length
+	for (unsigned int i = 0; i < 3; i++) { // for every direction (X,Y,Z)
+		if (max_length == lengths[i]) {
+			continue;
+		}
+		else {
+			float delta = max_length - lengths[i]; // compute difference between largest length and current (X,Y or Z) length
+			modelBoundingBox.boxOrigin[i] = minV[i] - (delta / 2.0f); // pad with half the difference before current min
+			modelBoundingBox.boxEnd[i] = maxV[i] + (delta / 2.0f); // pad with half the difference behind current max
+		}
+	}
+
+	// Next snippet adresses the problem reported here: https://github.com/Forceflow/cuda_voxelizer/issues/7
+	// Suspected cause: If a triangle is axis-aligned and lies perfectly on a voxel edge, it sometimes gets counted / not counted
+	// Probably due to a numerical instability (division by zero?)
+	// Ugly fix: we pad the bounding box on all sides by 1/10001th of its total length, bringing all triangles ever so slightly off-grid
+	Eigen::Vector3f epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 10001.0f;
+	modelBoundingBox.boxOrigin -= epsilon;
+	modelBoundingBox.boxEnd += epsilon;
+	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
 }
 
 vector<V2i> BaseModel::extractEdges()
@@ -483,10 +501,18 @@ void BaseModel::readFile(const string& filename)
 {
 	igl::read_triangle_mesh(filename, m_V, m_F);
 	for (int i = 0; i < m_V.rows(); i++) modelVerts.emplace_back(m_V.row(i));
-	for (int i = 0; i < m_F.rows(); i++) modelFaces.emplace_back(m_F.row(i));
+	for (int i = 0; i < m_F.rows(); i++)
+	{
+		modelFaces.emplace_back(m_F.row(i));
+
+		modelTris.emplace_back(Triangle<Eigen::Vector3d>(modelVerts[m_F.row(i)[0]],
+			modelVerts[m_F.row(i)[1]],
+			modelVerts[m_F.row(i)[2]]
+		));
+	}
 
 	modelName = getFileName(DELIMITER, filename);
-	nModelVerts = modelVerts.size(), nModelFaces = modelFaces.size();
+	nModelVerts = modelVerts.size(), nModelTris = modelFaces.size();
 }
 
 void BaseModel::readOffFile(const string& filename)

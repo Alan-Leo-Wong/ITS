@@ -14,12 +14,12 @@
 using uint = unsigned int;
 
 // constructor
-inline __host__ __device__ uint3 make_uint3(const VXi& a)
+inline __host__ __device__ uint3 make_uint3(const Eigen::VectorXi& a)
 {
 	return make_uint3(uint(a.x()), uint(a.y()), uint(a.z()));
 }
 
-inline __host__ __device__ double3 make_double3(const VXd& a)
+inline __host__ __device__ double3 make_double3(const Eigen::VectorXd& a)
 {
 	return make_double3(a.x(), a.y(), a.z());
 }
@@ -92,4 +92,54 @@ inline __host__ __device__ void operator+=(uint3& a, const uint& b) {
 	a.x += b;
 	a.y += b;
 	a.z += b;
+}
+
+inline _CUDA_GENERAL_CALL_ float fminf(float a, float b)
+{
+	return a < b ? a : b;
+}
+
+inline _CUDA_GENERAL_CALL_ float fmaxf(float a, float b)
+{
+	return a > b ? a : b;
+}
+
+inline _CUDA_GENERAL_CALL_ int mini(int a, int b)
+{
+	return a < b ? a : b;
+}
+
+inline _CUDA_GENERAL_CALL_ int maxi(int a, int b)
+{
+	return a > b ? a : b;
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3f fminf(Eigen::Vector3f a, Eigen::Vector3f b)
+{
+	return Eigen::Vector3f(fminf(a.x(), b.x()), fminf(a.y(), b.y()), fminf(a.z(), b.z()));
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3f fmaxf(Eigen::Vector3f a, Eigen::Vector3f b)
+{
+	return Eigen::Vector3f(fmaxf(a.x(), b.x()), fmaxf(a.y(), b.y()), fmaxf(a.z(), b.z()));
+}
+
+inline _CUDA_GENERAL_CALL_ float clamp(float f, float a, float b)
+{
+	return fmaxf(a, fminf(f, b));
+}
+
+inline _CUDA_GENERAL_CALL_ int clamp(int f, int a, int b)
+{
+	return maxi(a, mini(f, b));
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3f clamp(Eigen::Vector3f v, Eigen::Vector3f a, Eigen::Vector3f b)
+{
+	return Eigen::Vector3f(clamp(v.x(), a.x(), b.x()), clamp(v.y(), a.y(), b.y()), clamp(v.z(), a.z(), b.z()));
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3i clamp(Eigen::Vector3i v, Eigen::Vector3i a, Eigen::Vector3i b)
+{
+	return Eigen::Vector3i(clamp(v.x(), a.x(), b.x()), clamp(v.y(), a.y(), b.y()), clamp(v.z(), a.z(), b.z()));
 }
