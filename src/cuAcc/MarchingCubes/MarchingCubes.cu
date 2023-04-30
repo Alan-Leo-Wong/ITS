@@ -28,7 +28,7 @@ namespace MC {
 	// device
 	//namespace {
 	thrust::device_vector<SVONode> d_svoNodeArray;
-	thrust::device_vector<thrust::pair<Eigen::Vector3d, uint32_t>> d_nodeVertexArray;
+	thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray;
 
 	double* d_lambda = nullptr;
 
@@ -368,21 +368,28 @@ inline void MC::setTextureObject(const uint& srcSizeInBytes, int* srcDev,
 	CUDA_CHECK(cudaCreateTextureObject(texObj, &texRes, &texDesc, nullptr));
 }
 
-inline void MC::initResources(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
-	const vector<SVONode>& svoNodeArray, const VXd& lambda,
+inline void MC::initResources(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
+	const vector<SVONode>& svoNodeArray, const size_t& _numNodeVerts, const VXd& lambda,
 	const uint3& resolution, const uint& nVoxels,
 	const double& isoVal, const double3& gridOrigin,
 	const double3& voxelSize, const uint& maxVerts) {
 	// host
 		{
-			numNodeVerts = nodeVertexArray.size();
+			numNodeVerts = _numNodeVerts;
 			h_triPoints = (double3*)malloc(sizeof(double3) * maxVerts);
 		}
 
 		// device
 		{
 			d_svoNodeArray = thrust::device_vector<SVONode>(svoNodeArray);
-			d_nodeVertexArray = thrust::device_vector<thrust::pair<Eigen::Vector3d, uint32_t>>(nodeVertexArray);
+
+			CUDA_CHECK(cudaMalloc((void**)&d_nodeVertexArray, sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts));
+			for (int i = 0; i < depthNodeVertexArray.size(); ++i)
+			{
+				const size_t i_nodeVerts = depthNodeVertexArray[i].size();
+				CUDA_CHECK(cudaMemcpy(d_nodeVertexArray + i * i_nodeVerts, depthNodeVertexArray[i].data(),
+					sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * i_nodeVerts, cudaMemcpyHostToDevice));
+			}
 
 			CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows())); // lambda.rows() == nAllNodes * 8
 			CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice));
@@ -579,11 +586,11 @@ inline void MC::writeToOBJFile(const std::string& filename) {
  * @param isoVal     isosurface value
  * @param filename   output obj file
  */
-void MC::marching_cubes(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray, const vector<SVONode>& svoNodeArray,
+void MC::marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
+	const vector<SVONode>& svoNodeArray, const size_t& numNodeVerts,
 	const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 	const uint3& resolution, const double& isoVal, const std::string& filename) {
-	if (nodeVertexArray.empty()) { printf("[MC] There is no valid node vertex...\n"); return; }
-	const size_t numNodeVerts = nodeVertexArray.size();
+	if (numNodeVerts == 0) { printf("[MC] There is no valid node vertex...\n"); return; }
 	uint nVoxels = resolution.x * resolution.y * resolution.z;
 
 	uint maxVerts = nVoxels * 18;
@@ -595,7 +602,7 @@ void MC::marching_cubes(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& n
 
 	start = system_clock::now();
 
-	initResources(nodeVertexArray, svoNodeArray, lambda, resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
+	initResources(depthNodeVertexArray, svoNodeArray, numNodeVerts, lambda, resolution, nVoxels, isoVal, gridOrigin, voxelSize, maxVerts);
 
 	//launch_computSDFKernel(nVoxels);
 

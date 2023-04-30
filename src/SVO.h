@@ -45,7 +45,7 @@ using node_edge_type = thrust::pair<thrust_edge_type, uint32_t>;
 using node_vertex_type = thrust::pair<Eigen::Vector3d, uint32_t>;
 class SparseVoxelOctree
 {
-friend class ThinShells;
+	friend class ThinShells;
 private:
 	int treeDepth = 0;
 	size_t numVoxels = 0;
@@ -59,6 +59,7 @@ private:
 	vector<SVONode> svoNodeArray;
 
 	vector<node_vertex_type> nodeVertexArray;
+	vector<vector<node_vertex_type>> depthNodeVertexArray;
 	vector<node_edge_type> fineNodeEdgeArray;
 
 	size_t numNodeVerts = 0;
@@ -79,7 +80,8 @@ private:
 	void constructNodeAtrributes(const thrust::device_vector<size_t>& d_esumTreeNodesArray,
 		thrust::device_vector<SVONode>& d_SVONodeArray);
 
-	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(const uint32_t nodeIdx, std::map<V3d, size_t>& nodeVertex2Idx);
+	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth, 
+		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx);
 
 public:
 	SparseVoxelOctree() : treeDepth(0) {}

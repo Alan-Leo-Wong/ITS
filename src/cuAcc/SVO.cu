@@ -618,14 +618,36 @@ struct uniqueEdge : public thrust::binary_function<T, T, T> {
 	}
 };
 
+#define MAX_STREAM 16
 void SparseVoxelOctree::constructNodeVertexAndEdge(thrust::device_vector<SVONode>& d_SVONodeArray)
 {
-	cudaStream_t streams[2];
-	for (int i = 0; i < 2; ++i) CUDA_CHECK(cudaStreamCreate(&streams[i]));
+	assert(treeDepth + 1 < MAX_STREAM, "the number of stream is too small!\n");
+	cudaStream_t streams[MAX_STREAM];
+	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamCreate(&streams[i]));
 
-	thrust::device_vector < node_vertex_type> d_nodeVertArray(numTreeNodes * 8);
+	/*thrust::device_vector < node_vertex_type> d_nodeVertArray(numTreeNodes * 8);
 	getOccupancyMaxPotentialBlockSize(numTreeNodes, minGridSize, blockSize, gridSize, determineNodeVertex, 0, 0);
-	determineNodeVertex << <gridSize, blockSize, 0, streams[0] >> > (numTreeNodes, d_SVONodeArray.data().get(), d_nodeVertArray.data().get());
+	determineNodeVertex << <gridSize, blockSize, 0, streams[0] >> > (numTreeNodes, d_SVONodeArray.data().get(), d_nodeVertArray.data().get());*/
+	depthNodeVertexArray.resize(treeDepth);
+	for (int i = 0; i < treeDepth; ++i)
+	{
+		const size_t numNodes = depthNumNodes[i];
+		thrust::device_vector<node_vertex_type> d_nodeVertArray(numNodes * 8);
+		getOccupancyMaxPotentialBlockSize(numNodes * 8, minGridSize, blockSize, gridSize, determineNodeVertex, 0, 0);
+		determineNodeVertex << <gridSize, blockSize, 0, streams[i] >> > (numNodes * 8, (d_SVONodeArray.data() + numNodes).get(), d_nodeVertArray.data().get());
+
+		auto vertNewEnd = thrust::unique(thrust::cuda::par.on(streams[i]), d_nodeVertArray.begin(), 
+			d_nodeVertArray.end(), uniqueVert<node_vertex_type>());
+		cudaStreamSynchronize(streams[i]);
+		size_t cur_numNodeVerts = vertNewEnd - d_nodeVertArray.begin();
+		numNodeVerts += cur_numNodeVerts;
+		resizeThrust(d_nodeVertArray, cur_numNodeVerts);
+
+		std::vector<node_vertex_type> h_nodeVertArray(cur_numNodeVerts);
+		CUDA_CHECK(cudaMemcpy(h_nodeVertArray.data(), d_nodeVertArray.data().get(), sizeof(node_vertex_type) * cur_numNodeVerts, cudaMemcpyDeviceToHost));
+		depthNodeVertexArray[i].emplace_back(h_nodeVertArray);
+	}
+
 
 	///TODO: 换成最底层节点，而不需要全部节点的边
 	/*thrust::device_vector <node_edge_type> d_nodeEdgeArray(numTreeNodes * 12);
@@ -633,15 +655,7 @@ void SparseVoxelOctree::constructNodeVertexAndEdge(thrust::device_vector<SVONode
 	determineNodeEdge << <gridSize, blockSize, 0, streams[1] >> > (numTreeNodes, d_SVONodeArray.data().get(), d_nodeEdgeArray.data().get());*/
 	thrust::device_vector <node_edge_type> d_fineNodeEdgeArray(numFineNodes * 12);
 	getOccupancyMaxPotentialBlockSize(numFineNodes, minGridSize, blockSize, gridSize, determineNodeEdge, 0, 0);
-	determineNodeEdge << <gridSize, blockSize, 0, streams[1] >> > (numFineNodes, d_SVONodeArray.data().get(), d_nodeEdgeArray.data().get());
-
-	cudaStreamSynchronize(streams[0]);
-	auto vertNewEnd = thrust::unique(d_nodeVertArray.begin(), d_nodeVertArray.end(), uniqueVert<node_vertex_type>());
-	numNodeVerts = vertNewEnd - d_nodeVertArray.begin();
-	resizeThrust(d_nodeVertArray, numNodeVerts);
-	nodeVertexArray.resize(numNodeVerts);
-	CUDA_CHECK(cudaMemcpy(nodeVertexArray.data(), d_nodeVertArray.data().get(),
-		sizeof(node_vertex_type) * numNodeVerts, cudaMemcpyDeviceToHost));
+	determineNodeEdge << <gridSize, blockSize, 0, streams[treeDepth + 1] >> > (numFineNodes, d_SVONodeArray.data().get(), d_nodeEdgeArray.data().get());
 
 	//cudaStreamSynchronize(streams[1]);
 	//auto edgeNewEnd = thrust::unique(d_nodeEdgeArray.begin(), d_nodeEdgeArray.end(), uniqueEdge<node_edge_type>()); // error
@@ -650,8 +664,9 @@ void SparseVoxelOctree::constructNodeVertexAndEdge(thrust::device_vector<SVONode
 	//nodeEdgeArray.resize(numEdges);
 	//CUDA_CHECK(cudaMemcpy(nodeEdgeArray.data(), d_nodeEdgeArray.data().get(),
 	//	sizeof(node_edge_type) * numEdges, cudaMemcpyDeviceToHost));
-	cudaStreamSynchronize(streams[1]);
-	auto edgeNewEnd = thrust::unique(d_fineNodeEdgeArray.begin(), d_fineNodeEdgeArray.end(), uniqueEdge<node_edge_type>()); // error
+	auto edgeNewEnd = thrust::unique(thrust::cuda::par.on(streams[treeDepth + 1]),
+		d_fineNodeEdgeArray.begin(), d_fineNodeEdgeArray.end(), uniqueEdge<node_edge_type>()); // error
+	cudaStreamSynchronize(streams[treeDepth + 1]);
 	numFineNodeEdges = edgeNewEnd - d_fineNodeEdgeArray.begin();
 	resizeThrust(d_fineNodeEdgeArray, numFineNodeEdges);
 	fineNodeEdgeArray.resize(numFineNodeEdges);
@@ -669,16 +684,19 @@ void SparseVoxelOctree::constructNodeAtrributes(const thrust::device_vector<size
 	constructNodeVertexAndEdge(d_SVONodeArray);
 }
 
-std::tuple<vector<PV3d>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t nodeIdx, std::map<V3d, size_t>& nodeVertex2Idx)
+std::tuple<vector<PV3d>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth,
+	const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx)
 {
+	int depth = nodeDepth;
 	auto parentIdx = svoNodeArray[nodeIdx].parent;
 	vector<PV3d> dm_points;
 	vector<size_t> dm_pointsIdx;
 
-	auto getCorners = [&](const SVONode& node)
+	auto getCorners = [&](const SVONode& node, const int& depth)
 	{
 		const V3d nodeOrigin = node.origin;
 		const double nodeWidth = node.width;
+		const size_t& esumNodeVerts = esumDepthNodeVertexSize[depth];
 
 		for (int k = 0; k < 8; ++k)
 		{
@@ -689,15 +707,16 @@ std::tuple<vector<PV3d>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(co
 			V3d corner = nodeOrigin + nodeWidth * V3d(xOffset, yOffset, zOffset);
 
 			dm_points.emplace_back(std::make_pair(corner, nodeWidth));
-			dm_pointsIdx.emplace_back(nodeVertex2Idx[corner]);
+			dm_pointsIdx.emplace_back(esumNodeVerts + nodeVertex2Idx[depth][corner]);
 		}
 	};
 
 	while (parentIdx != UINT_MAX)
 	{
 		const auto& svoNode = svoNodeArray[parentIdx];
-		getCorners(svoNode);
+		getCorners(svoNode, depth);
 		parentIdx = svoNode.parent;
+		depth++;
 	}
 
 	return std::make_tuple(dm_points, dm_pointsIdx);

@@ -133,38 +133,60 @@ inline void ThinShells::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
-	const vector<node_vertex_type>& nodeVertexArray = svo.nodeVertexArray;
-	const size_t numNodeVertex = nodeVertexArray.size();
-	vector<size_t> nodeVertexIdx(numNodeVertex);
-	std::iota(nodeVertexIdx.begin(), nodeVertexIdx.end(), numNodeVertex);
+	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
 
-	std::map<V3d, size_t> nodeVertex2Idx;
-	std::transform(nodeVertexIdx.begin(), nodeVertexIdx.end(), nodeVertexArray.begin(),
-		std::inserter(nodeVertex2Idx, nodeVertex2Idx.end()),
-		[](const node_vertex_type& val, size_t i) {
-			return std::make_pair(val.first, i);
-		});
+	vector<size_t> esumDepthNodeVertexSize(treeDepth);
+
+	vector<std::map<V3d, size_t>> nodeVertex2Idx(treeDepth);
+	for (int i = 0; i < treeDepth; ++i)
+	{
+		const size_t i_numNodeVertex = depthNodeVertexArray[i].size();
+		vector<size_t> i_nodeVertexIdx(i_numNodeVertex);
+		std::iota(i_nodeVertexIdx.begin(), i_nodeVertexIdx.end(), i_numNodeVertex);
+
+		std::transform(depthNodeVertexArray[i].begin(), depthNodeVertexArray[i].end(), i_nodeVertexIdx.begin(),
+			std::inserter(nodeVertex2Idx[i], nodeVertex2Idx[i].end()),
+			[](const node_vertex_type& val, size_t i) {
+				return std::make_pair(val.first, i);
+			});
+
+		esumDepthNodeVertexSize[i] = i_numNodeVertex;
+
+		std::cout << "depth = " << i << ":" << std::endl;
+		for (const auto& entry : nodeVertex2Idx[i])
+		{
+			std::cout << "{" << entry.first << ", " << entry.second << "}" << std::endl;
+		}
+		std::cout << "----------" << std::endl;
+	}
 
 	// initial matrix
-	SpMat sm(numNodeVertex, numNodeVertex); // A
+	const size_t numNodeVerts = svo.numNodeVerts;
+	SpMat sm(numNodeVerts, numNodeVerts); // A
 	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
-	for (int i = 0; i < numNodeVertex; ++i)
+	std::exclusive_scan(esumDepthNodeVertexSize.begin(), esumDepthNodeVertexSize.end(), esumDepthNodeVertexSize.begin(), 0);
+	for (int d = 0; d < treeDepth; ++d)
 	{
-		V3d i_nodeVertex = nodeVertexArray[i].first;
-		uint32_t i_fromNodeIdx = nodeVertexArray[i].second;
-
-		matVal.emplace_back(Trip(i, i, 1)); // self
-
-		auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, nodeVertex2Idx);
-		const int nInDmPoints = inDmPoints.size();
-
-		for (int k = 0; k < nInDmPoints; ++k)
+		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+		const size_t& d_esumNodeVerts = esumDepthNodeVertexSize[d];
+		for (int i = 0; i < d_numNodeVerts; ++i)
 		{
-			double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
-			assert(inDmPointsIdx[k] < numNodeVertex, "index of col > nAllNodes * 8!");
-			if (val != 0) matVal.emplace_back(Trip(i, inDmPointsIdx[k], val));
+			V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
+			uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
+
+			matVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+
+			auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d, esumDepthNodeVertexSize, nodeVertex2Idx);
+			const int nInDmPoints = inDmPoints.size();
+
+			for (int k = 0; k < nInDmPoints; ++k)
+			{
+				double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
+				assert(inDmPointsIdx[k] < numNodeVertex, "index of col > numNodeVertex!");
+				if (val != 0) matVal.emplace_back(Trip(i, inDmPointsIdx[k], val));
+			}
 		}
 	}
 
@@ -205,16 +227,19 @@ inline void ThinShells::cpBSplineValue()
 	bSplineVal.setZero();
 
 	const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
-	const vector<node_vertex_type>& nodeVertexArray = svo.nodeVertexArray;
-	const size_t numNodeVertex = nodeVertexArray.size();
+	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
 	for (int i = 0; i < nModelVerts; ++i)
 	{
 		const V3d& modelVert = modelVerts[i];
-		for (int j = 0; j < numNodeVertex; ++j)
+		for (int d = 0; d < treeDepth; ++d)
 		{
-			V3d nodeVert = nodeVertexArray[j].first;
-			uint32_t nodeIdx = nodeVertexArray[j].second;
-			bSplineVal[i] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, modelVert));
+			const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+			for (int j = 0; j < d_numNodeVerts; ++j)
+			{
+				V3d nodeVert = depthNodeVertexArray[d][j].first;
+				uint32_t nodeIdx = depthNodeVertexArray[d][j].second;
+				bSplineVal[i] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, modelVert));
+			}
 		}
 	}
 
@@ -223,11 +248,15 @@ inline void ThinShells::cpBSplineValue()
 	{
 		cnt = i + nModelVerts;
 		const V3d& interPoint = allInterPoints[i];
-		for (int j = 0; j < numNodeVertex; ++j)
+		for (int d = 0; d < treeDepth; ++d)
 		{
-			V3d nodeVert = nodeVertexArray[j].first;
-			uint32_t nodeIdx = nodeVertexArray[j].second;
-			bSplineVal[cnt] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, interPoint));
+			const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+			for (int j = 0; j < d_numNodeVerts; ++j)
+			{
+				V3d nodeVert = depthNodeVertexArray[d][j].first;
+				uint32_t nodeIdx = depthNodeVertexArray[d][j].second;
+				bSplineVal[cnt] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, interPoint));
+			}
 		}
 	}
 
@@ -360,7 +389,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
 	{
 		cout << "\n[MC] Extract inner shell by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.nodeVertexArray, svo.svoNodeArray, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 		cout << "=====================\n";
 	}
@@ -368,7 +397,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{
 		cout << "\n[MC] Extract outer shell by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.nodeVertexArray, svo.svoNodeArray, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
 		cout << "=====================\n";
 	}

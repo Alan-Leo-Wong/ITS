@@ -103,9 +103,9 @@ void MC::launch_computSDFKernel(const uint& nVoxels)
 
 		double* d_voxelMatrix = nullptr;
 
-		launch_prepareMatrixKernel(nVoxelElems, nAllNodes, voxelOffset, streams[i], d_voxelMatrix);
+		launch_prepareMatrixKernel(nVoxelElems, numNodeVerts, voxelOffset, streams[i], d_voxelMatrix);
 
-		launch_BLASRowSumReduce(streams[i], nVoxelElems * 8, nAllNodes * 8, d_voxelMatrix, d_voxelSDF + voxelOffset * 8);
+		launch_BLASRowSumReduce(streams[i], nVoxelElems * 8, numNodeVerts * 8, d_voxelMatrix, d_voxelSDF + voxelOffset * 8);
 
 		CUDA_CHECK(cudaFree(d_voxelMatrix));
 	}

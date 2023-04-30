@@ -59,7 +59,7 @@ namespace MCKernel {
 namespace MC {
 	// host
 	//namespace {
-	extern uint nAllNodes;
+	extern uint numNodeVerts;
 
 	extern uint allTriVertices, nValidVoxels;
 
@@ -107,8 +107,8 @@ namespace MC {
 	void setTextureObject(const uint& srcSizeInBytes, int* srcDev,
 		cudaTextureObject_t* texObj);
 
-	void initResources(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
-		const vector<SVONode>& svoNodeArray, const VXd& lambda,
+	void initResources(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
+		const vector<SVONode>& svoNodeArray, const size_t& numNodeVerts, const VXd& lambda,
 		const uint3& resolution, const uint& nVoxels,
 		const double& isoVal, const double3& gridOrigin,
 		const double3& voxelSize, const uint& maxVerts);
@@ -128,7 +128,8 @@ namespace MC {
 
 	void writeToOBJFile(const std::string& filename);
 
-	void marching_cubes(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray, const vector<SVONode>& svoNodeArray, 
+	void marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
+		const vector<SVONode>& svoNodeArray, const size_t& numNodeVerts,
 		const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 		const uint3& resolution, const double& isoVal, const std::string& filename);
 } // namespace MC
