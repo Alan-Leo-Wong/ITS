@@ -1,7 +1,10 @@
-#include "CUDACompute.h"
 #include <vector>
-//#include "utils.hpp"
-//#include <cuda/std/limits>
+#include <cuda_runtime.h>
+#include <thrust\device_vector.h>
+#include <device_launch_parameters.h>
+#include "CUDACompute.h"
+#include "..\BasicDataType.h"
+#include "..\utils\Geometry.hpp"
 
 void launch_BLASRowSumReduce(const cudaStream_t& stream,
 	const int& rows,
@@ -94,3 +97,36 @@ void launch_BLASRowSumReduce(const cudaStream_t& stream,
 //{
 //
 //}
+
+// 计算三角形法线和面积
+template<typename Real>
+__global__ void modelTriAttributeKernel(const size_t& nTriangles,
+	Triangle<Real>* d_modelTriangleArray)
+{
+	const size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+	if (tid < nTriangles)
+	{
+		const V3d p1 = d_modelTriangleArray[tid].p1;
+		const V3d p2 = d_modelTriangleArray[tid].p2;
+		const V3d p3 = d_modelTriangleArray[tid].p3;
+
+		const V3d normal = (p2 - p1).cross(p3 - p1);
+
+		d_modelTriangleArray[tid].normal = normal;
+		d_modelTriangleArray[tid].area = 0.5 * (normal.norm());
+		d_modelTriangleArray[tid].dir = (-normal).dot(p1);
+	}
+}
+
+template<typename Real>
+void launch_modelTriAttributeKernel(const size_t& nTriangles,
+	std::vector<Triangle<Real>>& modelTriangleArray)
+{
+	thrust::device_vector<Triangle<Real>>d_modelTriangleArray(modelTriangleArray);
+	int blockSize, gridSize;
+
+	modelTriAttributeKernel << <gridSize, blockSize >> > (nTriangles, d_modelTriangleArray.data().get());
+
+	CUDA_CHECK(cudaMemcpy(modelTriangleArray.data(), d_modelTriangleArray.data().get(), sizeof(Triangle<Real>) * nTriangles, cudaMemcpyDeviceToHost));
+}

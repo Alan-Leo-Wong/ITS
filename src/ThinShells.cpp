@@ -6,6 +6,7 @@
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
 #include <queue>
 #include <iomanip>
+#include <numeric>
 #include <Eigen\Sparse>
 #include <igl\signed_distance.h>
 
@@ -301,57 +302,58 @@ inline void ThinShells::cpIntersectionPoints()
 {
 	vector<V2i> modelEdges = extractEdges();
 	uint nModelEdges = modelEdges.size();
-	cout << "-- Number of leaf nodes: " << bSplineTree.nLeafNodes << endl;;
 
-	auto leafNodes = bSplineTree.leafNodes;
+	const size_t& numFineNodes = svo.numFineNodes;
+	cout << "-- Number of level-0 nodes: " << numFineNodes << endl;;
+
+	const vector<SVONode>& nodeArray = svo.svoNodeArray;
+	const vector<node_edge_type>& fineNodeEdges = svo.fineNodeEdgeArray;
+
+	// 只需要求三角形与最底层节点的交点
 
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 	for (int i = 0; i < nModelEdges; i++)
 	{
 		Eigen::Vector2i e = modelEdges[i];
-		V3d p1 = m_V.row(e.x());
-		V3d p2 = m_V.row(e.y());
-		V3d dir = p2 - p1;
+		V3d p1 = m_V.row(e.x()); V3d p2 = m_V.row(e.y());
+		V3d modelEdgeDir = p2 - p1;
 
-		for (auto node : leafNodes)
+		for (int j = 0; j < numFineNodes; ++j)
 		{
-			V3d lbbCorner = node->boundary.first;
-			V3d width = node->width;
+			V3d lbbCorner = nodeArray[j].origin;
+			double width = nodeArray[j].width;
 
 			// back plane
 			double back_t = DINF;
-			if (dir.x() != 0)
-				back_t = (lbbCorner.x() - p1.x()) / dir.x();
+			if (modelEdgeDir.x() != 0)
+				back_t = (lbbCorner.x() - p1.x()) / modelEdgeDir.x();
 			// left plane
 			double left_t = DINF;
-			if (dir.y() != 0)
-				left_t = (lbbCorner.y() - p1.y()) / dir.y();
+			if (modelEdgeDir.y() != 0)
+				left_t = (lbbCorner.y() - p1.y()) / modelEdgeDir.y();
 			// bottom plane
 			double bottom_t = DINF;
-			if (dir.z() != 0)
-				bottom_t = (lbbCorner.z() - p1.z()) / dir.z();
+			if (modelEdgeDir.z() != 0)
+				bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
 
 			if (isInRange(.0, 1.0, back_t) &&
-				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + back_t * dir).y()) &&
-				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + back_t * dir).z()))
+				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
+				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + back_t * dir);
-				node->isInterMesh = true;
+				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, left_t) &&
-				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + left_t * dir).x()) &&
-				isInRange(lbbCorner.z(), lbbCorner.z() + width.z(), (p1 + left_t * dir).z()))
+				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
+				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + left_t * dir);
-				node->isInterMesh = true;
+				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, bottom_t) &&
-				isInRange(lbbCorner.x(), lbbCorner.x() + width.x(), (p1 + bottom_t * dir).x()) &&
-				isInRange(lbbCorner.y(), lbbCorner.y() + width.y(), (p1 + bottom_t * dir).y()))
+				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
+				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
 			{
-				edgeInterPoints.emplace_back(p1 + bottom_t * dir);
-				node->isInterMesh = true;
+				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
 			}
 		}
 	}
@@ -362,87 +364,32 @@ inline void ThinShells::cpIntersectionPoints()
 
 	// 三角形面与node边线交（有重合点）
 	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
-	for (const auto& leafNode : leafNodes)
+	for (const auto& tri : modelTris)
 	{
-		auto edges = leafNode->edges;
-
-		for (int i = 0; i < nModelFaces; i++)
+		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
+		V3d triNormal = tri.normal; double triDir = tri.dir;
+		for (const auto& nodeEdge : fineNodeEdges)
 		{
-			V3i f = modelFaces[i];
-			V3d p1 = modelVerts[f.x()];
-			V3d p2 = modelVerts[f.y()];
-			V3d p3 = modelVerts[f.z()];
-			Eigen::Matrix3d faceMatrix;
-			faceMatrix << p1.x(), p2.x(), p3.x(),
-				p1.y(), p2.y(), p3.y(),
-				p1.z(), p2.z(), p3.z();
-			V3d maxElement = faceMatrix.rowwise().maxCoeff();
-			V3d minElement = faceMatrix.rowwise().minCoeff();
+			thrust_edge_type edge = nodeEdge.first;
+			V3d edgeDir = edge.second - edge.first;
 
-			Triangle t(p1, p2, p3);
+			if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
 
-			for (int j = 0; j < 4; ++j)
-			{
-				auto edge = edges[j];
-				double y = edge.first.y();
-				double z = edge.first.z();
-				if (maxElement.x() <= edge.first.x() || minElement.x() >= edge.second.x()) continue;
-				if (minElement.y() >= y || maxElement.y() <= y || minElement.z() >= z || maxElement.z() <= z) continue;
-				V3d coefficient = t.cpCoefficientOfTriangle(y, z, 1);
-				if (coefficient.x() > 0)
-				{
-					double interX = coefficient.x() * p1.x() + coefficient.y() * p2.x() + coefficient.z() * p3.x();
-					if (interX >= edge.first.x() && interX <= edge.second.x())
-					{
-						faceInterPoints.emplace_back(V3d(interX, y, z));
-						leafNode->isInterMesh = true;
-					}
-				}
-			}
+			double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
+			if (t <= 0. || t >= 1.) continue;
+			V3d interPoint = edge.first + edgeDir * t;
 
-			for (int j = 4; j < 8; ++j)
-			{
-				auto edge = edges[j];
-				double x = edge.first.x();
-				double z = edge.first.z();
-				if (maxElement.y() <= edge.first.y() || minElement.y() >= edge.second.y()) continue;
-				if (minElement.x() >= x || maxElement.x() <= x || minElement.z() >= z || maxElement.z() <= z) continue;
-				V3d coefficient = t.cpCoefficientOfTriangle(z, x, 2);
-				if (coefficient.x() > 0)
-				{
-					double interY = coefficient.x() * p1.y() + coefficient.y() * p2.y() + coefficient.z() * p3.y();
-					if (interY >= edge.first.y() && interY <= edge.second.y())
-					{
-						faceInterPoints.emplace_back(V3d(x, interY, z));
-						leafNode->isInterMesh = true;
-					}
-				}
-			}
+			if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
+			if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
+			if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
 
-			for (int j = 8; j < 11; ++j)
-			{
-				auto edge = edges[j];
-				double x = edge.first.x();
-				double y = edge.first.y();
-				if (maxElement.z() <= edge.first.z() || minElement.z() >= edge.second.z()) continue;
-				if (minElement.x() >= x || maxElement.x() <= x || minElement.y() >= y || maxElement.y() <= y) continue;
-				V3d coefficient = t.cpCoefficientOfTriangle(x, y, 0);
-				if (coefficient.x() > 0)
-				{
-					double interZ = coefficient.x() * p1.z() + coefficient.y() * p2.z() + coefficient.z() * p3.z();
-					if (interZ >= edge.first.z() && interZ <= edge.second.z())
-					{
-						faceInterPoints.emplace_back(V3d(x, y, interZ));
-						leafNode->isInterMesh = true;
-					}
-				}
-			}
+			faceInterPoints.emplace_back(interPoint);
 		}
 
 		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // 筛选有交点的叶子节点
 	}
 
-	faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
+	//faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
 	cout << "-- 三角形面与node边的交点数量：" << faceInterPoints.size() << endl;
 
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
@@ -453,18 +400,20 @@ inline void ThinShells::cpIntersectionPoints()
 
 inline void ThinShells::cpSDFOfTreeNodes()
 {
-	const uint nAllNodes = bSplineTree.nAllNodes;
+	const auto& nodeVertexArray = svo.nodeVertexArray;
+	const size_t& numNodeVerts = svo.numNodeVerts;
+	MXd pointsMat(numNodeVerts, 3);
+	for (int i = 0; i < numNodeVerts; ++i) pointsMat.row(i) = nodeVertexArray[i].first;
 
-	// initialize a 3d scene
-	sdfVal.resize(nAllNodes * 8);
-	//sdfVal.resize(nAllNodes * 8 + allInterPoints.size());
-	sdfVal.setZero();
-	//sdfVal.resize(nLeafNodes * 8);
-
-	for (int i = 0; i < nAllNodes; ++i)
-		//for (int i = 0; i < nLeafNodes; ++i)
-		for (int k = 0; k < 8; ++k)
-			sdfVal(i * 8 + k) = getSignedDistance(bSplineTree.allNodes[i]->corners[k], scene);
+	VXd S;
+	{
+		VXi I;
+		MXd C, N;
+		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
+		// Convert distances to binary inside-outside data --> aliasing artifacts
+		sdfVal = S;
+		std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? 1 : (b < 0 ? -1 : 0)); });
+	}
 }
 
 inline void ThinShells::cpCoefficients()
@@ -472,43 +421,59 @@ inline void ThinShells::cpCoefficients()
 	using SpMat = Eigen::SparseMatrix<double>;
 	using Trip = Eigen::Triplet<double>;
 
-	const auto allNodes = bSplineTree.allNodes;
-	const uint nAllNodes = bSplineTree.nAllNodes;
-	auto corner2IDs = bSplineTree.corner2IDs;
+	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
+
+	vector<size_t> esumDepthNodeVertexSize(treeDepth);
+
+	vector<std::map<V3d, size_t>> nodeVertex2Idx(treeDepth);
+	for (int i = 0; i < treeDepth; ++i)
+	{
+		const size_t i_numNodeVertex = depthNodeVertexArray[i].size();
+		vector<size_t> i_nodeVertexIdx(i_numNodeVertex);
+		std::iota(i_nodeVertexIdx.begin(), i_nodeVertexIdx.end(), i_numNodeVertex);
+
+		std::transform(depthNodeVertexArray[i].begin(), depthNodeVertexArray[i].end(), i_nodeVertexIdx.begin(),
+			std::inserter(nodeVertex2Idx[i], nodeVertex2Idx[i].end()),
+			[](const node_vertex_type& val, size_t i) {
+				return std::make_pair(val.first, i);
+			});
+
+		esumDepthNodeVertexSize[i] = i_numNodeVertex;
+
+		std::cout << "depth = " << i << ":" << std::endl;
+		for (const auto& entry : nodeVertex2Idx[i])
+		{
+			std::cout << "{" << entry.first << ", " << entry.second << "}" << std::endl;
+		}
+		std::cout << "----------" << std::endl;
+	}
 
 	// initial matrix
-	SpMat sm(nAllNodes * 8, nAllNodes * 8); // A
+	const size_t numNodeVerts = svo.numNodeVerts;
+	SpMat sm(numNodeVerts, numNodeVerts); // A
 	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
-	for (int i = 0; i < nAllNodes; ++i)
+	std::exclusive_scan(esumDepthNodeVertexSize.begin(), esumDepthNodeVertexSize.end(), esumDepthNodeVertexSize.begin(), 0);
+	for (int d = 0; d < treeDepth; ++d)
 	{
-		auto node_i = allNodes[i];
-		//auto node_i = leafNodes[i];
-		map<size_t, bool> visID;
-		auto [inDmPoints, inDmPointsID] = bSplineTree.setInDomainPoints(node_i, visID);
-		const int nInDmPoints = inDmPoints.size();
-
-		for (int k = 0; k < 8; ++k)
+		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+		const size_t& d_esumNodeVerts = esumDepthNodeVertexSize[d];
+		for (int i = 0; i < d_numNodeVerts; ++i)
 		{
-			V3d i_corner = node_i->corners[k];
-			const uint ic_row = i * 8 + k;
+			V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
+			uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
 
-			for (const auto& id_ck : corner2IDs[i_corner])
+			matVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+
+			auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d, esumDepthNodeVertexSize, nodeVertex2Idx);
+			const int nInDmPoints = inDmPoints.size();
+
+			for (int k = 0; k < nInDmPoints; ++k)
 			{
-				// i_corner所在的其他节点的id和位置
-				const uint o_id = id_ck.first;
-				const uint o_k = id_ck.second;
-				const uint o_realID = o_id * 8 + o_k;
-
-				if (!visID[o_realID]) matVal.emplace_back(Trip(ic_row, o_realID, 1));
-			}
-
-			for (int j = 0; j < nInDmPoints; ++j)
-			{
-				double val = BaseFunction4Point(inDmPoints[j].first, inDmPoints[j].second, i_corner);
-				assert(inDmPointsID[j] < nAllNodes * 8, "index of col > nAllNodes * 8!");
-				if (val != 0) matVal.emplace_back(Trip(ic_row, inDmPointsID[j], val));
+				double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
+				assert(inDmPointsIdx[k] < numNodeVertex, "index of col > numNodeVertex!");
+				if (val != 0) matVal.emplace_back(Trip(i, inDmPointsIdx[k], val));
 			}
 		}
 	}
@@ -552,15 +517,20 @@ inline void ThinShells::cpBSplineValue()
 	bSplineVal.resize(nModelVerts + nInterPoints);
 	bSplineVal.setZero();
 
+	const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
+	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
 	for (int i = 0; i < nModelVerts; ++i)
 	{
-		V3d modelPoint = modelVerts[i];
-
-		for (int j = 0; j < nAllNodes; ++j)
+		const V3d& modelVert = modelVerts[i];
+		for (int d = 0; d < treeDepth; ++d)
 		{
-			auto node = bSplineTree.allNodes[j];
-			for (int k = 0; k < 8; k++)
-				bSplineVal[i] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, modelPoint));
+			const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+			for (int j = 0; j < d_numNodeVerts; ++j)
+			{
+				V3d nodeVert = depthNodeVertexArray[d][j].first;
+				uint32_t nodeIdx = depthNodeVertexArray[d][j].second;
+				bSplineVal[i] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, modelVert));
+			}
 		}
 	}
 
@@ -568,13 +538,16 @@ inline void ThinShells::cpBSplineValue()
 	for (int i = 0; i < nInterPoints; ++i)
 	{
 		cnt = i + nModelVerts;
-		V3d interPoint = allInterPoints[i];
-
-		for (int j = 0; j < nAllNodes; ++j)
+		const V3d& interPoint = allInterPoints[i];
+		for (int d = 0; d < treeDepth; ++d)
 		{
-			auto node = bSplineTree.allNodes[j];
-			for (int k = 0; k < 8; k++)
-				bSplineVal[cnt] += lambda[j * 8 + k] * (BaseFunction4Point(node->corners[k], node->width, interPoint));
+			const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+			for (int j = 0; j < d_numNodeVerts; ++j)
+			{
+				V3d nodeVert = depthNodeVertexArray[d][j].first;
+				uint32_t nodeIdx = depthNodeVertexArray[d][j].second;
+				bSplineVal[cnt] += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, interPoint));
+			}
 		}
 	}
 
@@ -615,12 +588,12 @@ void ThinShells::creatShell()
 //////////////////////
 //  I/O: Save Data  //
 //////////////////////
-void ThinShells::saveOctree(const string& filename) const
+void ThinShells::saveTree(const string& filename) const
 {
 	string t_filename = filename;
-	if (filename.empty())
-		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"octree.obj");
-	bSplineTree.saveNodeCorners2OBJFile(t_filename);
+	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"_svo.obj");
+
+	svo.saveSVO(t_filename);
 }
 
 void ThinShells::saveIntersections(const string& filename, const vector<V3d>& intersections) const
@@ -706,16 +679,16 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 
 	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
 	{
-		cout << "\nExtract inner shell by MarchingCubes..." << endl;
-		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		cout << "\n[MC] Extract inner shell by MarchingCubes..." << endl;
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 		cout << "=====================\n";
 	}
 
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{
-		cout << "\nExtract outer shell by MarchingCubes..." << endl;
-		MC::marching_cubes(bSplineTree.allNodes, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		cout << "\n[MC] Extract outer shell by MarchingCubes..." << endl;
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
 		cout << "=====================\n";
 	}

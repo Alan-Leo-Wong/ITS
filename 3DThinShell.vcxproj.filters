@@ -93,6 +93,9 @@
     <ClInclude Include="src\utils\cuda\cuBLASCheck.cuh">
       <Filter>头文件\utils\cuda</Filter>
     </ClInclude>
+    <ClInclude Include="src\SVO.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -122,6 +125,9 @@
     </CudaCompile>
     <CudaCompile Include="src\cuAcc\CUDACompute.cu">
       <Filter>源文件\cudaAcc</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\cuAcc\SVO.cu">
+      <Filter>源文件</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

@@ -29,6 +29,7 @@
     <ClInclude Include="src\ModelDefine.h" />
     <ClInclude Include="src\Octree.h" />
     <ClInclude Include="src\SDFHelper.h" />
+    <ClInclude Include="src\SVO.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\Common.hpp" />
@@ -53,6 +54,7 @@
     <CudaCompile Include="src\cuAcc\CUDACompute.cu" />
     <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu" />
     <CudaCompile Include="src\cuAcc\MarchingCubes\SDFCompute.cu" />
+    <CudaCompile Include="src\cuAcc\SVO.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -91,7 +93,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.6.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -187,6 +189,6 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.6.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.targets" />
   </ImportGroup>
 </Project>
