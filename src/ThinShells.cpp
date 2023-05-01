@@ -255,6 +255,29 @@ inline void ThinShells::cpCoefficients()
 	lambda = mat.colPivHouseholderQr().solve(b);*/
 
 	//saveCoefficients(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Coefficients.txt"));
+	for (int u = 0; u < treeDepth; ++u)
+	{
+		const size_t u_numNodeVerts = depthNodeVertexArray[u].size();
+		const size_t& u_esumNodeVerts = esumDepthNodeVerts[u];
+		for (int k = 0; k < u_numNodeVerts; ++k)
+		{
+			double bSplineVal = 0, sdf = sdfVal[u_esumNodeVerts + k];
+			V3d vert = depthNodeVertexArray[u][k].first;
+			for (int d = 0; d < treeDepth; ++d)
+			{
+				const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+				const size_t& d_esumNodeVerts = esumDepthNodeVerts[d];
+				for (int j = 0; j < d_numNodeVerts; ++j)
+				{
+					V3d nodeVert = depthNodeVertexArray[d][j].first;
+					uint32_t nodeIdx = depthNodeVertexArray[d][j].second;
+					bSplineVal += lambda[d_esumNodeVerts + j] * (BaseFunction4Point(nodeVert, svo.svoNodeArray[nodeIdx].width, vert));
+				}
+			}
+
+			printf("vertIdx = %llu, bSplineVal = %.10lf, sdf = %.10lf\n", u_esumNodeVerts + k, bSplineVal, sdf);
+		}
+	}
 }
 
 inline void ThinShells::cpBSplineValue()
@@ -447,7 +470,8 @@ void ThinShells::saveBSplineValue(const string& filename) const
 //   Visualiztion   //
 //////////////////////
 void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerResolution,
-	const string& outerFilename, const V3i& outerResolution) const
+	const string& outerFilename, const V3i& outerResolution,
+	const string& isoFilename, const V3i& isoResolution) const
 {
 	V3d gridOrigin = modelBoundingBox.boxOrigin;
 	V3d gridWidth = modelBoundingBox.boxWidth;
@@ -465,6 +489,14 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 		cout << "\n[MC] Extract outer shell by MarchingCubes..." << endl;
 		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.esumDepthNodeVerts, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
+		cout << "=====================\n";
+	}
+
+	if (!isoFilename.empty())
+	{
+		cout << "\n[MC] Extract isosurface by MarchingCubes..." << endl;
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.esumDepthNodeVerts, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+			make_uint3(isoResolution), .0, isoFilename);
 		cout << "=====================\n";
 	}
 }

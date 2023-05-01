@@ -82,7 +82,8 @@ public:
 
 public:
 	void mcVisualization(const string& innerFilename, const V3i& innerResolution,
-		const string& outerFilename, const V3i& outerResolution) const;
+		const string& outerFilename, const V3i& outerResolution,
+		const string& isoFilename, const V3i& isoResolution) const;
 
 	void textureVisualization(const string& filename) const;
 
