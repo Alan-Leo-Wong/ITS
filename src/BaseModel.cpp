@@ -1,5 +1,6 @@
 #include "BaseModel.h"
 #include "utils\String.hpp"
+#include "cuAcc\CUDACompute.h"
 #include <sstream>
 #include <iomanip>
 #include <igl\writeOBJ.h>
@@ -45,6 +46,11 @@ void BaseModel::setUniformBoundingBox()
 	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
 }
 
+void BaseModel::setTriAttributes()
+{
+	launch_modelTriAttributeKernel(nModelTris, modelTris);
+}
+
 vector<V2i> BaseModel::extractEdges()
 {
 	cout << "Extracting edges from " << std::quoted(modelName) << endl;
@@ -65,7 +71,7 @@ vector<V2i> BaseModel::extractEdges()
 	for (PII it : uset)
 		edges.emplace_back(V2i(it.first, it.second));
 
-	cout << "-- Number of model's edges: " << edges.size() << endl;
+	cout << "-- Number of " << modelName << "'edges: " << edges.size() << endl;
 	return edges;
 }
 

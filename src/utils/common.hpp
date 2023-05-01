@@ -1,6 +1,54 @@
 #pragma once
-#include "Config.h"
+#include "..\Config.h"
 #include "cuda\CUDAMacro.h"
+#include <string>
+#include <iostream>
+
+namespace tType {
+	const std::string NONE("0"), BOLD("1"), DIM("2"), UNDERLINE("4"), BLINK("5"),
+		INVERSE("7"), HIDDEN("8");
+}
+namespace tColor {
+	const std::string BLACK("30"), RED("31"), GREEN("32"), YELLOW("33"), BLUE("34"),
+		MAGENTA("35"), CYAN("36");
+}
+
+//namespace qp {
+//	template <typename T, typename... Ts> void qp_ctrl(T v, Ts... vl) {
+//		std::string ctrl("\033[");
+//		ctrl += std::string(v);
+//		if constexpr (sizeof...(vl) > 0) {
+//			std::array cl = { std::string(vl)... };
+//			for (auto& c : cl)
+//				ctrl += ";" + c;
+//		}
+//		ctrl += "m";
+//		std::cout << ctrl;
+//	}
+//	void qp_ctrl() { std::cout << "\033[0m"; }
+//
+//	// Print the values no line break.
+//	template <typename T, typename... Ts> void qprint_nlb(T v, Ts... vl) {
+//		std::cout << v << " ";
+//		if constexpr (sizeof...(vl) > 0) {
+//			qprint_nlb(vl...);
+//			return;
+//		}
+//		// std::cout << std::endl;
+//	}
+//
+//	// Print the values with line break.
+//	template <typename T, typename... Ts> void qprint(T v, Ts... vl) {
+//		std::cout << v << " ";
+//		if constexpr (sizeof...(vl) > 0) {
+//			qprint(vl...);
+//			return;
+//		}
+//		std::cout << std::endl;
+//	}
+//
+//	inline void qprint() { printf("\n"); }
+//}
 
 namespace detail {
 	template <class T, T... inds, class F>

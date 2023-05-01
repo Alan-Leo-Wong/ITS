@@ -29,6 +29,7 @@ public:
 	{ 
 		readFile(filename);
 		setUniformBoundingBox();
+		setTriAttributes();
 	}
 
 	~BaseModel() {}
@@ -39,6 +40,8 @@ public:
 	void setBoundingBox(const double& scaleSize = 1);
 
 	void setUniformBoundingBox();
+
+	void setTriAttributes();
 
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;

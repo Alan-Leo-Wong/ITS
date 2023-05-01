@@ -15,6 +15,6 @@ void launch_BLASRowSumReduce(const cudaStream_t& stream,
 
 //void accIntersection();
 
-template<typename Real>
+//template<typename Real>
 void launch_modelTriAttributeKernel(const size_t& nTriangles,
-	std::vector<Triangle<Real>>& modelTriangleArray);
+	std::vector<Triangle<Eigen::Vector3d>>& modelTriangleArray);

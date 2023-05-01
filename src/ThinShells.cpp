@@ -1,5 +1,6 @@
 #include "ThinShells.h"
 #include "BSpline.hpp"
+#include "utils\Timer.hpp"
 #include "utils\Common.hpp"
 #include "utils\String.hpp"
 #include "utils\cuda\CUDAMath.hpp"
@@ -108,25 +109,29 @@ inline void ThinShells::cpIntersectionPoints()
 
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
 
-	allInterPoints.erase(std::unique(allInterPoints.begin(), allInterPoints.end()), allInterPoints.end());
+	//allInterPoints.erase(std::unique(allInterPoints.begin(), allInterPoints.end()), allInterPoints.end());
 	cout << "-- 总交点数量：" << allInterPoints.size() << endl;
 }
 
 inline void ThinShells::cpSDFOfTreeNodes()
 {
-	const auto& nodeVertexArray = svo.nodeVertexArray;
+	const auto& depthNodeVertexArray = svo.depthNodeVertexArray;
+	const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
 	const size_t& numNodeVerts = svo.numNodeVerts;
 	MXd pointsMat(numNodeVerts, 3);
-	for (int i = 0; i < numNodeVerts; ++i) pointsMat.row(i) = nodeVertexArray[i].first;
+	for (int d = 0; d < treeDepth; ++d)
+	{
+		const size_t& d_numNodeVerts = depthNodeVertexArray[d].size();
+		for (int i = 0; i < d_numNodeVerts; ++i)
+			pointsMat.row(esumDepthNodeVerts[d] + i) = depthNodeVertexArray[d][i].first;
+	}
 
-	VXd S;
 	{
 		VXi I;
 		MXd C, N;
-		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
+		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, sdfVal, I, C, N);
 		// Convert distances to binary inside-outside data --> aliasing artifacts
-		sdfVal = S;
-		std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? 1 : (b < 0 ? -1 : 0)); });
+		//std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? b : (b < 0 ? -1 : 0)); });
 	}
 }
 
@@ -143,20 +148,19 @@ inline void ThinShells::cpCoefficients()
 	{
 		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
 		vector<size_t> d_nodeVertexIdx(d_numNodeVerts);
-		std::iota(d_nodeVertexIdx.begin(), d_nodeVertexIdx.end(), d_numNodeVerts);
+		std::iota(d_nodeVertexIdx.begin(), d_nodeVertexIdx.end(), 0);
 
 		std::transform(depthNodeVertexArray[d].begin(), depthNodeVertexArray[d].end(), d_nodeVertexIdx.begin(),
 			std::inserter(nodeVertex2Idx[d], nodeVertex2Idx[d].end()),
 			[](const node_vertex_type& val, size_t i) {
 				return std::make_pair(val.first, i);
 			});
-
-		std::cout << "depth = " << d << ":" << std::endl;
+		/*std::cout << "depth = " << d << ":" << std::endl;
 		for (const auto& entry : nodeVertex2Idx[d])
 		{
 			std::cout << "{" << entry.first << ", " << entry.second << "}" << std::endl;
 		}
-		std::cout << "----------" << std::endl;
+		std::cout << "----------" << std::endl;*/
 	}
 
 	// initial matrix
@@ -165,17 +169,48 @@ inline void ThinShells::cpCoefficients()
 	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
+	//MXd mat(numNodeVerts, numNodeVerts);
+	//for (int d = 0; d < treeDepth; ++d)
+	//{
+	//	const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
+	//	const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
+	//	for (int i = 0; i < d_numNodeVerts; ++i)
+	//	{
+	//		V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
+	//		uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
+	//
+	//		for (int u = 0; u < treeDepth; ++u)
+	//		{
+	//			const size_t ud_numNodeVerts = depthNodeVertexArray[u].size(); // 每层节点的顶点数量
+	//			const size_t& ud_esumNodeVerts = esumDepthNodeVerts[u]; // 顶点数量的exclusive scan
+	//			for (int j = 0; j < ud_numNodeVerts; ++j)
+	//			{
+	//				V3d j_nodeVertex = depthNodeVertexArray[u][j].first;
+	//				uint32_t j_fromNodeIdx = depthNodeVertexArray[u][j].second;
+	//
+	//				double val = BaseFunction4Point(j_nodeVertex, svo.svoNodeArray[j_fromNodeIdx].width, i_nodeVertex);
+	//				mat(d_esumNodeVerts + i, ud_esumNodeVerts + j) = val;
+	//			}
+	//		}
+	//	}
+	//}
+
 	for (int d = 0; d < treeDepth; ++d)
 	{
-		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
-		const size_t& d_esumNodeVerts = esumDepthNodeVerts[d];
+		const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
+		const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
 		for (int i = 0; i < d_numNodeVerts; ++i)
 		{
 			V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
+			//std::cout << "d = " << d << ", i = " << i << ", vert = " << i_nodeVertex.transpose();
 			uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
 
 			for (int j = d; j >= 0; --j)
-				matVal.emplace_back(Trip(esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // self and child
+			{
+				if (nodeVertex2Idx[j].find(i_nodeVertex) == nodeVertex2Idx[j].end()) break;
+				matVal.emplace_back(Trip(esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex],
+					esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // self and child
+			}
 
 			// parent
 			auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d, esumDepthNodeVerts, nodeVertex2Idx);
@@ -185,7 +220,7 @@ inline void ThinShells::cpCoefficients()
 			{
 				double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
 				assert(inDmPointsIdx[k] < numNodeVerts, "index of col > numNodeVertex!");
-				if (val != 0) matVal.emplace_back(Trip(i, inDmPointsIdx[k], val));
+				if (val != 0) matVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
 			}
 		}
 	}
@@ -213,8 +248,11 @@ inline void ThinShells::cpCoefficients()
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
 	lscg.compute(A);
 	lambda = lscg.solve(b);
-
 	cout << "-- Residual Error: " << (A * lambda - b).norm() << endl;
+
+	/*auto A = mat;
+	auto b = sdfVal;
+	lambda = mat.colPivHouseholderQr().solve(b);*/
 
 	//saveCoefficients(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Coefficients.txt"));
 }
@@ -272,25 +310,49 @@ inline void ThinShells::cpBSplineValue()
 
 inline void ThinShells::initBSplineTree()
 {
+	TimerInterface* timer = nullptr;
+	createTimer(&timer);
+
 	cout << "\nComputing intersection points of " << std::quoted(modelName) << "and level-0 nodes...\n=====================" << endl;
+	startTimer(&timer);
 	cpIntersectionPoints();
+	stopTimer(&timer);
+	double time = getElapsedTime(&timer) * 1e-3;
+	//qp::qp_ctrl(tColor::GREEN);
+	//qp::qprint("-- Elapsed time: ", time, "s.");
+	printf("-- Elapsed time: %lf s.\n", time);
+	//qp::qp_ctrl();
 	cout << "=====================\n";
 	saveIntersections("", "");
 
 	cout << "\nComputing discrete SDF of tree nodes..." << endl;
+	startTimer(&timer);
 	cpSDFOfTreeNodes();
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("-- Elapsed time: %lf s.\n", time);
 	cout << "=====================\n";
 	saveSDFValue("");
 
 	cout << "\nComputing coefficients..." << endl;
+	startTimer(&timer);
 	cpCoefficients();
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("-- Elapsed time: %lf s.\n", time);
 	cout << "=====================\n";
 	saveCoefficients("");
 
 	cout << "\nComputing B-Spline value..." << endl;
+	startTimer(&timer);
 	cpBSplineValue();
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("-- Elapsed time: %lf s.\n", time);
 	cout << "=====================\n";
 	saveBSplineValue("");
+
+	deleteTimer(&timer);
 }
 
 void ThinShells::creatShell()
@@ -304,7 +366,7 @@ void ThinShells::creatShell()
 void ThinShells::saveTree(const string& filename) const
 {
 	string t_filename = filename;
-	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"_svo.obj");
+	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"svo.obj");
 
 	svo.saveSVO(t_filename);
 }
@@ -312,7 +374,7 @@ void ThinShells::saveTree(const string& filename) const
 void ThinShells::saveIntersections(const string& filename, const vector<V3d>& intersections) const
 {
 	std::ofstream out(filename);
-	if (!out) { fprintf(stderr, "IO Error: File %s could not be opened!", filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
 	checkDir(filename);
 
 	for (const V3d& p : intersections)
@@ -343,7 +405,7 @@ void ThinShells::saveSDFValue(const string& filename) const
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
-	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!", filename.c_str()); return; }
 
 	cout << "-- Save SDF value to " << std::quoted(t_filename) << endl;
 	for (const auto& val : sdfVal)
@@ -359,7 +421,7 @@ void ThinShells::saveCoefficients(const string& filename) const
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
-	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", t_filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!", t_filename.c_str()); return; }
 
 	cout << "-- Save coefficients to " << std::quoted(t_filename) << endl;
 	for (const auto& val : lambda)
@@ -374,7 +436,7 @@ void ThinShells::saveBSplineValue(const string& filename) const
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
-	if (!out) { fprintf(stderr, "IO Error: File %s could not open!", t_filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!", t_filename.c_str()); return; }
 
 	cout << "-- Save B-Spline value to " << std::quoted(t_filename) << endl;
 	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bSplineVal << endl;

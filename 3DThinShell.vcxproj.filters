@@ -99,6 +99,9 @@
     <ClInclude Include="src\utils\IO.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\utils\cuda\CUDAUtil.cuh">
+      <Filter>头文件\utils\cuda</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

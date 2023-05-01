@@ -6,10 +6,12 @@
 #include "..\utils\cuda\CUDAUtil.cuh"
 #include "..\utils\cuda\CUDACheck.cuh"
 #include <thrust\scan.h>
+#include <thrust\sort.h>
 #include <thrust\unique.h>
 #include <thrust\extrema.h>
 #include <thrust\device_vector.h>
 #include <cuda_runtime_api.h>
+#include <iomanip>
 
 namespace {
 	// Estimate best block and grid size using CUDA Occupancy Calculator
@@ -379,7 +381,7 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 		thrust::transform(d_CNodeMortonArray.begin(), d_CNodeMortonArray.end(), d_isValidCNodeArray.begin(), scanMortonFlag<uint32_t>());
 		thrust::exclusive_scan(d_isValidCNodeArray.begin(), d_isValidCNodeArray.end(), d_esumCNodesArray.begin(), 0); // 必须加init
 		size_t numCNodes = *(d_esumCNodesArray.rbegin()) + *(d_isValidCNodeArray.rbegin());
-		if (!numCNodes) { printf("Sparse Voxel Octree depth: %d\n", treeDepth); break; }
+		if (!numCNodes) { printf("\n-- Sparse Voxel Octree depth: %d\n", treeDepth); break; }
 
 		treeDepth++;
 
@@ -465,9 +467,9 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 			resizeThrust(d_CNodeMortonArray, numParentCNodes);
 			unitNodeWidth *= 2.0; CUDA_CHECK(cudaMemcpy(d_unitNodeWidth, &unitNodeWidth, sizeof(double), cudaMemcpyHostToDevice));
 			gridCNodeSize = numParentCNodes; gridTreeNodeSize = gridCNodeSize % 8 ? gridCNodeSize + 8 - (gridCNodeSize % 8) : gridCNodeSize;
-			if (numNodes / 8 == 0) { printf("Sparse Voxel Octree depth: %d\n", treeDepth); break; }
+			if (numNodes / 8 == 0) { printf("\n-- Sparse Voxel Octree depth: %d\n", treeDepth); break; }
 		}
-		else { printf("Sparse Voxel Octree depth: %d\n", treeDepth); break; }
+		else { printf("\n-- Sparse Voxel Octree depth: %d\n", treeDepth); break; }
 	}
 
 	// copy to host
@@ -549,14 +551,6 @@ void SparseVoxelOctree::constructNodeNeighbors(const thrust::device_vector<size_
 			findNeighbors<false> << <gridSize, blockSize >> > (nNodes, d_esumTreeNodesArray[i], d_SVONodeArray.data().get());
 		}
 	}
-
-	/*CUDA_CHECK(cudaMemcpy(svoNodeArray.data(), d_SVONodeArray.data().get(), sizeof(SVONode) * numTreeNodes, cudaMemcpyDeviceToHost));
-	for (int i = 0; i < svoNodeArray.size(); ++i)
-	{
-		for (int j = 0; j < 27; ++j)
-			if (svoNodeArray[i].neighbors[j] != UINT_MAX)
-				std::cout << "i = " << i << ", j = " << j << ", neighbor = " << svoNodeArray[i].neighbors[j] << std::endl;
-	}*/
 }
 
 __global__ void determineNodeVertex(const size_t nNodes,
@@ -570,11 +564,10 @@ __global__ void determineNodeVertex(const size_t nNodes,
 	{
 		size_t nodeIdx = nodeOffset + tid_x;
 		uint16_t x, y, z;
-		Eigen::Vector3d origin = d_nodeArray[nodeIdx].origin;
-		//if (nodeIdx == 0) printf("origin = (%lf, %lf, %lf)\n", origin.x(), origin.y(), origin.z());
-		double width = d_nodeArray[nodeIdx].width;
+		const Eigen::Vector3d& origin = d_nodeArray[nodeIdx].origin;
+		const double& width = d_nodeArray[nodeIdx].width;
 
-		Eigen::Vector3d verts[8] =
+		/*Eigen::Vector3d verts[8] =
 		{
 			origin,
 			Eigen::Vector3d(origin.x() + width, origin.y(), origin.z()),
@@ -589,38 +582,26 @@ __global__ void determineNodeVertex(const size_t nNodes,
 
 		for (int i = 0; i < 8; ++i)
 		{
-			Eigen::Vector3d vert = verts[i];
 			size_t idx = tid_x;
 			for (int j = 0; j < 8; ++j)
 			{
 				if (d_nodeArray[nodeIdx].neighbors[morton::d_vertSharedLUT[i * 8 + j]] < idx) idx = d_nodeArray[nodeIdx].neighbors[morton::d_vertSharedLUT[i * 8 + j]];
 			}
-			d_nodeVertArray[tid_x * 8 + i] = thrust::make_pair(vert, idx);
-		}
+			d_nodeVertArray[tid_x * 8 + i] = thrust::make_pair<Eigen::Vector3d, uint32_t>(verts[i], idx);
+		}*/
 
-		#pragma unroll
+#pragma unroll
 		for (int i = 0; i < 8; ++i)
 		{
 			morton::morton3D_32_decode(i, x, y, z);
-			//Eigen::Vector3d offset = Eigen::Vector3d(width, width, width);
-			//if (nodeIdx == 0) printf("width = %lf, (x, y, z) = (%d, %d, %d), offset = (%lf, %lf, %lf)\n", width, (int)x, (int)y, (int)z, offset.x(), offset.y(), offset.z());
 			Eigen::Vector3d corner = origin + width * Eigen::Vector3d(x, y, z);
-
 			size_t idx = nodeIdx;
-			//#pragma unroll
+#pragma unroll
 			for (int j = 0; j < 8; ++j)
-			{
 				if (d_nodeArray[nodeIdx].neighbors[morton::d_vertSharedLUT[i * 8 + j]] < idx) idx = d_nodeArray[nodeIdx].neighbors[morton::d_vertSharedLUT[i * 8 + j]];
-				//if (nodeIdx == 0 && i == 1) printf("vertShared = %d, neighbor = %u, idx = %llu\n", (int)(morton::d_vertSharedLUT[i * 8 + j]), d_nodeArray[nodeIdx].neighbors[morton::d_vertSharedLUT[i * 8 + j]], idx);
-			}
-
-			//if (nodeIdx == 0) printf("corner = (%lf, %lf, %lf)\n", corner.x(), corner.y(), corner.z());
 
 			d_nodeVertArray[tid_x * 8 + i] = thrust::make_pair(corner, idx);
 		}
-
-		//if (nodeIdx == 0) printf("origin = (%lf, %lf, %lf)\n", origin.x(), origin.y(), origin.z());
-
 	}
 }
 
@@ -633,20 +614,20 @@ __global__ void determineNodeEdge(const size_t nNodes,
 	if (tid_x < nNodes)
 	{
 		Eigen::Vector3d origin = d_nodeArray[tid_x].origin;
-		if (tid_x == 0) printf("x = %lf, y = %lf, z= %lf\n", origin.x(), origin.y(), origin.z());
 		double width = d_nodeArray[tid_x].width;
 
+		// 0-2 2-3 1-3 0-1; 4-6 6-7 5-7 4-5; 0-4 2-6 3-7 1-5;
 		thrust_edge_type edges[12] =
 		{
 			thrust::make_pair(origin, origin + Eigen::Vector3d(0, width, 0)),
 			thrust::make_pair(origin + Eigen::Vector3d(0, width, 0), origin + Eigen::Vector3d(width, width, 0)),
-			thrust::make_pair(origin + Eigen::Vector3d(width, width, 0), origin + Eigen::Vector3d(width, 0, 0)),
-			thrust::make_pair(origin + Eigen::Vector3d(width, 0, 0), origin),
+			thrust::make_pair(origin + Eigen::Vector3d(width, 0, 0), origin + Eigen::Vector3d(width, width, 0)),
+			thrust::make_pair(origin,origin + Eigen::Vector3d(width, 0, 0)),
 
 			thrust::make_pair(origin + Eigen::Vector3d(0, 0, width), origin + Eigen::Vector3d(0, width, width)),
 			thrust::make_pair(origin + Eigen::Vector3d(0, width, width), origin + Eigen::Vector3d(width, width, width)),
-			thrust::make_pair(origin + Eigen::Vector3d(width, width, width), origin + Eigen::Vector3d(width, 0, width)),
-			thrust::make_pair(origin + Eigen::Vector3d(width, 0, width), origin + Eigen::Vector3d(0, 0, width)),
+			thrust::make_pair(origin + Eigen::Vector3d(width, 0, width),origin + Eigen::Vector3d(width, width, width)),
+			thrust::make_pair(origin + Eigen::Vector3d(0, 0, width), origin + Eigen::Vector3d(width, 0, width)),
 
 			thrust::make_pair(origin, origin + Eigen::Vector3d(0, 0, width)),
 			thrust::make_pair(origin + Eigen::Vector3d(0, width, 0), origin + Eigen::Vector3d(0, width, width)),
@@ -658,19 +639,53 @@ __global__ void determineNodeEdge(const size_t nNodes,
 		for (int i = 0; i < 12; ++i)
 		{
 			thrust_edge_type edge = edges[i];
-
 			size_t idx = tid_x;
+
 #pragma unroll
 			for (int j = 0; j < 4; ++j)
-			{
-				if (tid_x == 0 && i == 0) printf("edgeShared = %d, neighbor = %u, idx = %llu\n", (int)(morton::d_edgeSharedLUT[i * 4 + j]), d_nodeArray[tid_x].neighbors[morton::d_edgeSharedLUT[i * 4 + j]], idx);
 				if (d_nodeArray[tid_x].neighbors[morton::d_edgeSharedLUT[i * 4 + j]] < idx) idx = d_nodeArray[tid_x].neighbors[morton::d_edgeSharedLUT[i * 4 + j]];
-			}
 
 			d_nodeEdgeArray[tid_x * 12 + i] = thrust::make_pair(edge, idx);
 		}
 	}
 }
+
+template <typename T>
+struct lessPoint {
+	__host__ __device__ int operator()(const T& a, const T& b) const {
+		for (size_t i = 0; i < a.size(); ++i) {
+			if (fabs(a[i] - b[i]) < 1e-9) continue;
+
+			if (a[i] < b[i]) return 1;
+			else if (a[i] > b[i]) return -1;
+		}
+		return 0;
+	}
+};
+
+struct sortVert {
+	__host__ __device__ bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
+		int _t = lessPoint<V3d>{}(a.first, b.first);
+		if (_t == 0) return a.second < b.second;
+		else if (_t == 1) return true;
+		else return false;
+	}
+};
+
+struct sortEdge {
+	__host__ __device__ bool operator()(node_edge_type& a, node_edge_type& b) {
+		int _t_0 = lessPoint<V3d>{}(a.first.first, b.first.first);
+		if (_t_0 == 0)
+		{
+			int _t_1 = lessPoint<V3d>{}(a.first.second, b.first.second);
+			if (_t_1 == 0) return a.second < b.second;
+			else if (_t_1 == 1) return true;
+			else return false;
+		}
+		else if (_t_0 == 1) return true;
+		else return false;
+	}
+};
 
 struct uniqueVert {
 	__host__ __device__ bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
@@ -678,127 +693,62 @@ struct uniqueVert {
 	}
 };
 
-struct h_uniqueVert {
-	bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
-		return (a.first).isApprox(b.first, 1e-9);
-	}
-};
-
-template <typename T>
-struct uniqueEdge : public thrust::binary_function<T, T, T> {
+struct uniqueEdge {
 	__host__ __device__
-		bool operator()(const T& a, const T& b) {
-		return ((a.first.first == b.first.first) && (a.first.second == b.first.second)) ||
-			((a.first.first == b.first.second) && (a.first.second == b.first.first));
+		bool operator()(const node_edge_type& a, const node_edge_type& b) {
+		return ((a.first.first.isApprox(b.first.first)) && (a.first.second.isApprox(b.first.second))) ||
+			((a.first.first.isApprox(b.first.second)) && (a.first.second.isApprox(b.first.first)));
 	}
 };
 
 #define MAX_STREAM 16
 void SparseVoxelOctree::constructNodeVertexAndEdge(const thrust::device_vector<size_t>& d_esumTreeNodesArray, thrust::device_vector<SVONode>& d_SVONodeArray)
 {
-	/*assert(treeDepth + 1 <= MAX_STREAM, "the number of stream is too small!\n");
+	assert(treeDepth + 1 <= MAX_STREAM, "the number of stream is too small!\n");
 	cudaStream_t streams[MAX_STREAM];
-	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamCreate(&streams[i]));*/
+	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamCreate(&streams[i]));
 
-	/*thrust::device_vector < node_vertex_type> d_nodeVertArray(numTreeNodes * 8);
-	getOccupancyMaxPotentialBlockSize(numTreeNodes, minGridSize, blockSize, gridSize, determineNodeVertex, 0, 0);
-	determineNodeVertex << <gridSize, blockSize, 0, streams[0] >> > (numTreeNodes, d_SVONodeArray.data().get(), d_nodeVertArray.data().get());*/
 	depthNodeVertexArray.resize(treeDepth);
 	esumDepthNodeVerts.resize(treeDepth + 1, 0);
-	//std::vector<thrust::device_vector<node_vertex_type>> depthNodeVertArray(treeDepth);
-
 	for (int i = 0; i < treeDepth; ++i)
 	{
 		const size_t numNodes = depthNumNodes[i];
 		thrust::device_vector<node_vertex_type> d_nodeVertArray(numNodes * 8);
 
 		getOccupancyMaxPotentialBlockSize(numNodes, minGridSize, blockSize, gridSize, determineNodeVertex, 0, 0);
-		determineNodeVertex << <gridSize, blockSize >> > (numNodes, d_esumTreeNodesArray[i], d_SVONodeArray.data().get(), d_nodeVertArray.data().get());
+		determineNodeVertex << <gridSize, blockSize, 0, streams[i] >> > (numNodes, d_esumTreeNodesArray[i], d_SVONodeArray.data().get(), d_nodeVertArray.data().get());
 		getLastCudaError("Kernel 'determineNodeVertex' launch failed!\n");
 
-		std::vector<node_vertex_type> h_nodeVertArray(numNodes * 8);
-		std::vector<V3d> h_nodeVerts(numNodes * 8);
-		CUDA_CHECK(cudaMemcpy(h_nodeVertArray.data(), d_nodeVertArray.data().get(), sizeof(node_vertex_type) * numNodes * 8, cudaMemcpyDeviceToHost));
-		for (int j = 0; j < numNodes * 8; j++)
-		{
-			std::cout << h_nodeVertArray[j].first.transpose() << std::endl;
-			h_nodeVerts[j] = h_nodeVertArray[j].first;
-		}
+		thrust::sort(thrust::cuda::par.on(streams[i]), d_nodeVertArray.begin(), d_nodeVertArray.end(), sortVert());
+		auto vertNewEnd = thrust::unique(thrust::cuda::par.on(streams[i]), d_nodeVertArray.begin(), d_nodeVertArray.end(), uniqueVert());
+		cudaStreamSynchronize(streams[i]);
 
-		auto end = thrust::unique(h_nodeVerts.begin(), h_nodeVerts.end());
-		auto end2 = std::unique(h_nodeVerts.begin(), h_nodeVerts.end());
-		size_t cur = end - h_nodeVerts.begin();
-		std::cout << cur << std::endl;
-		cur = end2 - h_nodeVerts.begin();
-		std::cout << cur << std::endl;
-
-		auto vertNewEnd = thrust::unique(d_nodeVertArray.begin(), d_nodeVertArray.end(), uniqueVert());
-		//cudaStreamSynchronize(streams[i]);
 		size_t cur_numNodeVerts = vertNewEnd - d_nodeVertArray.begin();
 		resizeThrust(d_nodeVertArray, cur_numNodeVerts);
 		numNodeVerts += cur_numNodeVerts;
 
+		std::vector<node_vertex_type> h_nodeVertArray;
 		h_nodeVertArray.resize(cur_numNodeVerts);
 		CUDA_CHECK(cudaMemcpy(h_nodeVertArray.data(), d_nodeVertArray.data().get(), sizeof(node_vertex_type) * cur_numNodeVerts, cudaMemcpyDeviceToHost));
-		//std::unique(h_nodeVertArray.begin(), h_nodeVertArray.end(), h_uniqueVert());
 		depthNodeVertexArray[i] = h_nodeVertArray;
-		esumDepthNodeVerts[i + 1] = esumDepthNodeVerts[i] + numNodeVerts;
-
-		//CUDA_CHECK(cudaMemcpy(svoNodeArray.data(), d_SVONodeArray.data().get(), sizeof(SVONode) * numTreeNodes, cudaMemcpyDeviceToHost));
-		//for (int i = 0; i < svoNodeArray.size(); ++i)
-		//{
-		//	std::cout << "i = " << i << ", origin = " << svoNodeArray[i].origin.transpose() << std::endl;
-		//}
+		esumDepthNodeVerts[i + 1] = esumDepthNodeVerts[i] + cur_numNodeVerts;
 	}
 
-	//for (int i = 0; i < treeDepth; ++i)
-	//{
-	//	auto vertNewEnd = thrust::unique(depthNodeVertArray[i].begin(), depthNodeVertArray[i].end(), uniqueVert<node_vertex_type>());
-	//	//cudaStreamSynchronize(streams[i]);
+	thrust::device_vector <node_edge_type> d_fineNodeEdgeArray(numFineNodes * 12);
+	getOccupancyMaxPotentialBlockSize(numFineNodes, minGridSize, blockSize, gridSize, determineNodeEdge, 0, 0);
+	determineNodeEdge << <gridSize, blockSize, 0, streams[treeDepth] >> > (numFineNodes, d_SVONodeArray.data().get(), d_fineNodeEdgeArray.data().get());
+	getLastCudaError("Kernel 'determineNodeEdge' launch failed!\n");
 
-	//	size_t cur_numNodeVerts = vertNewEnd - depthNodeVertArray[i].begin();
-	//	resizeThrust(depthNodeVertArray[i], cur_numNodeVerts);
-	//	numNodeVerts += cur_numNodeVerts;
+	thrust::sort(thrust::cuda::par.on(streams[treeDepth]), d_fineNodeEdgeArray.begin(), d_fineNodeEdgeArray.end(), sortEdge());
+	auto edgeNewEnd = thrust::unique(thrust::cuda::par.on(streams[treeDepth]), d_fineNodeEdgeArray.begin(), d_fineNodeEdgeArray.end(), uniqueEdge());
+	cudaStreamSynchronize(streams[treeDepth]);
 
-	//	std::vector<node_vertex_type> h_nodeVertArray(cur_numNodeVerts);
-	//	CUDA_CHECK(cudaMemcpy(h_nodeVertArray.data(), depthNodeVertArray[i].data().get(), sizeof(node_vertex_type) * cur_numNodeVerts, cudaMemcpyDeviceToHost));
-	//	depthNodeVertexArray[i] = h_nodeVertArray;
+	numFineNodeEdges = edgeNewEnd - d_fineNodeEdgeArray.begin();
+	resizeThrust(d_fineNodeEdgeArray, numFineNodeEdges);
+	fineNodeEdgeArray.resize(numFineNodeEdges);
+	CUDA_CHECK(cudaMemcpy(fineNodeEdgeArray.data(), d_fineNodeEdgeArray.data().get(), sizeof(node_edge_type) * numFineNodeEdges, cudaMemcpyDeviceToHost));
 
-	//	esumDepthNodeVerts[i + 1] = esumDepthNodeVerts[i] + numNodeVerts;
-	//}
-
-
-	CUDA_CHECK(cudaMemcpy(svoNodeArray.data(), d_SVONodeArray.data().get(), sizeof(SVONode) * numTreeNodes, cudaMemcpyDeviceToHost));
-	for (int i = 0; i < svoNodeArray.size(); ++i)
-	{
-		std::cout << "i = " << i << ", origin = " << svoNodeArray[i].origin.transpose() << std::endl;
-	}
-
-	///TODO: 换成最底层节点，而不需要全部节点的边
-	/*thrust::device_vector <node_edge_type> d_nodeEdgeArray(numTreeNodes * 12);
-	getOccupancyMaxPotentialBlockSize(numTreeNodes, minGridSize, blockSize, gridSize, determineNodeEdge, 0, 0);
-	determineNodeEdge << <gridSize, blockSize, 0, streams[1] >> > (numTreeNodes, d_SVONodeArray.data().get(), d_nodeEdgeArray.data().get());*/
-	//thrust::device_vector <node_edge_type> d_fineNodeEdgeArray(numFineNodes * 12);
-	//getOccupancyMaxPotentialBlockSize(numFineNodes, minGridSize, blockSize, gridSize, determineNodeEdge, 0, 0);
-	//determineNodeEdge << <gridSize, blockSize, 0, streams[treeDepth] >> > (numFineNodes, d_SVONodeArray.data().get(), d_fineNodeEdgeArray.data().get());
-
-	////cudaStreamSynchronize(streams[1]);
-	////auto edgeNewEnd = thrust::unique(d_nodeEdgeArray.begin(), d_nodeEdgeArray.end(), uniqueEdge<node_edge_type>()); // error
-	////const size_t numEdges = edgeNewEnd - d_nodeEdgeArray.begin();
-	////resizeThrust(d_nodeEdgeArray, numEdges);
-	////nodeEdgeArray.resize(numEdges);
-	////CUDA_CHECK(cudaMemcpy(nodeEdgeArray.data(), d_nodeEdgeArray.data().get(),
-	////	sizeof(node_edge_type) * numEdges, cudaMemcpyDeviceToHost));
-
-	//auto edgeNewEnd = thrust::unique(d_fineNodeEdgeArray.begin(), d_fineNodeEdgeArray.end(), uniqueEdge<node_edge_type>());
-	//cudaStreamSynchronize(streams[treeDepth]);
-
-	//numFineNodeEdges = edgeNewEnd - d_fineNodeEdgeArray.begin();
-	//resizeThrust(d_fineNodeEdgeArray, numFineNodeEdges);
-	//fineNodeEdgeArray.resize(numFineNodeEdges);
-	//CUDA_CHECK(cudaMemcpy(fineNodeEdgeArray.data(), d_fineNodeEdgeArray.data().get(), sizeof(node_edge_type) * numFineNodeEdges, cudaMemcpyDeviceToHost));
-
-	//for (int i = 0; i < 2; ++i) CUDA_CHECK(cudaStreamDestroy(streams[i]));
+	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamDestroy(streams[i]));
 }
 
 void SparseVoxelOctree::constructNodeAtrributes(const thrust::device_vector<size_t>& d_esumTreeNodesArray,
@@ -812,7 +762,7 @@ void SparseVoxelOctree::constructNodeAtrributes(const thrust::device_vector<size
 std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth,
 	const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx)
 {
-	int depth = nodeDepth;
+	int parentDepth = nodeDepth + 1;
 	auto parentIdx = svoNodeArray[nodeIdx].parent;
 	vector<std::pair<V3d, double>> dm_points;
 	vector<size_t> dm_pointsIdx;
@@ -839,9 +789,9 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 	while (parentIdx != UINT_MAX)
 	{
 		const auto& svoNode = svoNodeArray[parentIdx];
-		getCorners(svoNode, depth);
+		getCorners(svoNode, parentDepth);
 		parentIdx = svoNode.parent;
-		depth++;
+		parentDepth++;
 	}
 
 	return std::make_tuple(dm_points, dm_pointsIdx);
@@ -856,7 +806,7 @@ void SparseVoxelOctree::saveSVO(const std::string& filename) const
 	assert(output);
 
 #ifndef SILENT
-	fprintf(stdout, "[I/O] Writing octree data in obj format to file %s \n", filename.c_str());
+	std::cout << "[I/O] Writing Sparse Voxel Octree data in obj format to file " << std::quoted(filename.c_str()) << std::endl;
 	// Write stats
 	size_t voxels_seen = 0;
 	const size_t write_stats_25 = numTreeNodes / 4.0f;
@@ -889,7 +839,7 @@ void SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const
 	assert(output);
 
 #ifndef SILENT
-	fprintf(stdout, "[I/O] Writing data in obj voxels format to file %s \n", filename_output.c_str());
+	std::cout << "[I/O] Writing data in obj voxels format to file " << std::quoted(filename_output.c_str()) << std::endl;
 	// Write stats
 	size_t voxels_seen = 0;
 	const size_t write_stats_25 = voxelArray.size() / 4.0f;
@@ -914,7 +864,7 @@ void SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const
 		gvis::writeCube(nodeOrigin, Eigen::Vector3d(width, width, width), output, faceBegIdx);
 	}
 #ifndef SILENT
-	//fprintf(stdout, "100%% \n");
+	fprintf(stdout, "100%% \n");
 #endif
 
 	output.close();

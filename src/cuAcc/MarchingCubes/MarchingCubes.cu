@@ -384,11 +384,13 @@ inline void MC::initResources(const vector<vector<thrust::pair<Eigen::Vector3d, 
 			d_svoNodeArray = thrust::device_vector<SVONode>(svoNodeArray);
 
 			CUDA_CHECK(cudaMalloc((void**)&d_nodeVertexArray, sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts));
+			size_t offset = 0;
 			for (int i = 0; i < depthNodeVertexArray.size(); ++i)
 			{
 				const size_t i_nodeVerts = depthNodeVertexArray[i].size();
-				CUDA_CHECK(cudaMemcpy(d_nodeVertexArray + i * i_nodeVerts, depthNodeVertexArray[i].data(),
+				CUDA_CHECK(cudaMemcpy(d_nodeVertexArray + offset, depthNodeVertexArray[i].data(),
 					sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * i_nodeVerts, cudaMemcpyHostToDevice));
+				offset += i_nodeVerts;
 			}
 
 			CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows())); // lambda.rows() == nAllNodes * 8
