@@ -22,7 +22,7 @@ void BaseModel::setUniformBoundingBox()
 	V3d maxV = m_V.colwise().maxCoeff();
 
 	modelBoundingBox = AABox<V3d>(minV, maxV); // initialize answer
-	Eigen::Vector3f lengths = maxV - minV; // check length of given bbox in every direction
+	Eigen::Vector3d lengths = maxV - minV; // check length of given bbox in every direction
 	float max_length = fmaxf(lengths.x(), fmaxf(lengths.y(), lengths.z())); // find max length
 	for (unsigned int i = 0; i < 3; i++) { // for every direction (X,Y,Z)
 		if (max_length == lengths[i]) {
@@ -39,7 +39,7 @@ void BaseModel::setUniformBoundingBox()
 	// Suspected cause: If a triangle is axis-aligned and lies perfectly on a voxel edge, it sometimes gets counted / not counted
 	// Probably due to a numerical instability (division by zero?)
 	// Ugly fix: we pad the bounding box on all sides by 1/10001th of its total length, bringing all triangles ever so slightly off-grid
-	Eigen::Vector3f epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 10001.0f;
+	Eigen::Vector3d epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 10001.0;
 	modelBoundingBox.boxOrigin -= epsilon;
 	modelBoundingBox.boxEnd += epsilon;
 	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
@@ -505,9 +505,9 @@ void BaseModel::readFile(const string& filename)
 	{
 		modelFaces.emplace_back(m_F.row(i));
 
-		modelTris.emplace_back(Triangle<Eigen::Vector3d>(modelVerts[m_F.row(i)[0]],
-			modelVerts[m_F.row(i)[1]],
-			modelVerts[m_F.row(i)[2]]
+		modelTris.emplace_back(Triangle<Eigen::Vector3d>(modelVerts[(m_F.row(i))[0]],
+			modelVerts[(m_F.row(i))[1]],
+			modelVerts[(m_F.row(i))[2]]
 		));
 	}
 

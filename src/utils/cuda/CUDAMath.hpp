@@ -104,6 +104,16 @@ inline _CUDA_GENERAL_CALL_ float fmaxf(float a, float b)
 	return a > b ? a : b;
 }
 
+inline _CUDA_GENERAL_CALL_ double fminf(double a, double b)
+{
+	return a < b ? a : b;
+}
+
+inline _CUDA_GENERAL_CALL_ double fmaxf(double a, double b)
+{
+	return a > b ? a : b;
+}
+
 inline _CUDA_GENERAL_CALL_ int mini(int a, int b)
 {
 	return a < b ? a : b;
@@ -124,7 +134,22 @@ inline _CUDA_GENERAL_CALL_ Eigen::Vector3f fmaxf(Eigen::Vector3f a, Eigen::Vecto
 	return Eigen::Vector3f(fmaxf(a.x(), b.x()), fmaxf(a.y(), b.y()), fmaxf(a.z(), b.z()));
 }
 
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3d fminf(Eigen::Vector3d a, Eigen::Vector3d b)
+{
+	return Eigen::Vector3d(fminf(a.x(), b.x()), fminf(a.y(), b.y()), fminf(a.z(), b.z()));
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3d fmaxf(Eigen::Vector3d a, Eigen::Vector3d b)
+{
+	return Eigen::Vector3d(fmaxf(a.x(), b.x()), fmaxf(a.y(), b.y()), fmaxf(a.z(), b.z()));
+}
+
 inline _CUDA_GENERAL_CALL_ float clamp(float f, float a, float b)
+{
+	return fmaxf(a, fminf(f, b));
+}
+
+inline _CUDA_GENERAL_CALL_ double clamp(double f, double a, double b)
 {
 	return fmaxf(a, fminf(f, b));
 }
@@ -137,6 +162,11 @@ inline _CUDA_GENERAL_CALL_ int clamp(int f, int a, int b)
 inline _CUDA_GENERAL_CALL_ Eigen::Vector3f clamp(Eigen::Vector3f v, Eigen::Vector3f a, Eigen::Vector3f b)
 {
 	return Eigen::Vector3f(clamp(v.x(), a.x(), b.x()), clamp(v.y(), a.y(), b.y()), clamp(v.z(), a.z(), b.z()));
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3d clamp(Eigen::Vector3d v, Eigen::Vector3d a, Eigen::Vector3d b)
+{
+	return Eigen::Vector3d(clamp(v.x(), a.x(), b.x()), clamp(v.y(), a.y(), b.y()), clamp(v.z(), a.z(), b.z()));
 }
 
 inline _CUDA_GENERAL_CALL_ Eigen::Vector3i clamp(Eigen::Vector3i v, Eigen::Vector3i a, Eigen::Vector3i b)

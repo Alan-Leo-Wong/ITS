@@ -11,7 +11,7 @@ protected:
 
 	vector<V3d> modelVerts;
 	vector<V3i> modelFaces;
-	vector<Triangle<Eigen::Vector3d>> modelTris;
+	vector<Triangle<V3d>> modelTris;
 
 protected:
 	string modelName;

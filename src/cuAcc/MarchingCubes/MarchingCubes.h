@@ -68,8 +68,8 @@ namespace MC {
 
 	// device
 	//namespace {
-	extern V3d* d_nodeCorners;
-	extern V3d* d_nodeWidth;
+	/*extern V3d* d_nodeCorners;
+	extern V3d* d_nodeWidth;*/
 
 	extern double* d_lambda;
 
@@ -129,7 +129,7 @@ namespace MC {
 	void writeToOBJFile(const std::string& filename);
 
 	void marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
-		const vector<SVONode>& svoNodeArray, const size_t& numNodeVerts,
-		const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
+		const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts, 
+		const size_t& numNodeVerts, const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 		const uint3& resolution, const double& isoVal, const std::string& filename);
 } // namespace MC

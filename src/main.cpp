@@ -55,27 +55,28 @@ int main(int argc, char** argv)
 	cout << "***************************************************\n";
 
 	string modelName = getFileName("", "bunny.off");
-	const int treeDepth = 5;
+	//const int treeDepth = 5;
 	cout << "-- Model: " << modelName << endl;
-	cout << "-- Octree depth: " << treeDepth << endl;
 
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), treeDepth);
-	thinShell.creatShell();
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 2, 2, 2);
+	//thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
 	printf("\nCreate shells spent %lf s.\n", time);
 
-	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
+	const int treeDepth = thinShell.treeDepth;
+	cout << "Sparse Voxel Octree depth: " << treeDepth << endl;
+	//thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	
 	const int res = 80;
 	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
 	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
 	startTimer(&timer);
-	thinShell.mcVisualization(innerShellFile, V3i(res, res, res), outerShellFile, V3i(res, res, res));
+	//thinShell.mcVisualization(innerShellFile, V3i(res, res, res), outerShellFile, V3i(res, res, res));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nMarchingCubes spent %lf s.\n", time);

@@ -582,7 +582,7 @@ namespace morton
 			d_morton256_z[(z) & 0xFF] |
 			d_morton256_y[(y) & 0xFF] |
 			d_morton256_x[(x) & 0xFF];
-#else
+#  else
 		answer = answer << 48 |
 			h_morton256_z[(z >> 8) & 0xFF] |
 			h_morton256_y[(y >> 8) & 0xFF] |
@@ -608,7 +608,7 @@ namespace morton
 				(d_morton256_z[(z >> shift) & EIGHT_BIT_MASK] |
 					d_morton256_y[(y >> shift) & EIGHT_BIT_MASK] |
 					d_morton256_x[(x >> shift) & EIGHT_BIT_MASK]);
-#else
+#  else
 			answer =
 				answer << 24 |
 				(h_morton256_z[(z >> shift) & EIGHT_BIT_MASK] |
@@ -638,7 +638,7 @@ namespace morton
 		x = morton3D_DecodeCoord_LUT256<morton, coord>(m, d_Morton3D_decode_x_512, 0);
 		y = morton3D_DecodeCoord_LUT256<morton, coord>(m, d_Morton3D_decode_y_512, 0);
 		z = morton3D_DecodeCoord_LUT256<morton, coord>(m, d_Morton3D_decode_z_512, 0);
-#else
+#  else
 		x = morton3D_DecodeCoord_LUT256<morton, coord>(m, h_Morton3D_decode_x_512, 0);
 		y = morton3D_DecodeCoord_LUT256<morton, coord>(m, h_Morton3D_decode_y_512, 0);
 		z = morton3D_DecodeCoord_LUT256<morton, coord>(m, h_Morton3D_decode_z_512, 0);

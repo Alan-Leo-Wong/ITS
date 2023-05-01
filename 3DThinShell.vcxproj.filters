@@ -54,9 +54,6 @@
     <ClInclude Include="src\cuAcc\CUDACompute.h">
       <Filter>头文件\cudaAcc</Filter>
     </ClInclude>
-    <ClInclude Include="src\SDFHelper.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\utils\String.hpp">
       <Filter>头文件\utils</Filter>
     </ClInclude>
@@ -64,9 +61,6 @@
       <Filter>头文件\utils</Filter>
     </ClInclude>
     <ClInclude Include="src\BSpline.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Octree.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\cuAcc\MarchingCubes\MCDefine.h">
@@ -96,6 +90,15 @@
     <ClInclude Include="src\SVO.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\MortonLUT.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Config.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\IO.hpp">
+      <Filter>头文件\utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -107,9 +110,6 @@
     <ClCompile Include="src\ThinShells.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\Octree.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\utils\CMDParser.inl">
@@ -118,9 +118,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\cuAcc\MarchingCubes\MarchingCubes.cu">
-      <Filter>源文件\cudaAcc\MarchingCubes</Filter>
-    </CudaCompile>
-    <CudaCompile Include="src\cuAcc\MarchingCubes\SDFCompute.cu">
       <Filter>源文件\cudaAcc\MarchingCubes</Filter>
     </CudaCompile>
     <CudaCompile Include="src\cuAcc\CUDACompute.cu">

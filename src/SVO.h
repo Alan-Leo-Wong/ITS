@@ -4,7 +4,8 @@
 #include <Eigen\Dense>
 #include <thrust\pair.h>
 #include <thrust\device_vector.h>
-#include "ThinShells.h"
+//#include "ThinShells.h"
+#include "BasicDataType.h"
 #include "utils\Common.hpp"
 #include "utils\Geometry.hpp"
 #include "utils\cuda\CUDAMacro.h"
@@ -30,19 +31,11 @@ struct SVONode
 	}
 };
 
-_CUDA_GENERAL_CALL_ uint32_t getParentMorton(const uint32_t morton)
-{
-	return (((morton >> 3) & 0xfffffff));
-}
-
-_CUDA_GENERAL_CALL_ bool isSameParent(const uint32_t morton_1, const uint32_t morton_2)
-{
-	return getParentMorton(morton_1) == getParentMorton(morton_2);
-}
-
 using thrust_edge_type = thrust::pair<Eigen::Vector3d, Eigen::Vector3d>;
 using node_edge_type = thrust::pair<thrust_edge_type, uint32_t>;
 using node_vertex_type = thrust::pair<Eigen::Vector3d, uint32_t>;
+
+class ThinShells;
 class SparseVoxelOctree
 {
 	friend class ThinShells;
@@ -65,22 +58,28 @@ private:
 	size_t numNodeVerts = 0;
 	size_t numFineNodeEdges = 0;
 
+	vector<size_t> esumDepthNodeVerts;
+
 private:
 	void meshVoxelize(const size_t& nModelTris,
+		const vector<Triangle<V3d>>& modelTris, 
 		const Eigen::Vector3i* d_surfaceVoxelGridSize,
 		const Eigen::Vector3d* d_unitVoxelSize,
 		const Eigen::Vector3d* d_gridOrigin,
 		thrust::device_vector<uint32_t>& d_CNodeMortonArray); // construct nodes in `depth - 1`
 
+	void saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const vector<uint32_t>& voxelArray,
+		const std::string& base_filename, const double& width) const;
+
 	void constructNodeNeighbors(const thrust::device_vector<size_t>& d_esumTreeNodesArray,
 		thrust::device_vector<SVONode>& d_SVONodeArray);
 
-	void constructNodeVertexAndEdge(thrust::device_vector<SVONode>& d_SVONodeArray);
+	void constructNodeVertexAndEdge(const thrust::device_vector<size_t>& d_esumTreeNodesArray, thrust::device_vector<SVONode>& d_SVONodeArray);
 
 	void constructNodeAtrributes(const thrust::device_vector<size_t>& d_esumTreeNodesArray,
 		thrust::device_vector<SVONode>& d_SVONodeArray);
 
-	std::tuple<vector<PV3d>, vector<size_t>> setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth, 
+	std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth,
 		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx);
 
 public:
@@ -93,12 +92,9 @@ public:
 		treeDepth(0), surfaceVoxelGridSize(Eigen::Vector3i(_grid_x, _grid_y, _grid_z)) {}
 
 public:
-	void createOctree(const size_t& nModelTris, const AABox<Eigen::Vector3d>& modelBBox, const std::string& base_filename);
+	void createOctree(const size_t& nModelTris, const vector<Triangle<V3d>>& modelTris, const AABox<Eigen::Vector3d>& modelBBox, const std::string& base_filename);
 
 public:
 	// save data
 	void saveSVO(const std::string& filename) const;
-
-	void saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const vector<uint32_t>& voxelArray,
-		const std::string& base_filename, const double& width) const;
 };

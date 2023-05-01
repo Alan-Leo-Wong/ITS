@@ -1,16 +1,12 @@
 #pragma once
 #include "SVO.h"
-#include "Octree.h"
 #include "BaseModel.h"
-#include "SDFHelper.h"
 #include "utils\String.hpp"
 
 class ThinShells : public BaseModel
 {
 private:
 	SparseVoxelOctree svo;
-
-	int treeDepth;
 
 	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
 	vector<V3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
@@ -26,20 +22,23 @@ private:
 	double outerShellIsoVal = -DINF;
 
 public:
+	int treeDepth;
+
+public:
 	// constructor and destructor
 	ThinShells() {}
 
-	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z) : 
+	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z) :
 		BaseModel(filename), svo(_grid_x, _grid_y, _grid_z)
 	{
-		svo.createOctree(nModelTris, modelBoundingBox, filename);
+		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		saveTree("");
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) : BaseModel(filename), svo(_grid)
 	{
-		svo.createOctree(nModelTris, modelBoundingBox, filename);
+		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		saveTree("");
 	}

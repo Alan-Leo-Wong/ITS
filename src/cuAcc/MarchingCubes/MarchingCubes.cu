@@ -444,8 +444,8 @@ inline void MC::freeResources() {
 
 	// device
 	{
-		CUDA_CHECK(cudaFree(d_nodeCorners));
-		CUDA_CHECK(cudaFree(d_nodeWidth));
+		/*CUDA_CHECK(cudaFree(d_nodeCorners));
+		CUDA_CHECK(cudaFree(d_nodeWidth));*/
 
 		CUDA_CHECK(cudaFree(d_lambda));
 
@@ -490,7 +490,7 @@ inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
 	/*MCKernel::determineVoxelKernel << <nBlocks, nThreads >> > (nVoxels, d_isoVal, nVertsTex,
 		d_nVoxelVertsArray, d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);*/
 	MCKernel::determineVoxelKernel_2 << <nBlocks, nThreads >> > (nVoxels, numNodeVerts, d_isoVal, d_gridOrigin,
-		d_voxelSize, d_res, d_nodeVertexArray.data().get(), d_svoNodeArray.data().get(), d_lambda, nVertsTex, d_nVoxelVertsArray,
+		d_voxelSize, d_res, d_nodeVertexArray, d_svoNodeArray.data().get(), d_lambda, nVertsTex, d_nVoxelVertsArray,
 		d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);
 	getLastCudaError("Kernel: 'determineVoxelKernel' failed!\n");
 	cudaDeviceSynchronize();
@@ -587,8 +587,8 @@ inline void MC::writeToOBJFile(const std::string& filename) {
  * @param filename   output obj file
  */
 void MC::marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
-	const vector<SVONode>& svoNodeArray, const size_t& numNodeVerts,
-	const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
+	const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts,
+	const size_t& numNodeVerts, const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 	const uint3& resolution, const double& isoVal, const std::string& filename) {
 	if (numNodeVerts == 0) { printf("[MC] There is no valid node vertex...\n"); return; }
 	uint nVoxels = resolution.x * resolution.y * resolution.z;
