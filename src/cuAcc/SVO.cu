@@ -295,7 +295,7 @@ __global__ void createNode_2(const size_t pactSize,
 		for (int i = 0; i < 8; ++i)
 		{
 			tNode.childs[i] = d_preChildDepthTreeNodes + tid * 8 + i;
-			d_childArray[tid * 8 + i].parent = d_preDepthTreeNodes + tid;
+			d_childArray[tid * 8 + i].parent = d_preDepthTreeNodes + sumNodes + key;
 		}
 	}
 }
@@ -769,8 +769,8 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 
 	auto getCorners = [&](const SVONode& node, const int& depth)
 	{
-		const V3d nodeOrigin = node.origin;
-		const double nodeWidth = node.width;
+		const V3d& nodeOrigin = node.origin;
+		const double& nodeWidth = node.width;
 		const size_t& esumNodeVerts = esumDepthNodeVertexSize[depth];
 
 		for (int k = 0; k < 8; ++k)

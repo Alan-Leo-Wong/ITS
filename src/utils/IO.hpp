@@ -16,6 +16,12 @@ namespace gvis
 		output << "f " << f.x() << " " << f.y() << " " << f.z() << std::endl;
 	}
 
+	// Helper function to write face
+	static void write_face(std::ofstream& output, const Eigen::Vector4i& f)
+	{
+		output << "f " << f.x() << " " << f.y() << " " << f.z() << " " << f.w() << std::endl;
+	}
+
 	// Helper function to write line
 	static void write_line(std::ofstream& output, const Eigen::Vector2i& l)
 	{
@@ -53,7 +59,7 @@ namespace gvis
 		write_vertex(output, v8);
 
 		// create faces
-#ifdef MESH_WRITE
+#if defined(MESH_WRITE)
 		// back
 		write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 3, faceBegIdx + 4));
 		write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 4, faceBegIdx + 2));
@@ -72,6 +78,19 @@ namespace gvis
 		// front								   	  
 		write_face(output, Eigen::Vector3i(faceBegIdx + 5, faceBegIdx + 6, faceBegIdx + 8));
 		write_face(output, Eigen::Vector3i(faceBegIdx + 5, faceBegIdx + 8, faceBegIdx + 7));
+#  elif defined(CUBE_WRITE)
+		// back
+		write_face(output, Eigen::Vector4i(faceBegIdx + 3, faceBegIdx + 4, faceBegIdx + 2, faceBegIdx + 1));
+		// bottom								   
+		write_face(output, Eigen::Vector4i(faceBegIdx + 6, faceBegIdx + 5, faceBegIdx + 4, faceBegIdx + 3));
+		// right								   	 
+		write_face(output, Eigen::Vector4i(faceBegIdx + 1, faceBegIdx + 8, faceBegIdx + 6, faceBegIdx + 3));
+		// top									   	 
+		write_face(output, Eigen::Vector4i(faceBegIdx + 1, faceBegIdx + 2, faceBegIdx + 7, faceBegIdx + 8));
+		// left									   	 
+		write_face(output, Eigen::Vector4i(faceBegIdx + 4, faceBegIdx + 5, faceBegIdx + 7, faceBegIdx + 2));
+		// front								   	  
+		write_face(output, Eigen::Vector4i(faceBegIdx + 8, faceBegIdx + 7, faceBegIdx + 5, faceBegIdx + 6));
 #  else
 		write_line(output, Eigen::Vector2i(faceBegIdx + 1, faceBegIdx + 2));
 		write_line(output, Eigen::Vector2i(faceBegIdx + 2, faceBegIdx + 7));

@@ -100,7 +100,6 @@ __device__ uint3 MCKernel::getVoxelShift(const uint index,
 //	}
 //	return sum;
 //}
-
 __device__ inline double MCKernel::computeSDF(const uint numNodeVerts, const thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray,
 	const SVONode* d_svoNodeArray, const double* d_lambda, double3 pos)
 {

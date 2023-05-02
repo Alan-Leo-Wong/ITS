@@ -158,7 +158,7 @@ inline void ThinShells::cpCoefficients()
 		/*std::cout << "depth = " << d << ":" << std::endl;
 		for (const auto& entry : nodeVertex2Idx[d])
 		{
-			std::cout << "{" << entry.first << ", " << entry.second << "}" << std::endl;
+			std::cout << "{" << entry.first.transpose() << ", " << entry.second << "}" << std::endl;
 		}
 		std::cout << "----------" << std::endl;*/
 	}
@@ -169,32 +169,37 @@ inline void ThinShells::cpCoefficients()
 	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
 	vector<Trip> matVal;
 
-	//MXd mat(numNodeVerts, numNodeVerts);
 	//for (int d = 0; d < treeDepth; ++d)
 	//{
-	//	const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
 	//	const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
+	//	const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
 	//	for (int i = 0; i < d_numNodeVerts; ++i)
 	//	{
 	//		V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
+	//		//std::cout << "d = " << d << ", i = " << i << ", vert = " << i_nodeVertex.transpose();
 	//		uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
 	//
-	//		for (int u = 0; u < treeDepth; ++u)
+	//		matVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+	//		for (int j = d - 1; j >= 0; --j)
 	//		{
-	//			const size_t ud_numNodeVerts = depthNodeVertexArray[u].size(); // 每层节点的顶点数量
-	//			const size_t& ud_esumNodeVerts = esumDepthNodeVerts[u]; // 顶点数量的exclusive scan
-	//			for (int j = 0; j < ud_numNodeVerts; ++j)
-	//			{
-	//				V3d j_nodeVertex = depthNodeVertexArray[u][j].first;
-	//				uint32_t j_fromNodeIdx = depthNodeVertexArray[u][j].second;
+	//			if (nodeVertex2Idx[j].find(i_nodeVertex) == nodeVertex2Idx[j].end()) break;
+	//			matVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
+	//		}
 	//
-	//				double val = BaseFunction4Point(j_nodeVertex, svo.svoNodeArray[j_fromNodeIdx].width, i_nodeVertex);
-	//				mat(d_esumNodeVerts + i, ud_esumNodeVerts + j) = val;
-	//			}
+	//		// parent
+	//		auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d, esumDepthNodeVerts, nodeVertex2Idx);
+	//		const int nInDmPoints = inDmPoints.size();
+	//
+	//		for (int k = 0; k < nInDmPoints; ++k)
+	//		{
+	//			double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
+	//			assert(inDmPointsIdx[k] < numNodeVerts, "index of col > numNodeVertex!");
+	//			if (val != 0) matVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
 	//		}
 	//	}
 	//}
 
+	MXd mat(numNodeVerts, numNodeVerts);
 	for (int d = 0; d < treeDepth; ++d)
 	{
 		const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
@@ -202,14 +207,13 @@ inline void ThinShells::cpCoefficients()
 		for (int i = 0; i < d_numNodeVerts; ++i)
 		{
 			V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
-			//std::cout << "d = " << d << ", i = " << i << ", vert = " << i_nodeVertex.transpose();
 			uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
 
-			for (int j = d; j >= 0; --j)
+			matVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+			for (int j = d - 1; j >= 0; --j)
 			{
 				if (nodeVertex2Idx[j].find(i_nodeVertex) == nodeVertex2Idx[j].end()) break;
-				matVal.emplace_back(Trip(esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex],
-					esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // self and child
+				matVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
 			}
 
 			// parent
@@ -237,25 +241,29 @@ inline void ThinShells::cpCoefficients()
 		}
 	}*/
 
-	sm.setFromTriplets(matVal.begin(), matVal.end());
-	//sm.makeCompressed();
 
+	sm.setFromTriplets(matVal.begin(), matVal.end());
+	sm.makeCompressed();
 	auto A = sm;
 	auto b = sdfVal;
+
+	/*auto A = mat;
+	auto b = sdfVal;*/
 	/*auto A = sm.transpose() * sm;
 	auto b = sm.transpose() * sdfVal;*/
 
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
 	lscg.compute(A);
 	lambda = lscg.solve(b);
+
+	/*Eigen::LeastSquaresConjugateGradient<MXd> lscg;
+	lscg.compute(A);
+	lambda = lscg.solve(b);*/
+
 	cout << "-- Residual Error: " << (A * lambda - b).norm() << endl;
 
-	/*auto A = mat;
-	auto b = sdfVal;
-	lambda = mat.colPivHouseholderQr().solve(b);*/
-
 	//saveCoefficients(concatFilePath((string)OUT_DIR, modelName, std::to_string(maxDepth), (string)"Coefficients.txt"));
-	for (int u = 0; u < treeDepth; ++u)
+	/*for (int u = 0; u < treeDepth; ++u)
 	{
 		const size_t u_numNodeVerts = depthNodeVertexArray[u].size();
 		const size_t& u_esumNodeVerts = esumDepthNodeVerts[u];
@@ -275,9 +283,10 @@ inline void ThinShells::cpCoefficients()
 				}
 			}
 
-			printf("vertIdx = %llu, bSplineVal = %.10lf, sdf = %.10lf\n", u_esumNodeVerts + k, bSplineVal, sdf);
+			if (fabs(bSplineVal - sdf) > 1e-9)
+				printf("vertIdx = %llu, bSplineVal = %.10lf, sdf = %.10lf\n", u_esumNodeVerts + k, bSplineVal, sdf);
 		}
-	}
+	}*/
 }
 
 inline void ThinShells::cpBSplineValue()

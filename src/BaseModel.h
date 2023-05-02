@@ -37,6 +37,8 @@ public:
 public:
 	vector<V2i> extractEdges();
 
+	//void scaleMatrix(MXd V);
+
 	void setBoundingBox(const double& scaleSize = 1);
 
 	void setUniformBoundingBox();

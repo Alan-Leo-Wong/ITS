@@ -40,7 +40,7 @@ void BaseModel::setUniformBoundingBox()
 	// Suspected cause: If a triangle is axis-aligned and lies perfectly on a voxel edge, it sometimes gets counted / not counted
 	// Probably due to a numerical instability (division by zero?)
 	// Ugly fix: we pad the bounding box on all sides by 1/10001th of its total length, bringing all triangles ever so slightly off-grid
-	Eigen::Vector3d epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 10001.0;
+	Eigen::Vector3d epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 11.0; // Ö®Ç°ÊÇ10001
 	modelBoundingBox.boxOrigin -= epsilon;
 	modelBoundingBox.boxEnd += epsilon;
 	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
