@@ -1,8 +1,10 @@
 #include "ThinShells.h"
+#include "MortonLUT.h"
 #include "BSpline.hpp"
 #include "utils\Timer.hpp"
 #include "utils\Common.hpp"
 #include "utils\String.hpp"
+#include "cuAcc\CUDACompute.h"
 #include "utils\cuda\CUDAMath.hpp"
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
 #include <queue>
@@ -58,28 +60,37 @@ inline void ThinShells::cpIntersectionPoints()
 				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
+				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir, j);
 			}
 			if (isInRange(.0, 1.0, left_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
+				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir, j);
 			}
 			if (isInRange(.0, 1.0, bottom_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
 				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
 			{
-				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
+				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir, j);
 			}
 		}
 	}
+	std::sort(edgeInterPoints.begin(), edgeInterPoints.end(), std::less<V3d>());
 
+	struct uniqueVert {
+		double eps;
+		uniqueVert(const double& _eps) :eps(_eps) {}
+		bool operator()(const V3d a, const V3d b) {
+			return a.isApprox(b, eps);
+		}
+	};
+	edgeInterPoints.erase(std::unique(edgeInterPoints.begin(), edgeInterPoints.end(), uniqueVert(1e-9)));
 	cout << "-- 三角形边与node的交点数量：" << edgeInterPoints.size() << endl;
 
 	allInterPoints.insert(allInterPoints.end(), edgeInterPoints.begin(), edgeInterPoints.end());
 
-	// 三角形面与node边线交（有重合点）
+	// 三角形面与node边线交
 	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
 	for (const auto& tri : modelTris)
 	{
@@ -126,13 +137,16 @@ inline void ThinShells::cpSDFOfTreeNodes()
 			pointsMat.row(esumDepthNodeVerts[d] + i) = depthNodeVertexArray[d][i].first;
 	}
 
+	VXd S;
 	{
 		VXi I;
 		MXd C, N;
-		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, sdfVal, I, C, N);
-		// Convert distances to binary inside-outside data --> aliasing artifacts
+		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
 		//std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? b : (b < 0 ? -1 : 0)); });
 	}
+	sdfVal.resize(numNodeVerts + allInterPoints.size() + nModelVerts);
+	sdfVal.setZero();
+	sdfVal.block(0, 0, numNodeVerts, 1) = S;
 }
 
 inline void ThinShells::cpCoefficients()
@@ -155,51 +169,11 @@ inline void ThinShells::cpCoefficients()
 			[](const node_vertex_type& val, size_t i) {
 				return std::make_pair(val.first, i);
 			});
-		/*std::cout << "depth = " << d << ":" << std::endl;
-		for (const auto& entry : nodeVertex2Idx[d])
-		{
-			std::cout << "{" << entry.first.transpose() << ", " << entry.second << "}" << std::endl;
-		}
-		std::cout << "----------" << std::endl;*/
 	}
 
 	// initial matrix
 	const size_t& numNodeVerts = svo.numNodeVerts;
-	SpMat sm(numNodeVerts, numNodeVerts); // A
-	//SpMat sm(nAllNodes * 8 + allInterPoints.size(), nAllNodes * 8); // A
-	vector<Trip> matVal;
-
-	//for (int d = 0; d < treeDepth; ++d)
-	//{
-	//	const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
-	//	const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
-	//	for (int i = 0; i < d_numNodeVerts; ++i)
-	//	{
-	//		V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
-	//		//std::cout << "d = " << d << ", i = " << i << ", vert = " << i_nodeVertex.transpose();
-	//		uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
-	//
-	//		matVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
-	//		for (int j = d - 1; j >= 0; --j)
-	//		{
-	//			if (nodeVertex2Idx[j].find(i_nodeVertex) == nodeVertex2Idx[j].end()) break;
-	//			matVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
-	//		}
-	//
-	//		// parent
-	//		auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d, esumDepthNodeVerts, nodeVertex2Idx);
-	//		const int nInDmPoints = inDmPoints.size();
-	//
-	//		for (int k = 0; k < nInDmPoints; ++k)
-	//		{
-	//			double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
-	//			assert(inDmPointsIdx[k] < numNodeVerts, "index of col > numNodeVertex!");
-	//			if (val != 0) matVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
-	//		}
-	//	}
-	//}
-
-	MXd mat(numNodeVerts, numNodeVerts);
+	vector<Trip> matApVal;
 	for (int d = 0; d < treeDepth; ++d)
 	{
 		const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
@@ -209,56 +183,42 @@ inline void ThinShells::cpCoefficients()
 			V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
 			uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
 
-			matVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+			matApVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
 			for (int j = d - 1; j >= 0; --j)
 			{
 				if (nodeVertex2Idx[j].find(i_nodeVertex) == nodeVertex2Idx[j].end()) break;
-				matVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
+				matApVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
 			}
 
 			// parent
-			auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d, esumDepthNodeVerts, nodeVertex2Idx);
+			auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d + 1, esumDepthNodeVerts, nodeVertex2Idx);
 			const int nInDmPoints = inDmPoints.size();
 
 			for (int k = 0; k < nInDmPoints; ++k)
 			{
 				double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
 				assert(inDmPointsIdx[k] < numNodeVerts, "index of col > numNodeVertex!");
-				if (val != 0) matVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
+				if (val != 0) matApVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
 			}
 		}
 	}
 
-	/*for (int i = 0; i < allInterPoints.size(); ++i)
-	{
-		for (int j = 0; j < nAllNodes; ++j)
-		{
-			for (int k = 0; k < 8; ++k)
-			{
-				double val = BaseFunction4Point(allNodes[j]->corners[k], allNodes[j]->width, allInterPoints[i]);
-				matVal.emplace_back(Trip(nAllNodes * 8 + i, j * 8 + k, val));
-			}
-		}
-	}*/
-
-
-	sm.setFromTriplets(matVal.begin(), matVal.end());
-	sm.makeCompressed();
-	auto A = sm;
+	SpMat A(numNodeVerts, numNodeVerts); // Ap
+	A.setFromTriplets(matApVal.begin(), matApVal.end());
 	auto b = sdfVal;
 
-	/*auto A = mat;
-	auto b = sdfVal;*/
-	/*auto A = sm.transpose() * sm;
-	auto b = sm.transpose() * sdfVal;*/
+	TimerInterface* timer = nullptr;
+	createTimer(&timer);
 
 	Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
+	startTimer(&timer);
 	lscg.compute(A);
 	lambda = lscg.solve(b);
 
-	/*Eigen::LeastSquaresConjugateGradient<MXd> lscg;
-	lscg.compute(A);
-	lambda = lscg.solve(b);*/
+	stopTimer(&timer);
+	double time = getElapsedTime(&timer) * 1e-3;
+	printf("-- Solve equation elapsed time: %lf s.\n", time);
+	deleteTimer(&timer);
 
 	cout << "-- Residual Error: " << (A * lambda - b).norm() << endl;
 
@@ -291,7 +251,21 @@ inline void ThinShells::cpCoefficients()
 
 inline void ThinShells::cpBSplineValue()
 {
-	const uint nInterPoints = allInterPoints.size();
+	const uint numAllPoints = nModelVerts + allInterPoints.size();
+	std::vector<V3d> pointsData;
+	pointsData.insert(pointsData.end(), modelVerts.begin(), modelVerts.end());
+	pointsData.insert(pointsData.end(), allInterPoints.begin(), allInterPoints.end());
+	
+	if (nodeWidthArray.empty())
+		std::transform(svo.svoNodeArray.begin(), svo.svoNodeArray.end(), std::inserter(nodeWidthArray, nodeWidthArray.end()),
+			[](const SVONode& node) {
+				return V3d(node.width, node.width, node.width);
+			});
+
+	cuAcc::cpBSplineVal(numAllPoints, svo.numNodeVerts, svo.numTreeNodes, pointsData,
+		svo.nodeVertexArray, nodeWidthArray, lambda, bSplineVal);
+
+	/*const uint nInterPoints = allInterPoints.size();
 
 	bSplineVal.resize(nModelVerts + nInterPoints);
 	bSplineVal.setZero();
@@ -320,7 +294,7 @@ inline void ThinShells::cpBSplineValue()
 	for (int i = 0; i < nInterPoints; ++i)
 	{
 		cnt = i + nModelVerts;
-		const V3d& interPoint = allInterPoints[i];
+		const V3d& interPoint = allInterPoints[i].first;
 		for (int d = 0; d < treeDepth; ++d)
 		{
 			const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
@@ -332,10 +306,12 @@ inline void ThinShells::cpBSplineValue()
 				bSplineVal[cnt] += lambda[d_esumNodeVerts + j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, interPoint));
 			}
 		}
-	}
+	}*/
 
 	innerShellIsoVal = *(std::min_element(bSplineVal.begin(), bSplineVal.end()));
 	outerShellIsoVal = *(std::max_element(bSplineVal.begin(), bSplineVal.end()));
+	std::cout << "-- innerShellIsoVal:" << innerShellIsoVal << std::endl;
+	std::cout << "-- outerShellIsoVal:" << outerShellIsoVal << std::endl;
 
 	//bSplineTree.saveBSplineValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"bSplineVal.txt"));
 }
@@ -392,6 +368,90 @@ void ThinShells::creatShell()
 	initBSplineTree();
 }
 
+inline void ThinShells::setLatentMatrix(const double& alpha)
+{
+	//using SpMat = Eigen::SparseMatrix<double>;
+	//using Trip = Eigen::Triplet<double>;
+	//
+	//const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
+	//const vector<size_t>& esumDepthNodeVerts = svo.esumDepthNodeVerts;
+	//vector<std::map<V3d, size_t>> nodeVertex2Idx(treeDepth);
+	//const size_t& numNodeVerts = svo.numNodeVerts;
+	//
+	//vector<Trip> matAlVal;
+	//const uint nInterPoints = allInterPoints.size();
+	//const vector<SVONode>& nodeArray = svo.svoNodeArray;
+	//for (int i = 0; i < nInterPoints; ++i)
+	//{
+	//	V3d interPoint = allInterPoints[i].first;
+	//	uint32_t fromNodeIdx = allInterPoints[i].second;
+	//	// 自身所处格子的八个顶点和所有父节点的八个顶点
+	//	auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(fromNodeIdx, 0, esumDepthNodeVerts, nodeVertex2Idx);
+	//	const int nInDmPoints = inDmPoints.size();
+	//
+	//	for (int k = 0; k < nInDmPoints; ++k)
+	//	{
+	//		double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, interPoint);
+	//		if (val != 0) matAlVal.emplace_back(Trip(numNodeVerts + i, inDmPointsIdx[k], alpha * val));
+	//	}
+	//}
+	//
+	//const V3i& surfaceVoxelGridSize = svo.surfaceVoxelGridSize;
+	//const V3i grid_max = V3i(surfaceVoxelGridSize.x() - 1, surfaceVoxelGridSize.y() - 1, surfaceVoxelGridSize.z() - 1);
+	//const V3d unitVoxelSize = V3d(modelBoundingBox.boxWidth.x() / surfaceVoxelGridSize.x(),
+	//	modelBoundingBox.boxWidth.y() / surfaceVoxelGridSize.y(),
+	//	modelBoundingBox.boxWidth.z() / surfaceVoxelGridSize.z());
+	//std::map<uint32_t, uint32_t> morton2Idx;
+	//const size_t& numFineNodes = svo.numFineNodes;
+	//vector<uint32_t> nodeIdx(numFineNodes);
+	//std::iota(nodeIdx.begin(), nodeIdx.end(), 0);
+	//std::transform(nodeArray.begin(), nodeArray.begin() + numFineNodes, nodeIdx.begin(),
+	//	std::inserter(morton2Idx, morton2Idx.end()),
+	//	[](const SVONode& val, uint32_t i) {
+	//		return std::make_pair(val.mortonCode, i);
+	//	});
+	//
+	//auto getFromNodeIdx = [&](const V3d& modelVertex)->uint32_t
+	//{
+	//	const V3d gridVertex = modelVertex - modelBoundingBox.boxOrigin;
+	//	const V3i gridIdx = clamp(
+	//		V3i((gridVertex.x() / unitVoxelSize.x()), (gridVertex.y() / unitVoxelSize.y()), (gridVertex.z() / unitVoxelSize.z())),
+	//		V3i(0, 0, 0), grid_max
+	//	);
+	//	return morton2Idx[morton::mortonEncode_LUT((uint16_t)gridIdx.x(), (uint16_t)gridIdx.y(), (uint16_t)gridIdx.z())];
+	//};
+	//
+	//for (int i = 0; i < nModelVerts; ++i)
+	//{
+	//	V3d modelVertex = modelVerts[i];
+	//	uint32_t i_fromNodeIdx = getFromNodeIdx(modelVertex);
+	//	// 自身所处格子的八个顶点和所有父节点的八个顶点
+	//	auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, 0, esumDepthNodeVerts, nodeVertex2Idx);
+	//	const int nInDmPoints = inDmPoints.size();
+	//
+	//	for (int k = 0; k < nInDmPoints; ++k)
+	//	{
+	//		double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, modelVertex);
+	//		if (val != 0) matApVal.emplace_back(Trip(numNodeVerts + nInterPoints + i, inDmPointsIdx[k], alpha * val));
+	//	}
+	//}
+	//
+	////SpMat sm_Ap(numNodeVerts, numNodeVerts); // Ap
+	//SpMat sm_Ap(numNodeVerts + nInterPoints + nModelVerts, numNodeVerts); // Ap
+	//sm_Ap.setFromTriplets(matApVal.begin(), matApVal.end());
+	//SpMat sm_Al(nInterPoints + nModelVerts, numNodeVerts); // Al
+	//sm_Al.setFromTriplets(matAlVal.begin(), matAlVal.end());
+	//auto Ap = /*alpha * sm_Ap.transpose() * */sm_Ap;
+	//auto Al = sm_Al.transpose() * sm_Al;
+	//auto A = Ap/* + Al*/;
+	//auto b = /*alpha * sm_Ap.transpose() * */sdfVal;
+	//
+	////Eigen::SimplicialLLT<SpMat> sllt;
+	//Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
+	//lscg.compute(A);
+	//lambda = lscg.solve(b);
+}
+
 //////////////////////
 //  I/O: Save Data  //
 //////////////////////
@@ -403,14 +463,14 @@ void ThinShells::saveTree(const string& filename) const
 	svo.saveSVO(t_filename);
 }
 
-void ThinShells::saveIntersections(const string& filename, const vector<V3d>& intersections) const
+void ThinShells::saveIntersections(const string& filename, const vector<std::pair<V3d, uint32_t>>& intersections) const
 {
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
 	checkDir(filename);
 
-	for (const V3d& p : intersections)
-		out << p.x() << " " << p.y() << " " << p.z() << endl;
+	for (const auto& p : intersections)
+		out << p.first.x() << " " << p.first.y() << " " << p.first.z() << endl;
 	out.close();
 }
 
@@ -485,26 +545,38 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	V3d gridOrigin = modelBoundingBox.boxOrigin;
 	V3d gridWidth = modelBoundingBox.boxWidth;
 
-	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
-	{
-		cout << "\n[MC] Extract inner shell by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.esumDepthNodeVerts, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
-			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
-		cout << "=====================\n";
-	}
+	if (nodeWidthArray.empty())
+		std::transform(svo.svoNodeArray.begin(), svo.svoNodeArray.end(), std::inserter(nodeWidthArray, nodeWidthArray.end()),
+			[](const SVONode& node) {
+				return V3d(node.width, node.width, node.width);
+			});
 
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{
 		cout << "\n[MC] Extract outer shell by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.esumDepthNodeVerts, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray,
+			svo.esumDepthNodeVerts, svo.numTreeNodes, nodeWidthArray,
+			svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
+		cout << "=====================\n";
+	}
+
+	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
+	{
+		cout << "\n[MC] Extract inner shell by MarchingCubes..." << endl;
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray,
+			svo.esumDepthNodeVerts, svo.numTreeNodes, nodeWidthArray,
+			svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 		cout << "=====================\n";
 	}
 
 	if (!isoFilename.empty())
 	{
 		cout << "\n[MC] Extract isosurface by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray, svo.esumDepthNodeVerts, svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
+		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray,
+			svo.esumDepthNodeVerts, svo.numTreeNodes, nodeWidthArray,
+			svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(isoResolution), .0, isoFilename);
 		cout << "=====================\n";
 	}

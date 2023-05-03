@@ -24,14 +24,19 @@ namespace MCKernel {
 
 	__device__ uint3 getVoxelShift(const uint index, const uint3 d_res);
 
+	__device__ uint3 getCoordShift(const uint index);
+
 	// 与SDFCompute.cu二选一
 	__device__ double computeSDF(const uint numNodeVerts, const thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray,
 		const SVONode* d_svoNodeArray, const double* d_lambda, double3 pos);
 
-	__global__ void prepareMatrixKernel(const uint nVoxelElemCorners, const uint nAllNodeCorners,
+	/*__global__ void prepareMatrixKernel(const uint nVoxelElemCorners, const uint nAllNodeCorners,
 		const uint* d_voxelOffset, const uint3* d_res, double* d_lambda,
 		double3* d_origin, double3* d_voxelSize,
-		V3d* d_nodeCorners, V3d* d_nodeWidth, double* d_voxelMatrix);
+		V3d* d_nodeCorners, V3d* d_nodeWidth, double* d_voxelMatrix);*/
+
+	__global__ void prepareVoxelCornerKernel(const size_t nPoints, const double3* d_origin,
+		const double3* d_voxelSize, const uint3* d_res, V3d* d_voxelCornerData);
 
 	__global__ void
 		determineVoxelKernel(const uint nVoxels, const double* d_isoVal,
@@ -68,9 +73,6 @@ namespace MC {
 
 	// device
 	//namespace {
-	/*extern V3d* d_nodeCorners;
-	extern V3d* d_nodeWidth;*/
-
 	extern double* d_lambda;
 
 	extern uint3* d_res;
@@ -85,7 +87,7 @@ namespace MC {
 	extern double3* d_gridOrigin;
 	extern double3* d_voxelSize;
 
-	extern double* d_voxelSDF;
+	extern thrust::device_vector<double> d_voxelSDF;
 	extern uint* d_voxelCubeIndex;
 
 	extern uint* d_compactedVoxelArray;
@@ -107,18 +109,19 @@ namespace MC {
 	void setTextureObject(const uint& srcSizeInBytes, int* srcDev,
 		cudaTextureObject_t* texObj);
 
-	void initResources(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
-		const vector<SVONode>& svoNodeArray, const size_t& numNodeVerts, const VXd& lambda,
-		const uint3& resolution, const uint& nVoxels,
-		const double& isoVal, const double3& gridOrigin,
+	void initCommonResources(const uint& nVoxels,
+		const uint3& resolution, const double& isoVal, const double3& gridOrigin,
 		const double3& voxelSize, const uint& maxVerts);
 
-	void freeResources();
+	void freeCommonResources();
 
-	void launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNodes, const uint& voxelOffset,
-		const cudaStream_t& stream, double*& d_voxelMatrix);
+	/*void launch_prepareMatrixKernel(const uint& nVoxelElems, const uint& nAllNodes, const uint& voxelOffset,
+		const cudaStream_t& stream, double*& d_voxelMatrix);*/
 
-	void launch_computSDFKernel(const uint& nVoxels);
+	void launch_computSDFKernel(const uint& nVoxels,
+		const uint& numNodes, const size_t& _numNodeVerts,
+		const VXd& lambda, const std::vector<V3d>& nodeWidthArray,
+		const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray);
 
 	void launch_determineVoxelKernel(const uint& nVoxels, const double& isoVal, const uint& maxVerts);
 
@@ -129,7 +132,8 @@ namespace MC {
 	void writeToOBJFile(const std::string& filename);
 
 	void marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
-		const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts, 
+		const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts,
+		const size_t& numNodes, const std::vector<V3d>& nodeWidthArray,
 		const size_t& numNodeVerts, const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 		const uint3& resolution, const double& isoVal, const std::string& filename);
 } // namespace MC

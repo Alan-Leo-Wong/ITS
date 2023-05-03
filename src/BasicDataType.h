@@ -53,3 +53,19 @@ public:
 		return false;
 	}
 };
+
+template <>
+struct std::less<std::pair<V3d, uint32_t>> {
+public:
+	bool operator()(const std::pair<V3d, uint32_t>& a, const std::pair<V3d, uint32_t>& b) const {
+		short int _t = 0;
+		for (size_t i = 0; i < a.first.size(); ++i) {
+			if (fabs(a.first[i] - b.first[i]) < 1e-9) continue;
+
+			if (a.first[i] < b.first[i]) _t = 1;
+			else if (a.first[i] > b.first[i]) _t = -1;
+		}
+		if (_t == 0) return a.second < b.second;
+		else return _t == 1;
+	}
+};

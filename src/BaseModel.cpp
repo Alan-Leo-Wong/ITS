@@ -48,7 +48,7 @@ void BaseModel::setUniformBoundingBox()
 
 void BaseModel::setTriAttributes()
 {
-	launch_modelTriAttributeKernel(nModelTris, modelTris);
+	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);
 }
 
 vector<V2i> BaseModel::extractEdges()
