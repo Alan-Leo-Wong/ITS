@@ -60,19 +60,19 @@ inline void ThinShells::cpIntersectionPoints()
 				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir, j);
+				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, left_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir, j);
+				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, bottom_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
 				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
 			{
-				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir, j);
+				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
 			}
 		}
 	}
@@ -80,7 +80,6 @@ inline void ThinShells::cpIntersectionPoints()
 
 	struct uniqueVert {
 		double eps;
-		uniqueVert(const double& _eps) :eps(_eps) {}
 		bool operator()(const V3d a, const V3d b) {
 			return a.isApprox(b, eps);
 		}
@@ -249,6 +248,9 @@ inline void ThinShells::cpCoefficients()
 	}*/
 }
 
+namespace {
+	vector<V3d> nodeWidthArray;
+}
 inline void ThinShells::cpBSplineValue()
 {
 	const uint numAllPoints = nModelVerts + allInterPoints.size();
@@ -257,10 +259,13 @@ inline void ThinShells::cpBSplineValue()
 	pointsData.insert(pointsData.end(), allInterPoints.begin(), allInterPoints.end());
 	
 	if (nodeWidthArray.empty())
-		std::transform(svo.svoNodeArray.begin(), svo.svoNodeArray.end(), std::inserter(nodeWidthArray, nodeWidthArray.end()),
-			[](const SVONode& node) {
-				return V3d(node.width, node.width, node.width);
+	{
+		auto& svoNodeArray = svo.svoNodeArray;
+		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
+			[](SVONode node) {
+				return Eigen::Vector3d(node.width, node.width, node.width);
 			});
+	}
 
 	cuAcc::cpBSplineVal(numAllPoints, svo.numNodeVerts, svo.numTreeNodes, pointsData,
 		svo.nodeVertexArray, nodeWidthArray, lambda, bSplineVal);
@@ -463,14 +468,14 @@ void ThinShells::saveTree(const string& filename) const
 	svo.saveSVO(t_filename);
 }
 
-void ThinShells::saveIntersections(const string& filename, const vector<std::pair<V3d, uint32_t>>& intersections) const
+void ThinShells::saveIntersections(const string& filename, const vector<V3d>& intersections) const
 {
 	checkDir(filename);
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
 
 	for (const auto& p : intersections)
-		out << p.first.x() << " " << p.first.y() << " " << p.first.z() << endl;
+		out << p.x() << " " << p.y() << " " << p.z() << endl;
 	out.close();
 }
 
@@ -546,10 +551,14 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	V3d gridWidth = modelBoundingBox.boxWidth;
 
 	if (nodeWidthArray.empty())
-		std::transform(svo.svoNodeArray.begin(), svo.svoNodeArray.end(), std::inserter(nodeWidthArray, nodeWidthArray.end()),
-			[](const SVONode& node) {
-				return V3d(node.width, node.width, node.width);
+	{
+		//nodeWidthArray.reserve(svo.numTreeNodes);
+		auto& svoNodeArray = svo.svoNodeArray; 
+		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
+			[](SVONode node) {
+				return Eigen::Vector3d(node.width, node.width, node.width);
 			});
+	}
 
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{

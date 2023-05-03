@@ -7,11 +7,11 @@ class ThinShells : public BaseModel
 {
 private:
 	SparseVoxelOctree svo;
-	std::vector<V3d> nodeWidthArray;
+	//vector<V3d> nodeWidthArray;
 
-	vector<std::pair<V3d, uint32_t>> edgeInterPoints; // Intersection points of octree node and mesh's edges
-	vector<std::pair<V3d, uint32_t>> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
-	vector<std::pair<V3d, uint32_t>> allInterPoints;  // All intersection points of octree node and mesh
+	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
+	vector<V3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
+	vector<V3d> allInterPoints;  // All intersection points of octree node and mesh
 
 private:
 	VXd sdfVal;
@@ -73,7 +73,7 @@ public:
 public:
 	void saveTree(const string& filename) const;
 
-	void saveIntersections(const string& filename, const vector<std::pair<V3d, uint32_t>>& intersections) const;
+	void saveIntersections(const string& filename, const vector<V3d>& intersections) const;
 
 	void saveIntersections(const string& filename_1, const string& filename_2) const;
 
