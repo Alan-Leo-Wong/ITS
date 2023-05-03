@@ -465,9 +465,9 @@ void ThinShells::saveTree(const string& filename) const
 
 void ThinShells::saveIntersections(const string& filename, const vector<std::pair<V3d, uint32_t>>& intersections) const
 {
+	checkDir(filename);
 	std::ofstream out(filename);
 	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
-	checkDir(filename);
 
 	for (const auto& p : intersections)
 		out << p.first.x() << " " << p.first.y() << " " << p.first.z() << endl;

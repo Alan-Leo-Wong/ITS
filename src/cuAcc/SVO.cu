@@ -5,6 +5,7 @@
 #include "..\utils\cuda\CUDAMath.hpp"
 #include "..\utils\cuda\CUDAUtil.cuh"
 #include "..\utils\cuda\CUDACheck.cuh"
+#include "..\utils\String.hpp"
 #include <thrust\scan.h>
 #include <thrust\sort.h>
 #include <thrust\unique.h>
@@ -1136,8 +1137,10 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 //////////////////////
 void SparseVoxelOctree::saveSVO(const std::string& filename) const
 {
+	checkDir(filename);
 	std::ofstream output(filename.c_str(), std::ios::out);
-	assert(output);
+	if (!output) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
+	//assert(output);
 
 #ifndef SILENT
 	std::cout << "[I/O] Writing Sparse Voxel Octree data in obj format to file " << std::quoted(filename.c_str()) << std::endl;
@@ -1169,8 +1172,10 @@ void SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const
 	const std::string& base_filename, const double& width) const
 {
 	std::string filename_output = base_filename + std::string("_voxel.obj");
+	checkDir(filename_output);
 	std::ofstream output(filename_output.c_str(), std::ios::out);
-	assert(output);
+	if (!output) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename_output.c_str()); return; }
+	//assert(output);
 
 #ifndef SILENT
 	std::cout << "[I/O] Writing data in obj voxels format to file " << std::quoted(filename_output.c_str()) << std::endl;
