@@ -74,6 +74,8 @@ namespace MC {
 	extern double* d_lambda;
 
 	extern uint3* d_res;
+	extern uint3 h_res;
+
 	extern double* d_isoVal;
 
 	extern uint* d_nVoxelVertsArray;
@@ -121,7 +123,7 @@ namespace MC {
 	void launch_computSDFKernel(const uint& nVoxels,
 		const uint& numNodes, const size_t& _numNodeVerts,
 		const VXd& lambda, const std::vector<V3d>& nodeWidthArray,
-		const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray);
+		const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray);
 
 	void launch_determineVoxelKernel(const uint& nVoxels, const double& isoVal, const uint& maxVerts);
 
@@ -131,8 +133,7 @@ namespace MC {
 
 	void writeToOBJFile(const std::string& filename);
 
-	void marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
-		const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts,
+	void marching_cubes(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
 		const size_t& numNodes, const std::vector<V3d>& nodeWidthArray,
 		const size_t& numNodeVerts, const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 		const uint3& resolution, const double& isoVal, const std::string& filename);

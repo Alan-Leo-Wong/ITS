@@ -37,6 +37,8 @@ namespace MC {
 	V3d* d_nodeWidthArray = nullptr;
 
 	uint3* d_res = nullptr;
+	static uint3 h_res;
+
 	double* d_isoVal = nullptr;
 
 	uint* d_nVoxelVertsArray = nullptr;
@@ -462,19 +464,12 @@ inline void MC::freeCommonResources() {
 inline void MC::launch_computSDFKernel(const uint& nVoxels,
 	const uint& numNodes, const size_t& _numNodeVerts,
 	const VXd& lambda, const std::vector<V3d>& nodeWidthArray,
-	const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray)
+	const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray)
 {
 	// init resources
 	numNodeVerts = _numNodeVerts;
 	CUDA_CHECK(cudaMalloc((void**)&d_nodeVertexArray, sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts));
-	size_t offset = 0;
-	for (int i = 0; i < depthNodeVertexArray.size(); ++i)
-	{
-		const size_t i_nodeVerts = depthNodeVertexArray[i].size();
-		CUDA_CHECK(cudaMemcpy(d_nodeVertexArray + offset, depthNodeVertexArray[i].data(),
-			sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * i_nodeVerts, cudaMemcpyHostToDevice));
-		offset += i_nodeVerts;
-	}
+	CUDA_CHECK(cudaMemcpy(d_nodeVertexArray, nodeVertexArray.data(), sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts, cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows()));
 	CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice)); // lambda.rows() == numNodeVerts
 	CUDA_CHECK(cudaMalloc((void**)&d_nodeWidthArray, sizeof(V3d) * numNodes));
@@ -667,8 +662,7 @@ inline void MC::writeToOBJFile(const std::string& filename) {
  * @param isoVal     isosurface value
  * @param filename   output obj file
  */
-void MC::marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32_t>>>& depthNodeVertexArray,
-	const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts,
+void MC::marching_cubes(const vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
 	const size_t& numNodes, const std::vector<V3d>& nodeWidthArray,
 	const size_t& numNodeVerts, const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
 	const uint3& resolution, const double& isoVal, const std::string& filename) 
@@ -687,7 +681,7 @@ void MC::marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32
 
 	initCommonResources(nVoxels, resolution, isoVal, gridOrigin, voxelSize, maxVerts);
 
-	if (h_voxelSDF.empty()) launch_computSDFKernel(nVoxels, numNodes, numNodeVerts, lambda, nodeWidthArray, depthNodeVertexArray);
+	if (h_voxelSDF.empty() || h_res != resolution) { h_res = resolution; launch_computSDFKernel(nVoxels, numNodes, numNodeVerts, lambda, nodeWidthArray, nodeVertexArray); }
 	else d_voxelSDF = h_voxelSDF;
 
 	launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);

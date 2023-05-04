@@ -13,6 +13,16 @@
 
 using uint = unsigned int;
 
+inline __host__ __device__ bool operator==(const uint3& a, const uint3& b)
+{
+	return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);
+}
+
+inline __host__ __device__ bool operator!=(const uint3& a, const uint3& b)
+{
+	return (!(a == b));
+}
+
 // constructor
 inline __host__ __device__ uint3 make_uint3(const Eigen::VectorXi& a)
 {

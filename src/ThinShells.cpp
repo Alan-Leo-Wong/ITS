@@ -561,8 +561,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	if (!outerFilename.empty() && outerShellIsoVal != -DINF)
 	{
 		cout << "\n[MC] Extract outer shell by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray,
-			svo.esumDepthNodeVerts, svo.numTreeNodes, nodeWidthArray,
+		MC::marching_cubes(svo.nodeVertexArray, svo.numTreeNodes, nodeWidthArray,
 			svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(outerResolution), outerShellIsoVal, outerFilename);
 		cout << "=====================\n";
@@ -571,8 +570,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	if (!innerFilename.empty() && innerShellIsoVal != -DINF)
 	{
 		cout << "\n[MC] Extract inner shell by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray,
-			svo.esumDepthNodeVerts, svo.numTreeNodes, nodeWidthArray,
+		MC::marching_cubes(svo.nodeVertexArray, svo.numTreeNodes, nodeWidthArray,
 			svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 		cout << "=====================\n";
@@ -581,8 +579,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	if (!isoFilename.empty())
 	{
 		cout << "\n[MC] Extract isosurface by MarchingCubes..." << endl;
-		MC::marching_cubes(svo.depthNodeVertexArray, svo.svoNodeArray,
-			svo.esumDepthNodeVerts, svo.numTreeNodes, nodeWidthArray,
+		MC::marching_cubes(svo.nodeVertexArray, svo.numTreeNodes, nodeWidthArray,
 			svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
 			make_uint3(isoResolution), .0, isoFilename);
 		cout << "=====================\n";

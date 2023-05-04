@@ -77,7 +77,7 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
-	const int res = 120;
+	const int res = 80;
 	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
 	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
 	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_isosurface.obj");
