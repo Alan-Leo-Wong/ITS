@@ -54,16 +54,16 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "switchmec.obj");
-	const double alpha = 1000;
+	string modelName = getFileName("", "bunny.off");
+	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
-	cout << "-- alpha: " << alpha << endl;
+	//cout << "-- alpha: " << alpha << endl;
 
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"switchmec.obj"), 32, 32, 32);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 32, 32, 32);
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
@@ -77,7 +77,7 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
-	const int res = 80;
+	const int res = 120;
 	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
 	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
 	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_isosurface.obj");

@@ -77,14 +77,12 @@ inline void ThinShells::cpIntersectionPoints()
 		}
 	}
 	std::sort(edgeInterPoints.begin(), edgeInterPoints.end(), std::less<V3d>());
-
-	struct uniqueVert {
-		double eps;
-		bool operator()(const V3d a, const V3d b) {
-			return a.isApprox(b, eps);
+	/*struct uniqueVert {
+		bool operator()(const V3d& a, const V3d& b) {
+			return a.isApprox(b, 1e-9);
 		}
-	};
-	edgeInterPoints.erase(std::unique(edgeInterPoints.begin(), edgeInterPoints.end(), uniqueVert(1e-9)));
+	};*/
+	edgeInterPoints.erase(std::unique(edgeInterPoints.begin(), edgeInterPoints.end()), edgeInterPoints.end());
 	cout << "-- 三角形边与node的交点数量：" << edgeInterPoints.size() << endl;
 
 	allInterPoints.insert(allInterPoints.end(), edgeInterPoints.begin(), edgeInterPoints.end());
@@ -136,16 +134,16 @@ inline void ThinShells::cpSDFOfTreeNodes()
 			pointsMat.row(esumDepthNodeVerts[d] + i) = depthNodeVertexArray[d][i].first;
 	}
 
-	VXd S;
+	//VXd S;
 	{
 		VXi I;
 		MXd C, N;
-		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, S, I, C, N);
+		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, sdfVal, I, C, N);
 		//std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? b : (b < 0 ? -1 : 0)); });
 	}
-	sdfVal.resize(numNodeVerts + allInterPoints.size() + nModelVerts);
+	/*sdfVal.resize(numNodeVerts + allInterPoints.size() + nModelVerts);
 	sdfVal.setZero();
-	sdfVal.block(0, 0, numNodeVerts, 1) = S;
+	sdfVal.block(0, 0, numNodeVerts, 1) = S;*/
 }
 
 inline void ThinShells::cpCoefficients()
@@ -267,15 +265,15 @@ inline void ThinShells::cpBSplineValue()
 			});
 	}
 
-	cuAcc::cpBSplineVal(numAllPoints, svo.numNodeVerts, svo.numTreeNodes, pointsData,
-		svo.nodeVertexArray, nodeWidthArray, lambda, bSplineVal);
-
-	/*const uint nInterPoints = allInterPoints.size();
-
+	const uint nInterPoints = allInterPoints.size();
 	bSplineVal.resize(nModelVerts + nInterPoints);
 	bSplineVal.setZero();
 
-	const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
+	cuAcc::cpBSplineVal(numAllPoints, svo.numNodeVerts, svo.numTreeNodes, pointsData,
+		svo.nodeVertexArray, nodeWidthArray, lambda, bSplineVal);
+
+	// --CPU--
+	/*const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
 	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
 	const vector<size_t>& esumDepthNodeVerts = svo.esumDepthNodeVerts;
 
@@ -299,7 +297,7 @@ inline void ThinShells::cpBSplineValue()
 	for (int i = 0; i < nInterPoints; ++i)
 	{
 		cnt = i + nModelVerts;
-		const V3d& interPoint = allInterPoints[i].first;
+		const V3d& interPoint = allInterPoints[i];
 		for (int d = 0; d < treeDepth; ++d)
 		{
 			const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
@@ -315,8 +313,8 @@ inline void ThinShells::cpBSplineValue()
 
 	innerShellIsoVal = *(std::min_element(bSplineVal.begin(), bSplineVal.end()));
 	outerShellIsoVal = *(std::max_element(bSplineVal.begin(), bSplineVal.end()));
-	std::cout << "-- innerShellIsoVal:" << innerShellIsoVal << std::endl;
-	std::cout << "-- outerShellIsoVal:" << outerShellIsoVal << std::endl;
+	std::cout << "-- innerShellIsoVal: " << innerShellIsoVal << std::endl;
+	std::cout << "-- outerShellIsoVal: " << outerShellIsoVal << std::endl;
 
 	//bSplineTree.saveBSplineValue(concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"bSplineVal.txt"));
 }

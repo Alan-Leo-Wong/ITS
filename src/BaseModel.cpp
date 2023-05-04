@@ -505,7 +505,7 @@ vector<V3i> BaseModel::getFaces() const
 //////////////////////
 void BaseModel::readFile(const string& filename)
 {
-	igl::read_triangle_mesh(filename, m_V, m_F);
+	if (!igl::read_triangle_mesh(filename, m_V, m_F)) { exit(EXIT_FAILURE); }
 	for (int i = 0; i < m_V.rows(); i++) modelVerts.emplace_back(m_V.row(i));
 	for (int i = 0; i < m_F.rows(); i++)
 	{

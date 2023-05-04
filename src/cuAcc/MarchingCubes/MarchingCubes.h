@@ -11,6 +11,7 @@
 #include "..\..\SVO.h"
 #include "..\..\utils\cuda\CUDACheck.cuh"
 #include "..\..\utils\cuda\CUDAMath.hpp"
+#include <thrust\host_vector.h>
 
 namespace MCKernel {
 	template <typename T>
@@ -24,8 +25,6 @@ namespace MCKernel {
 
 	__device__ uint3 getVoxelShift(const uint index, const uint3 d_res);
 
-	__device__ uint3 getCoordShift(const uint index);
-
 	// 与SDFCompute.cu二选一
 	__device__ double computeSDF(const uint numNodeVerts, const thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray,
 		const SVONode* d_svoNodeArray, const double* d_lambda, double3 pos);
@@ -35,11 +34,10 @@ namespace MCKernel {
 		double3* d_origin, double3* d_voxelSize,
 		V3d* d_nodeCorners, V3d* d_nodeWidth, double* d_voxelMatrix);*/
 
-	__global__ void prepareVoxelCornerKernel(const size_t nPoints, const double3* d_origin,
+	__global__ void prepareVoxelCornerKernel(const uint nVoxels, const uint* voxel_offset, const double3* d_origin,
 		const double3* d_voxelSize, const uint3* d_res, V3d* d_voxelCornerData);
 
-	__global__ void
-		determineVoxelKernel(const uint nVoxels, const double* d_isoVal,
+	__global__ void determineVoxelKernel(const uint nVoxels, const double* d_isoVal,
 			const cudaTextureObject_t nVertsTex,
 			uint* d_nVoxelVerts, uint* d_voxelCubeIndex,
 			double* d_voxelSDF, uint* d_isValidVoxelArray);
@@ -88,6 +86,8 @@ namespace MC {
 	extern double3* d_voxelSize;
 
 	extern thrust::device_vector<double> d_voxelSDF;
+	extern thrust::host_vector<double> h_voxelSDF;
+
 	extern uint* d_voxelCubeIndex;
 
 	extern uint* d_compactedVoxelArray;

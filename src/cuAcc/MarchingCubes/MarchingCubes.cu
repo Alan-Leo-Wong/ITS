@@ -5,6 +5,7 @@
 #include "..\..\BSpline.hpp"
 #include "..\..\utils\cuda\CUDAUtil.cuh"
 #include "..\..\cuAcc\CUDACompute.h"
+#include "..\..\utils\cuda\DeviceQuery.cuh"
 #include <chrono>
 #include <cuda_device_runtime_api.h>
 #include <cuda_runtime_api.h>
@@ -47,7 +48,9 @@ namespace MC {
 	double3* d_gridOrigin = nullptr;
 	double3* d_voxelSize = nullptr;
 
-	static thrust::device_vector<double> d_voxelSDF;
+	thrust::device_vector<double> d_voxelSDF;
+	static thrust::host_vector<double> h_voxelSDF;
+
 	//static double* d_voxelSDF = nullptr;
 	uint* d_voxelCubeIndex = nullptr;
 
@@ -92,17 +95,6 @@ __device__ uint3 MCKernel::getVoxelShift(const uint index,
 	return make_uint3(x, y, z);
 }
 
-__device__ uint3 MCKernel::getCoordShift(const uint index) {
-	uint x, y, z;
-	if (index == 2 || index == 3 || index == 6 || index == 7) x = 1;
-	else x = 0;
-	if (index == 1 || index == 2 || index == 5 || index == 6) y = 1;
-	else y = 0;
-	if (index >= 4) z = 1;
-	else z = 0;
-	return make_uint3(x, y, z);
-}
-
 //__device__ inline double MCKernel::computeSDF(const uint nAllNodes, const V3d* d_nodeCorners,
 //	const V3d* d_nodeWidth, const double* d_lambda, double3 pos)
 //{
@@ -127,27 +119,32 @@ __device__ inline double MCKernel::computeSDF(const uint numNodeVerts, const thr
 	return sum;
 }
 
-__global__ void MCKernel::prepareVoxelCornerKernel(const size_t nPoints, const double3* d_origin,
-	const double3* d_voxelSize, const uint3* d_res, V3d* d_voxelCornerData)
+__global__ void MCKernel::prepareVoxelCornerKernel(const uint nVoxels, const uint* d_voxelOffset,
+	const double3* d_origin, const double3* d_voxelSize, const uint3* d_res, V3d* d_voxelCornerData)
 {
 	const size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (tid < nPoints)
+	if (tid < nVoxels)
 	{
-		const size_t voxelIdx = tid / 8;
-		const size_t coordIdx = tid % 8;
+		const size_t voxelIdx = tid + (*d_voxelOffset);
 		uint3 voxelShift = getVoxelShift(voxelIdx, *d_res);
-		uint3 coordShift = getCoordShift(coordIdx);
 
 		double3 origin = *d_origin;
 		double3 voxelSize = *d_voxelSize;
-		double3 voxelCorner; // voxel 原点坐标
+		V3d voxelPos; // voxel 原点坐标
 
-		voxelCorner.x = origin.x + (voxelShift.x + coordShift.x) * voxelSize.x;
-		voxelCorner.y = origin.y + (voxelShift.y + coordShift.y) * voxelSize.y;
-		voxelCorner.z = origin.z + (voxelShift.z + coordShift.z) * voxelSize.z;
+		voxelPos.x() = origin.x + voxelShift.x * voxelSize.x;
+		voxelPos.y() = origin.y + voxelShift.y * voxelSize.y;
+		voxelPos.z() = origin.z + voxelShift.z * voxelSize.z;
 
-		d_voxelCornerData[tid] = V3d(voxelCorner.x, voxelCorner.y, voxelCorner.z);
+		d_voxelCornerData[tid * 8] = voxelPos;
+		d_voxelCornerData[tid * 8 + 1] = voxelPos + V3d(0, voxelSize.y, 0);
+		d_voxelCornerData[tid * 8 + 2] = voxelPos + V3d(voxelSize.x, voxelSize.y, 0);
+		d_voxelCornerData[tid * 8 + 3] = voxelPos + V3d(voxelSize.x, 0, 0);
+		d_voxelCornerData[tid * 8 + 4] = voxelPos + V3d(0, 0, voxelSize.z);
+		d_voxelCornerData[tid * 8 + 5] = voxelPos + V3d(0, voxelSize.y, voxelSize.z);
+		d_voxelCornerData[tid * 8 + 6] = voxelPos + V3d(voxelSize.x, voxelSize.y, voxelSize.z);
+		d_voxelCornerData[tid * 8 + 7] = voxelPos + V3d(voxelSize.x, 0, voxelSize.z);
 	}
 }
 
@@ -246,6 +243,7 @@ __global__ void MCKernel::determineVoxelKernel_2(const uint nVoxels, const uint 
 		{
 			sdf[i] = computeSDF(numNodeVerts, d_nodeVertexArray, d_svoNodeArray, d_lambda, corners[i]);
 			d_voxelSDF[tid * 8 + i] = sdf[i];
+			printf("sdf[%d] = %lf\n", i, sdf[i]);
 		}
 
 		int cubeIndex = 0;
@@ -477,34 +475,67 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 			sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * i_nodeVerts, cudaMemcpyHostToDevice));
 		offset += i_nodeVerts;
 	}
-	CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows())); // lambda.rows() == nAllNodes * 8
-	CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows()));
+	CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice)); // lambda.rows() == numNodeVerts
 	CUDA_CHECK(cudaMalloc((void**)&d_nodeWidthArray, sizeof(V3d) * numNodes));
 	CUDA_CHECK(cudaMemcpy(d_nodeWidthArray, nodeWidthArray.data(), sizeof(V3d) * numNodes, cudaMemcpyHostToDevice));
+	d_voxelSDF.resize(nVoxels * 8);
 
-	const size_t dataSize = (size_t)nVoxels * 8;
-	thrust::device_vector<V3d> d_voxelCornerData(dataSize);
+	// device
+	cudaDeviceProp prop;
+	int device = getMaxComputeDevice();
+	CUDA_CHECK(cudaGetDevice(&device));
+	CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
 
-	int minGridSize, blockSize, gridSize;
-	getOccupancyMaxPotentialBlockSize(dataSize, minGridSize, blockSize, gridSize,
-		MCKernel::prepareVoxelCornerKernel);
-	MCKernel::prepareVoxelCornerKernel << <gridSize, blockSize >> > (dataSize, d_gridOrigin,
-		d_voxelSize, d_res, d_voxelCornerData.data().get());
-	getLastCudaError("Kernel: 'determineVoxelKernel' launch failed!\n");
+	using namespace std::chrono;
+	time_point<system_clock> start, end;
 
-	cuAcc::cpBSplineVal(dataSize, numNodeVerts, d_nodeVertexArray, d_nodeWidthArray,
-		d_lambda, d_voxelCornerData, d_voxelSDF);
+	// streams
+	cudaStream_t streams[MAX_NUM_STREAMS];
+	for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
+
+	for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
+		uint voxelElems = (nVoxels + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
+		uint voxelOffset = i * voxelElems;
+		voxelElems = voxelOffset + voxelElems > nVoxels ? nVoxels - voxelOffset : voxelElems;
+
+		uint* d_voxelOffset = nullptr;
+		CUDA_CHECK(cudaMalloc((void**)&d_voxelOffset, sizeof(uint)));
+		CUDA_CHECK(cudaMemcpy(d_voxelOffset, &voxelOffset, sizeof(uint), cudaMemcpyHostToDevice));
+
+		const uint numVoxelElemCorners = voxelElems * 8;
+		thrust::device_vector<V3d> d_voxelCornerData(numVoxelElemCorners);
+
+		int minGridSize, blockSize, gridSize;
+		getOccupancyMaxPotentialBlockSize(nVoxels, minGridSize, blockSize, gridSize, MCKernel::prepareVoxelCornerKernel);
+		MCKernel::prepareVoxelCornerKernel << <gridSize, blockSize >> > (voxelElems, d_voxelOffset, d_gridOrigin, d_voxelSize, d_res, d_voxelCornerData.data().get());
+		getLastCudaError("Kernel: 'determineVoxelKernel' launch failed!\n");
+
+		thrust::device_vector<double> d_voxelElemSDF(numVoxelElemCorners);
+		cuAcc::cpBSplineVal(prop, numVoxelElemCorners, numNodeVerts, d_nodeVertexArray, d_nodeWidthArray, d_lambda, d_voxelCornerData, d_voxelElemSDF, streams[i]);
+		CUDA_CHECK(cudaMemcpyAsync((d_voxelSDF.data() + voxelOffset * 8).get(), d_voxelElemSDF.data().get(), sizeof(double) * numVoxelElemCorners, cudaMemcpyDeviceToDevice, streams[i]));
+
+		cleanupThrust(d_voxelElemSDF);
+		cleanupThrust(d_voxelCornerData);
+		CUDA_CHECK(cudaFree(d_voxelOffset));
+	}
+
+	for (int i = 0; i < MAX_NUM_STREAMS; i++)
+		cudaStreamSynchronize(streams[i]);
+	for (int i = 0; i < MAX_NUM_STREAMS; ++i)
+		CUDA_CHECK(cudaStreamDestroy(streams[i]));
 
 	// free resources
-	//cleanupThrust(d_voxelCornerData); // already free in cpBSplineVal
 	CUDA_CHECK(cudaFree(d_lambda));
 	CUDA_CHECK(cudaFree(d_nodeWidthArray));
 	CUDA_CHECK(cudaFree(d_nodeVertexArray));
+
+	h_voxelSDF = d_voxelSDF;
 }
 
 inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
-	const double& isoVal,
-	const uint& maxVerts)
+	 const double& isoVal,
+	 const uint& maxVerts)
 {
 	// init resources
 	CUDA_CHECK(cudaMalloc((void**)&d_voxelCubeIndex, sizeof(uint) * nVoxels));
@@ -524,9 +555,8 @@ inline void MC::launch_determineVoxelKernel(const uint& nVoxels,
 		d_voxelCubeIndex, d_voxelSDF.data().get(), d_isValidVoxelArray);
 	/*MCKernel::determineVoxelKernel_2 << <nBlocks, nThreads >> > (nVoxels, numNodeVerts, d_isoVal, d_gridOrigin,
 		d_voxelSize, d_res, d_nodeVertexArray, d_svoNodeArray.data().get(), d_lambda, nVertsTex, d_nVoxelVertsArray,
-		d_voxelCubeIndex, d_voxelSDF, d_isValidVoxelArray);*/
+		d_voxelCubeIndex, d_voxelSDF.data().get(), d_isValidVoxelArray);*/
 	getLastCudaError("Kernel: 'determineVoxelKernel' launch failed!\n");
-	cudaDeviceSynchronize();
 
 	d_thrustExclusiveScan(nVoxels, d_nVoxelVertsArray, d_nVoxelVertsScan);
 	d_thrustExclusiveScan(nVoxels, d_isValidVoxelArray, d_nValidVoxelsScan);
@@ -583,7 +613,7 @@ inline void MC::launch_voxelToMeshKernel(const uint& maxVerts,
 		nBlocks.y *= 2;
 	}
 
-	MCKernel::voxelToMeshKernel<< <nBlocks, nThreads >> > (
+	MCKernel::voxelToMeshKernel << <nBlocks, nThreads >> > (
 		nValidVoxels, maxVerts, d_isoVal, d_voxelSize, d_gridOrigin, d_res,
 		d_compactedVoxelArray, nVertsTex, triTex, d_voxelCubeIndex, d_voxelSDF.data().get(),
 		d_nVoxelVertsScan, d_triPoints);
@@ -641,8 +671,9 @@ void MC::marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32
 	const vector<SVONode>& svoNodeArray, const vector<size_t>& esumDepthNodeVerts,
 	const size_t& numNodes, const std::vector<V3d>& nodeWidthArray,
 	const size_t& numNodeVerts, const VXd& lambda, const double3& gridOrigin, const double3& gridWidth,
-	const uint3& resolution, const double& isoVal, const std::string& filename) {
-	if (numNodeVerts == 0) { printf("[MC] There is no valid node vertex...\n"); return; }
+	const uint3& resolution, const double& isoVal, const std::string& filename) 
+{
+	if (numNodeVerts == 0) { printf("[MC] Warning: There is no valid Sparse Voxel Octree's node vertex, MarchingCubes is exited...\n"); return; }
 	uint nVoxels = resolution.x * resolution.y * resolution.z;
 
 	uint maxVerts = nVoxels * 18;
@@ -654,12 +685,10 @@ void MC::marching_cubes(const vector<vector<thrust::pair<Eigen::Vector3d, uint32
 
 	start = system_clock::now();
 
-	initCommonResources(nVoxels, resolution, isoVal, 
-		gridOrigin, voxelSize, maxVerts);
+	initCommonResources(nVoxels, resolution, isoVal, gridOrigin, voxelSize, maxVerts);
 
-	if (d_voxelSDF.empty())
-		launch_computSDFKernel(nVoxels, numNodes, numNodeVerts, 
-			lambda, nodeWidthArray, depthNodeVertexArray);
+	if (h_voxelSDF.empty()) launch_computSDFKernel(nVoxels, numNodes, numNodeVerts, lambda, nodeWidthArray, depthNodeVertexArray);
+	else d_voxelSDF = h_voxelSDF;
 
 	launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
 	if (allTriVertices == 0) {
