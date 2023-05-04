@@ -10,6 +10,12 @@ namespace gvis
 		output << "v " << v.x() << " " << v.y() << " " << v.z() << std::endl;
 	}
 
+	// Helper function to write single vertex to OBJ file
+	static void write_vertex(std::ofstream& output, const Eigen::Vector3d& v, const Eigen::Vector3d& rgb)
+	{
+		output << "v " << v.x() << " " << v.y() << " " << v.z() << " " << rgb.x() << " " << rgb.y() << " " << rgb.z() << std::endl;
+	}
+
 	// Helper function to write face
 	static void write_face(std::ofstream& output, const Eigen::Vector3i& f)
 	{
@@ -109,5 +115,16 @@ namespace gvis
 #endif
 
 		faceBegIdx += 8;
+	}
+
+	void writePointCloud(const std::vector<Eigen::Vector3d>& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.size(); ++i)
+			write_vertex(output, points[i], rgbs[i]);
+	}
+
+	void writePointCloud(const Eigen::Vector3d& point, const Eigen::Vector3d& rgb, std::ofstream& output)
+	{
+		write_vertex(output, point, rgb);
 	}
 }

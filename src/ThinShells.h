@@ -70,6 +70,13 @@ public:
 
 	std::array<double, 2> getShellIsoVal() { return { innerShellIsoVal, outerShellIsoVal }; }
 
+	// 点在表面的查询
+	void singlePointQuery(const std::string& out_file, const V3d& point);
+
+	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
+
+	void multiPointQuery(const std::string& out_file, const MXd& points);
+
 public:
 	void saveTree(const string& filename) const;
 

@@ -1,6 +1,7 @@
 #include "ThinShells.h"
 #include "MortonLUT.h"
 #include "BSpline.hpp"
+#include "utils\IO.hpp"
 #include "utils\Timer.hpp"
 #include "utils\Common.hpp"
 #include "utils\String.hpp"
@@ -255,7 +256,7 @@ inline void ThinShells::cpBSplineValue()
 	std::vector<V3d> pointsData;
 	pointsData.insert(pointsData.end(), modelVerts.begin(), modelVerts.end());
 	pointsData.insert(pointsData.end(), allInterPoints.begin(), allInterPoints.end());
-	
+
 	if (nodeWidthArray.empty())
 	{
 		auto& svoNodeArray = svo.svoNodeArray;
@@ -455,6 +456,66 @@ inline void ThinShells::setLatentMatrix(const double& alpha)
 	//lambda = lscg.solve(b);
 }
 
+void ThinShells::singlePointQuery(const std::string& out_file, const V3d& point)
+{
+	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!"); return; }
+	if (nodeWidthArray.empty())
+	{
+		auto& svoNodeArray = svo.svoNodeArray;
+		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
+			[](SVONode node) {
+				return Eigen::Vector3d(node.width, node.width, node.width);
+			});
+	}
+
+	string _out_file = (string)getDirName(DELIMITER, out_file.c_str()) + (string)getFileName(DELIMITER, out_file.c_str()) + (string)"_query_result.obj";
+	checkDir(_out_file);
+	std::ofstream out(_out_file);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", _out_file.c_str()); return; }
+	cout << "-- Save points to " << std::quoted(_out_file) << endl;
+	//gvis::writePointCloud(point, rgb, out);
+}
+
+void ThinShells::multiPointQuery(const std::string& out_file, const vector<V3d>& points)
+{
+	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!"); return; }
+	if (nodeWidthArray.empty())
+	{
+		auto& svoNodeArray = svo.svoNodeArray;
+		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
+			[](SVONode node) {
+				return Eigen::Vector3d(node.width, node.width, node.width);
+			});
+	}
+
+	VXd bSplineVal; vector<V3d> rgbs;
+	cuAcc::cpBSplineVal(points.size(), svo.numNodeVerts, svo.numTreeNodes, points, svo.nodeVertexArray, nodeWidthArray, lambda, bSplineVal);
+	std::transform(bSplineVal.begin(), bSplineVal.end(), std::back_inserter(rgbs),
+		[=](double val) {
+			V3d _t;
+			if (innerShellIsoVal < val && val < outerShellIsoVal) _t = V3d(0.56471, 0.93333, 0.56471);
+			else _t = V3d(1, 0.27059, 0);
+			return _t;
+		});
+
+	string _out_file = (string)getDirName(DELIMITER, out_file.c_str()) + (string)getFileName(DELIMITER, out_file.c_str()) + (string)"_query_result.obj";
+	checkDir(_out_file);
+	std::ofstream out(_out_file);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", _out_file.c_str()); return; }
+	cout << "-- Save points to " << std::quoted(_out_file) << endl;
+	gvis::writePointCloud(points, rgbs, out);
+}
+
+void ThinShells::multiPointQuery(const std::string& out_file, const MXd& pointsMat)
+{
+	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!"); return; }
+
+	vector<V3d> points;
+	for (int i = 0; i < pointsMat.rows(); ++i) points.emplace_back(pointsMat.row(i));
+
+	multiPointQuery(out_file, points);
+}
+
 //////////////////////
 //  I/O: Save Data  //
 //////////////////////
@@ -551,7 +612,7 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 	if (nodeWidthArray.empty())
 	{
 		//nodeWidthArray.reserve(svo.numTreeNodes);
-		auto& svoNodeArray = svo.svoNodeArray; 
+		auto& svoNodeArray = svo.svoNodeArray;
 		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
 			[](SVONode node) {
 				return Eigen::Vector3d(node.width, node.width, node.width);
