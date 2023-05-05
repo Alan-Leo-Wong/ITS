@@ -409,14 +409,14 @@ namespace cuAcc {
 	 */
 	template <typename T = Eigen::Vector3d, typename Scalar = double, bool useThrust = true>
 	void execMyReduce(const cudaDeviceProp& prop, const cudaStream_t& stream,
-		const int& rowElems, const uint& cols, const int& paddingCols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
+		const int& rowElems, const uint& cols, const uint& paddingCols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, thrust::device_vector<Scalar>& d_value)
 	{
-		int x_blockSize = 0, y_blockSize = 16; // x²Ù×ÝB£¬y²Ù×ÝA
+		int x_blockSize = 0, y_blockSize = 64; // x²Ù×ÝB£¬y²Ù×ÝA
 		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
 		// ·ÖÅäÊ±ÐèÒªpaddingCols
-		getBlocksAndThreadsNum(prop, paddingCols, 128, 1024 / y_blockSize, x_gridSize, x_blockSize);
+		getBlocksAndThreadsNum(prop, paddingCols, 65535, 1024 / y_blockSize, x_gridSize, x_blockSize);
 		dim3 blockSize(x_blockSize, y_blockSize, 1);
 		dim3 gridSize(x_gridSize, y_gridSize, 1);
 
@@ -495,7 +495,7 @@ namespace cuAcc {
 		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, const bool& useThrust)
 	{
 		// streams
-		constexpr int MAX_NUM_STREAMS = 2;
+		constexpr int MAX_NUM_STREAMS = 32;
 
 		// device
 		cudaDeviceProp prop;
