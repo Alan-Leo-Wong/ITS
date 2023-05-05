@@ -28,6 +28,10 @@ namespace cuAcc {
 		thrust::device_vector<double>& row_sums,
 		const cudaStream_t& stream = nullptr);
 
+	void cpBSplineVal(const uint& numNodeVerts, const uint& numNodes,
+		const V3d& pointData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
+		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, double& bSplinVal, const bool& useThrust = true);
+
 	void cpBSplineVal(const uint& numPoints, const uint& numNodeVerts, const uint& numNodes,
 		const std::vector<V3d>& pointsData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
 		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, const bool& useThrust = true);

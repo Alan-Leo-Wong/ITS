@@ -1,4 +1,6 @@
 #include "BaseModel.h"
+#include "utils\IO.hpp"
+#include "utils\Common.hpp"
 #include "utils\String.hpp"
 #include "cuAcc\CUDACompute.h"
 #include <sstream>
@@ -49,6 +51,31 @@ void BaseModel::setUniformBoundingBox()
 void BaseModel::setTriAttributes()
 {
 	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);
+}
+
+Eigen::MatrixXd BaseModel::generateRandomPoints(const size_t& numPoints)
+{
+	Eigen::MatrixXd M;
+	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
+	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
+	getRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	return M;
+}
+
+Eigen::MatrixXd BaseModel::generateRandomPoints(const string& filename, const size_t& numPoints)
+{
+	Eigen::MatrixXd M;
+	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
+	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
+	getRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+
+	checkDir(filename);
+	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return M; }
+	cout << "-- Save random points to " << std::quoted(filename) << endl;
+	gvis::writePointCloud(M, out);
+
+	return M;
 }
 
 vector<V2i> BaseModel::extractEdges()

@@ -8,6 +8,7 @@
 #include "cuAcc\CUDACompute.h"
 #include "utils\cuda\CUDAMath.hpp"
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
+#include <omp.h>
 #include <queue>
 #include <iomanip>
 #include <numeric>
@@ -33,12 +34,17 @@ inline void ThinShells::cpIntersectionPoints()
 
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
+
+#pragma omp parallel
 	for (int i = 0; i < nModelEdges; i++)
 	{
+		std::vector<V3d> edge_vec_private;
+
 		Eigen::Vector2i e = modelEdges[i];
 		V3d p1 = m_V.row(e.x()); V3d p2 = m_V.row(e.y());
 		V3d modelEdgeDir = p2 - p1;
 
+#pragma omp for nowait
 		for (int j = 0; j < numFineNodes; ++j)
 		{
 			V3d lbbCorner = nodeArray[j].origin;
@@ -61,22 +67,31 @@ inline void ThinShells::cpIntersectionPoints()
 				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
+				//edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
+				edge_vec_private.emplace_back(p1 + back_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, left_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
 				isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
 			{
-				edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
+				//edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
+				edge_vec_private.emplace_back(p1 + left_t * modelEdgeDir);
 			}
 			if (isInRange(.0, 1.0, bottom_t) &&
 				isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
 				isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
 			{
-				edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
+				//edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
+				edge_vec_private.emplace_back(p1 + bottom_t * modelEdgeDir);
 			}
 		}
+
+#pragma omp critical
+		{
+			edgeInterPoints.insert(edgeInterPoints.end(), edge_vec_private.begin(), edge_vec_private.end());
+		}
 	}
+
 	std::sort(edgeInterPoints.begin(), edgeInterPoints.end(), std::less<V3d>());
 	/*struct uniqueVert {
 		bool operator()(const V3d& a, const V3d& b) {
@@ -90,12 +105,19 @@ inline void ThinShells::cpIntersectionPoints()
 
 	// 三角形面与node边线交
 	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
+	const int numFineNodeEdges = fineNodeEdges.size();
+#pragma omp parallel
 	for (const auto& tri : modelTris)
 	{
+		std::vector<V3d> face_vec_private;
+
 		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
 		V3d triNormal = tri.normal; double triDir = tri.dir;
-		for (const auto& nodeEdge : fineNodeEdges)
+
+#pragma omp for nowait
+		for (int j = 0; j < numFineNodeEdges; ++j)
 		{
+			const auto& nodeEdge = fineNodeEdges[j];
 			thrust_edge_type edge = nodeEdge.first;
 			V3d edgeDir = edge.second - edge.first;
 
@@ -109,7 +131,13 @@ inline void ThinShells::cpIntersectionPoints()
 			if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
 			if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
 
-			faceInterPoints.emplace_back(interPoint);
+			//faceInterPoints.emplace_back(interPoint);
+			face_vec_private.emplace_back(interPoint);
+		}
+
+#pragma omp critical
+		{
+			faceInterPoints.insert(faceInterPoints.end(), face_vec_private.begin(), face_vec_private.end());
 		}
 	}
 
@@ -468,12 +496,23 @@ void ThinShells::singlePointQuery(const std::string& out_file, const V3d& point)
 			});
 	}
 
-	string _out_file = (string)getDirName(DELIMITER, out_file.c_str()) + (string)getFileName(DELIMITER, out_file.c_str()) + (string)"_query_result.obj";
+	double q_bSplineVal;
+	V3d rgb;
+	cuAcc::cpBSplineVal(svo.numNodeVerts, svo.numTreeNodes, point, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal);
+	if (innerShellIsoVal < q_bSplineVal && q_bSplineVal < outerShellIsoVal) rgb = V3d(0.56471, 0.93333, 0.56471);
+	else rgb = V3d(1, 0.27059, 0);
+
+	string _out_file = out_file;
+	if (getFileExtension(_out_file) != ".obj")
+		_out_file = (string)getDirName(DELIMITER, out_file.c_str()) + (string)getFileName(DELIMITER, out_file.c_str()) + (string)".obj";
+
 	checkDir(_out_file);
 	std::ofstream out(_out_file);
 	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", _out_file.c_str()); return; }
-	cout << "-- Save points to " << std::quoted(_out_file) << endl;
-	//gvis::writePointCloud(point, rgb, out);
+	cout << "-- Save query result to " << std::quoted(_out_file) <<
+		"-- [RED] point not on the surface, [GREEN] point lie on the surface" << endl;
+
+	gvis::writePointCloud(point, rgb, out);
 }
 
 void ThinShells::multiPointQuery(const std::string& out_file, const vector<V3d>& points)
@@ -488,9 +527,10 @@ void ThinShells::multiPointQuery(const std::string& out_file, const vector<V3d>&
 			});
 	}
 
-	VXd bSplineVal; vector<V3d> rgbs;
-	cuAcc::cpBSplineVal(points.size(), svo.numNodeVerts, svo.numTreeNodes, points, svo.nodeVertexArray, nodeWidthArray, lambda, bSplineVal);
-	std::transform(bSplineVal.begin(), bSplineVal.end(), std::back_inserter(rgbs),
+	VXd q_bSplineVal; vector<V3d> rgbs;
+	cuAcc::cpBSplineVal(points.size(), svo.numNodeVerts, svo.numTreeNodes,
+		points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal);
+	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), std::back_inserter(rgbs),
 		[=](double val) {
 			V3d _t;
 			if (innerShellIsoVal < val && val < outerShellIsoVal) _t = V3d(0.56471, 0.93333, 0.56471);
@@ -498,11 +538,16 @@ void ThinShells::multiPointQuery(const std::string& out_file, const vector<V3d>&
 			return _t;
 		});
 
-	string _out_file = (string)getDirName(DELIMITER, out_file.c_str()) + (string)getFileName(DELIMITER, out_file.c_str()) + (string)"_query_result.obj";
+	string _out_file = out_file;
+	if (getFileExtension(_out_file) != ".obj")
+		_out_file = (string)getDirName(DELIMITER, out_file.c_str()) + (string)getFileName(DELIMITER, out_file.c_str()) + (string)".obj";
+
 	checkDir(_out_file);
 	std::ofstream out(_out_file);
 	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", _out_file.c_str()); return; }
-	cout << "-- Save points to " << std::quoted(_out_file) << endl;
+	cout << "-- Save query result to " << std::quoted(_out_file) <<
+		"-- [RED] points not on the surface, [GREEN] points lie on the surface" << endl;
+
 	gvis::writePointCloud(points, rgbs, out);
 }
 

@@ -25,8 +25,8 @@ public:
 
 	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
 
-	BaseModel(const std::string& filename) 
-	{ 
+	BaseModel(const std::string& filename)
+	{
 		readFile(filename);
 		setUniformBoundingBox();
 		setTriAttributes();
@@ -45,6 +45,10 @@ public:
 
 	void setTriAttributes();
 
+	Eigen::MatrixXd generateRandomPoints(const size_t& numPoints);
+
+	Eigen::MatrixXd generateRandomPoints(const string& filename, const size_t& numPoints);
+
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;
 
@@ -59,7 +63,7 @@ public:
 	void readFile(const string& filename);
 
 	void readOffFile(const string& filename);
-	
+
 	void readObjFile(const string& filename);
 
 	void writeObjFile(const string& filename) const;

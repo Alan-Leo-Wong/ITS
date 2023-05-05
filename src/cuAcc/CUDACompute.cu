@@ -450,6 +450,46 @@ namespace cuAcc {
 	}
 
 	// argument is in host
+	// single point
+	void cpBSplineVal(const uint& numNodeVerts, const uint& numNodes,
+		const V3d& pointData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
+		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, double& bSplinVal, const bool& useThrust)
+	{
+		// device
+		cudaDeviceProp prop;
+		int device = getMaxComputeDevice();
+		CUDA_CHECK(cudaGetDevice(&device));
+		CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+
+		thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray = nullptr;
+		V3d* d_nodeWidthArray = nullptr;
+		double* d_lambda = nullptr;
+		V3d* d_pointData = nullptr;
+
+		CUDA_CHECK(cudaMalloc((void**)&d_nodeVertexArray, sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts));
+		CUDA_CHECK(cudaMalloc((void**)&d_nodeWidthArray, sizeof(V3d) * numNodes));
+		CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows()));
+		CUDA_CHECK(cudaMalloc((void**)&d_pointData, sizeof(V3d)));
+
+		CUDA_CHECK(cudaMemcpy(d_nodeVertexArray, nodeVertexArray.data(), sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts, cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_nodeWidthArray, nodeWidthArray.data(), sizeof(V3d) * numNodes, cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_pointData, &pointData, sizeof(V3d), cudaMemcpyHostToDevice));
+
+		thrust::device_vector<double> d_value(1);
+		unsigned int paddingCols = PADDING_TO_WARP(numNodeVerts);
+		if (useThrust) execMyReduce<V3d, double, true>(prop, 0, 1, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointData, d_lambda, d_value);
+		else execMyReduce<V3d, double, false>(prop, 0, 1, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointData, d_lambda, d_value);
+		
+		CUDA_CHECK(cudaMemcpy(&bSplinVal, d_value.data().get(), sizeof(double), cudaMemcpyDeviceToHost));
+
+		CUDA_CHECK(cudaFree(d_nodeVertexArray));
+		CUDA_CHECK(cudaFree(d_nodeWidthArray));
+		CUDA_CHECK(cudaFree(d_lambda));
+		CUDA_CHECK(cudaFree(d_pointData));
+		//free(h_bSplineVal);
+	}
+
 	void cpBSplineVal(const uint& numPoints, const uint& numNodeVerts, const uint& numNodes,
 		const std::vector<V3d>& pointsData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
 		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, const bool& useThrust)

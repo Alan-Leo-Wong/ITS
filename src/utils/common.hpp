@@ -215,3 +215,44 @@ inline bool list2Matrix(const std::vector<Eigen::Matrix<Scalar, Size, 1>>& V, Ei
 		M.row(i) = V[i];
 	return true;
 }
+
+template <int Rows, int Cols, typename Scalar>
+inline bool getRandomMatrix(const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& area,
+	const double& scale, const double& dis, Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& M)
+{
+	if (Rows == 0 || Cols == 0) return false;
+
+	M.resize(Rows, Cols);
+	M = Eigen::Matrix<Scalar, Rows, Cols>::Random(Rows, Cols);
+
+	const auto min_area = area.colwise().minCoeff();
+	const auto max_area = area.colwise().maxCoeff();
+	const auto diag_area = max_area - min_area;
+
+	for (int i = 0; i < M.rows(); ++i)
+		M.row(i) = (M.row(i).array() * scale + dis) * diag_area.array() + min_area.array();
+
+	return true;
+}
+
+template <typename Scalar>
+inline bool getRandomMatrix(const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& min_area,
+	const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& max_area,
+	const size_t& num, const double& scale, const double& dis,
+	Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& M)
+{
+	if (min_area.rows() != max_area.rows() ||
+		min_area.cols() != max_area.cols()) 
+	{
+		return false;
+	}
+
+	M.resize(num, min_area.rows());
+	M = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>::Random(num, min_area.cols());
+
+	const auto diag_area = max_area - min_area;
+
+	for (int i = 0; i < M.rows(); ++i)
+		M.row(i) = (M.row(i).array() * scale + dis) * diag_area.array() + min_area.array();
+	return true;
+}

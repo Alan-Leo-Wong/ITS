@@ -35,7 +35,7 @@ namespace gvis
 	}
 
 	// Helper function to write full cube (using relative vertex positions in the OBJ file - support for this should be widespread by now)
-	void writeCube(const Eigen::Vector3d& nodeOrigin, const Eigen::Vector3d& unit, std::ofstream& output, size_t& faceBegIdx)
+	inline void writeCube(const Eigen::Vector3d& nodeOrigin, const Eigen::Vector3d& unit, std::ofstream& output, size_t& faceBegIdx)
 	{
 		//	   2-------1
 		//	  /|      /|
@@ -117,13 +117,31 @@ namespace gvis
 		faceBegIdx += 8;
 	}
 
-	void writePointCloud(const std::vector<Eigen::Vector3d>& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
+	inline void writePointCloud(const std::vector<Eigen::Vector3d>& points, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.size(); ++i)
+			write_vertex(output, points[i]);
+	}
+
+	inline void writePointCloud(const std::vector<Eigen::Vector3d>& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
 	{
 		for (size_t i = 0; i < points.size(); ++i)
 			write_vertex(output, points[i], rgbs[i]);
 	}
 
-	void writePointCloud(const Eigen::Vector3d& point, const Eigen::Vector3d& rgb, std::ofstream& output)
+	inline void writePointCloud(const MXd& points, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.size(); ++i)
+			write_vertex(output, points.row(i));
+	}
+
+	inline void writePointCloud(const MXd& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.size(); ++i)
+			write_vertex(output, points.row(i), rgbs[i]);
+	}
+
+	inline void writePointCloud(const Eigen::Vector3d& point, const Eigen::Vector3d& rgb, std::ofstream& output)
 	{
 		write_vertex(output, point, rgb);
 	}

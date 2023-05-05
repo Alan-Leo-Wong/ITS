@@ -1,5 +1,6 @@
 //#include "CollisionDetection.h"
 #include "ThinShells.h"
+#include "utils\IO.hpp"
 #include "utils\Timer.hpp"
 #include "utils\String.hpp"
 #include "utils\Common.hpp"
@@ -54,7 +55,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "bunny.off");
+	string modelName = getFileName("", "switchmec.obj");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -63,7 +64,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 32, 32, 32);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"switchmec.obj"), 64, 64, 64);
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
@@ -77,7 +78,7 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
-	const int res = 80;
+	const int res = 20;
 	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
 	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
 	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_isosurface.obj");
@@ -90,6 +91,16 @@ int main(int argc, char** argv)
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nMarchingCubes spent %lf s.\n", time);
+
+	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"query_point.obj");
+	MXd randomPoints = thinShell.generateRandomPoints(queryFile, 100);
+
+	startTimer(&timer);
+	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"query_point_result.obj");
+	thinShell.multiPointQuery(queryResFile, randomPoints);
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("\nMulti points query spent %lf s.\n", time);*/
 
 	deleteTimer(&timer);
 
