@@ -538,7 +538,7 @@ __global__ void compactArray(const int n,
 // 计算表面voxel共对应多少个八叉树节点同时设置父节点的莫顿码数组
 __global__ void cpNumNodes(const size_t n,
 	const uint32_t* d_pactDataArray,
-	short int* d_nNodesArray,
+	size_t* d_nNodesArray,
 	uint32_t* d_parentMortonArray)
 {
 	size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -571,13 +571,13 @@ __global__ void createNode_1(const size_t pactSize,
 		const Eigen::Vector3d gridOrigin = *d_gridOrigin;
 		const double width = *d_width;
 
-		const int sumNodes = d_sumNodesArray[tid];
+		const size_t sumNodes = d_sumNodesArray[tid];
 		const uint32_t pactData = d_pactDataArray[tid];
 
-		const uint32_t key = pactData & LOWER_3BIT_MASK;
-		const uint32_t morton = pactData & D_MORTON_32_FLAG; // 去除符号位的实际莫顿码
+		const uint32_t key = (pactData & LOWER_3BIT_MASK);
+		const uint32_t morton = (pactData & D_MORTON_32_FLAG); // 去除符号位的实际莫顿码
 		// 得到mortonCode对应的实际存储节点的位置
-		const size_t address = sumNodes + key;
+		const uint32_t address = sumNodes + key;
 
 		SVONode& tNode = d_nodeArray[address];
 		tNode.mortonCode = morton;
@@ -586,6 +586,8 @@ __global__ void createNode_1(const size_t pactSize,
 		tNode.width = width;
 
 		d_begMortonArray[tid] = (morton / 8) * 8;
+
+		//if (blockIdx.x == 15 && threadIdx.x == 126) printf("d_begMortonArray[%d] = %u\n", tid, (unsigned int)d_begMortonArray[tid]);
 	}
 }
 
@@ -694,7 +696,7 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 	thrust::device_vector<bool> d_isValidCNodeArray;
 	thrust::device_vector<size_t> d_esumCNodesArray; // exclusive scan
 	thrust::device_vector<uint32_t> d_pactCNodeArray;
-	thrust::device_vector<short int> d_numTreeNodesArray; // 节点数量记录数组
+	thrust::device_vector<size_t> d_numTreeNodesArray; // 节点数量记录数组
 	thrust::device_vector<size_t> d_sumTreeNodesArray; // inlusive scan
 	thrust::device_vector<size_t> d_esumTreeNodesArray; // 存储每一层节点数量的exclusive scan数组
 	thrust::device_vector<uint32_t> d_begMortonArray;
@@ -724,8 +726,8 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 		compactArray << <gridSize, blockSize >> > (gridCNodeSize, d_isValidCNodeArray.data().get(),
 			d_CNodeMortonArray.data().get(), d_esumCNodesArray.data().get(), d_pactCNodeArray.data().get());
 		getLastCudaError("Kernel 'compactArray' launch failed!\n");
-		vector<uint32_t> h_pactCNodeArray(numCNodes, 0);
-		CUDA_CHECK(cudaMemcpy(h_pactCNodeArray.data(), d_pactCNodeArray.data().get(), sizeof(uint32_t) * numCNodes, cudaMemcpyDeviceToHost));
+		/*vector<uint32_t> h_pactCNodeArray(numCNodes, 0);
+		CUDA_CHECK(cudaMemcpy(h_pactCNodeArray.data(), d_pactCNodeArray.data().get(), sizeof(uint32_t) * numCNodes, cudaMemcpyDeviceToHost));*/
 
 		if (treeDepth == 1)
 		{
@@ -743,7 +745,7 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 		size_t numNodes = 1;
 		if (numCNodes > 1)
 		{
-			resizeThrust(d_numTreeNodesArray, numCNodes, (short int)0);
+			resizeThrust(d_numTreeNodesArray, numCNodes, (size_t)0);
 			d_CNodeMortonArray.clear(); resizeThrust(d_CNodeMortonArray, gridTreeNodeSize, (uint32_t)0); // 此时用于记录父节点层的coarse node
 			getOccupancyMaxPotentialBlockSize(numCNodes, minGridSize, blockSize, gridSize, cpNumNodes, 0, 0);
 			const uint32_t firstMortonCode = getParentMorton(d_pactCNodeArray[0]);
@@ -766,6 +768,7 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 			createNode_1 << <gridSize, blockSize >> > (numCNodes, d_sumTreeNodesArray.data().get(),
 				d_pactCNodeArray.data().get(), d_gridOrigin, d_unitNodeWidth, d_begMortonArray.data().get(), d_nodeArray.data().get());
 			getLastCudaError("Kernel 'createNode_1' launch failed!\n");
+			cudaDeviceSynchronize();
 
 			d_esumTreeNodesArray.push_back(0);
 
