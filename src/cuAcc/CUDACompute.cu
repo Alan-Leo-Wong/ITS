@@ -225,6 +225,7 @@ namespace cuAcc {
 
 			Scalar sum = (Scalar).0;
 
+			//printf("#1 sum = %lf\n", sum);
 			// reduce multiple elements per thread
 			if (nIsPow2) {
 				unsigned int i = blockIdx.x * colBlockSize * 2 + threadIdx.x;
@@ -232,18 +233,22 @@ namespace cuAcc {
 
 				while (i < n)
 				{
+					//printf("#2 sum = %lf\n", sum);
 					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
 					if (i + colBlockSize < n)
 					{
 						sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]); // (一个)线程块级别的跨度
 						i += x_gridSize; // 网格级别的跨度：默认网格大小(block的数量)为原有数据(x维度即列数)的一半(如果nIsPow2成立，则x_gridSize扩大一倍)
 					}
+
 				}
 			}
 			else {
 				unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
 				while (i < n)
 				{
+					//printf("#2 sum = %lf\n", sum);
+
 					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
 					i += x_gridSize;
 				}
@@ -257,17 +262,23 @@ namespace cuAcc {
 
 			cg::sync(ctb);
 
+			//printf("#3 sum = %lf\n", sum);
+
 			// 同一个block下所有warp求和(只要将每个warp的第一个thread保存的sum加起来即可，
 			// 因为每个warp的第一个thread保存的sum就是其所属warp的所有线程的数据和)
 			const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
 			if (x_tid < sh_reduceNum) {
 				sum = shData[threadIdx.y * sh_reduceNum + x_tid];
 				warpReduceSum<Scalar>(newMask, sum);
+
+				//printf("#4 sum = %lf\n", sum);
+
 			}
 
 			if (x_tid == 0) {
 				g_odata[ty * gridDim.x + blockIdx.x] = sum;
-				//printf("ty = %d, sum = %lf\n", ty, sum);
+
+				//printf("#4 ty = %d, sum = %lf\n", ty, sum);
 			}
 		}
 	}
