@@ -36,7 +36,7 @@ public:
 		treeDepth = svo.treeDepth;
 #ifndef NDEBUG
 		saveTree("");
-#endif
+#endif // !NDEBUG
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) : BaseModel(filename), svo(_grid)
@@ -45,7 +45,7 @@ public:
 		treeDepth = svo.treeDepth;
 #ifndef NDEBUG
 		saveTree("");
-#endif
+#endif // !NDEBUG
 	}
 
 	~ThinShells() {}
