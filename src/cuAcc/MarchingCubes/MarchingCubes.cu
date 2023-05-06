@@ -491,7 +491,7 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 
 	for (int i = 0; i < MAX_NUM_STREAMS; ++i) 
 	{
-		printf("[%d/%d]", i, MAX_NUM_STREAMS);
+		printf("[%d/%d]", i + 1, MAX_NUM_STREAMS);
 
 		uint voxelElems = (nVoxels + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
 		uint voxelOffset = i * voxelElems;
