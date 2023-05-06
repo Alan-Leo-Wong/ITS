@@ -2,6 +2,7 @@
 #include "..\Config.h"
 #include "cuda\CUDAMacro.h"
 #include <string>
+#include <random>
 #include <iostream>
 
 namespace tType {

@@ -64,7 +64,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"switchmec.obj"), 512, 512, 512);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"switchmec.obj"), 128, 128, 128);
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;

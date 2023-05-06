@@ -423,7 +423,7 @@ namespace cuAcc {
 		const uint& rowElems, const uint& cols, const uint& paddingCols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, thrust::device_vector<Scalar>& d_value)
 	{
-		std::cout << "rowElems = " << rowElems << std::endl;
+		//std::cout << "rowElems = " << rowElems << std::endl;
 		int x_blockSize = 0, y_blockSize = 16; // x²Ù×ÝB£¬y²Ù×ÝA
 		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
