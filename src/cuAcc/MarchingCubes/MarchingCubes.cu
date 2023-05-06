@@ -504,7 +504,9 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 		const uint numVoxelElemCorners = voxelElems * 8;
 		thrust::device_vector<V3d> d_voxelCornerData(numVoxelElemCorners);
 
-		printf(" batch_size = %u\n", numVoxelElemCorners);
+		printf(" batch_size = %u", numVoxelElemCorners);
+		if (i != MAX_NUM_STREAMS - 1) printf("\r");
+		else printf("\n");
 
 		int minGridSize, blockSize, gridSize;
 		getOccupancyMaxPotentialBlockSize(nVoxels, minGridSize, blockSize, gridSize, MCKernel::prepareVoxelCornerKernel);

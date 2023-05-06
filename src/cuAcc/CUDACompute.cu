@@ -492,7 +492,7 @@ namespace cuAcc {
 		unsigned int paddingCols = PADDING_TO_WARP(numNodeVerts);
 		if (useThrust) execMyReduce<V3d, double, true>(prop, 0, 1, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointData, d_lambda, d_value);
 		else execMyReduce<V3d, double, false>(prop, 0, 1, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointData, d_lambda, d_value);
-		
+
 		CUDA_CHECK(cudaMemcpy(&bSplinVal, d_value.data().get(), sizeof(double), cudaMemcpyDeviceToHost));
 
 		CUDA_CHECK(cudaFree(d_nodeVertexArray));
@@ -536,7 +536,7 @@ namespace cuAcc {
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
 
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
-			printf("[%d/%d]", i, MAX_NUM_STREAMS);
+			printf("[%d/%d]", i + 1, MAX_NUM_STREAMS);
 
 			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
 			uint points_offset = i * points_elems;
@@ -546,7 +546,9 @@ namespace cuAcc {
 			CUDA_CHECK(cudaMalloc((void**)&d_pointsData, sizeof(V3d) * points_elems));
 			CUDA_CHECK(cudaMemcpyAsync(d_pointsData, pointsData.data() + points_offset, sizeof(V3d) * points_elems, cudaMemcpyHostToDevice, streams[i]));
 
-			printf(" batch_size = %u\n", points_elems);
+			printf(" batch_size = %u", points_elems);
+			if (i != MAX_NUM_STREAMS - 1) printf("\r");
+			else printf("\n");
 
 			thrust::device_vector<double> d_value(points_elems);
 
