@@ -121,7 +121,7 @@ inline __host__ void getBlocksAndThreadsNum(const cudaDeviceProp& prop,
 			"<%d>)\n",
 			blocks, t_blocks, threads, t_threads);
 	}
-	 printf("-- Final grid size = %d, block size = %d\n", blocks, threads);
+	 //printf("-- Final grid size = %d, block size = %d\n", blocks, threads);
 }
 
 template <typename T> struct SharedMemory {

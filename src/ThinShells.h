@@ -34,14 +34,18 @@ public:
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
+#ifndef NDEBUG
 		saveTree("");
+#endif
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) : BaseModel(filename), svo(_grid)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
+#ifndef NDEBUG
 		saveTree("");
+#endif
 	}
 
 	~ThinShells() {}

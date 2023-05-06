@@ -285,7 +285,7 @@ namespace cuAcc {
 
 	template <typename T = Eigen::Vector3d, typename Scalar = double>
 	void switchKernel(const bool& isPow2, const int& threads, const dim3& gridSize,
-		const dim3& blockSize, const int& sh_memSize, const cudaStream_t& stream, const int& rowElems,
+		const dim3& blockSize, const int& sh_memSize, const cudaStream_t& stream, const uint& rowElems,
 		const uint& cols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, Scalar* d_tRowSumMatrix)
 	{
@@ -420,10 +420,11 @@ namespace cuAcc {
 	 */
 	template <typename T = Eigen::Vector3d, typename Scalar = double, bool useThrust = true>
 	void execMyReduce(const cudaDeviceProp& prop, const cudaStream_t& stream,
-		const int& rowElems, const uint& cols, const uint& paddingCols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
+		const uint& rowElems, const uint& cols, const uint& paddingCols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, thrust::device_vector<Scalar>& d_value)
 	{
-		int x_blockSize = 0, y_blockSize = 64; // x²Ù×ÝB£¬y²Ù×ÝA
+		std::cout << "rowElems = " << rowElems << std::endl;
+		int x_blockSize = 0, y_blockSize = 16; // x²Ù×ÝB£¬y²Ù×ÝA
 		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
 		// ·ÖÅäÊ±ÐèÒªpaddingCols
@@ -535,13 +536,17 @@ namespace cuAcc {
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
 
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
-			int points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
-			int points_offset = i * points_elems;
+			printf("[%d/%d]", i, MAX_NUM_STREAMS);
+
+			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
+			uint points_offset = i * points_elems;
 			points_elems = points_offset + points_elems > numPoints ? numPoints - points_offset : points_elems;
 
 			V3d* d_pointsData = nullptr;
 			CUDA_CHECK(cudaMalloc((void**)&d_pointsData, sizeof(V3d) * points_elems));
 			CUDA_CHECK(cudaMemcpyAsync(d_pointsData, pointsData.data() + points_offset, sizeof(V3d) * points_elems, cudaMemcpyHostToDevice, streams[i]));
+
+			printf(" batch_size = %u\n", points_elems);
 
 			thrust::device_vector<double> d_value(points_elems);
 
