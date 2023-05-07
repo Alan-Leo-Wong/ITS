@@ -369,4 +369,6 @@ vis/
 
 output/
 
-model/*.stl
+model/
+
+!model/bunny.off
