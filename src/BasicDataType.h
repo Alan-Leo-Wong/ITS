@@ -69,3 +69,22 @@ public:
 		else return _t == 1;
 	}
 };
+
+template <typename A, typename B, typename C = std::less<>>
+bool isLess(A a, B b, C cmp = C{})
+{
+	return cmp(a, b);
+}
+
+template <typename T> 
+struct lessPoint 
+{
+	int operator()(const T& a, const T& b) const {
+		for (size_t i = 0; i < a.size(); ++i) {
+			if (fabs(a[i] - b[i]) < 1e-9) continue;
+			if (a[i] < b[i]) return 1;
+			else if (a[i] > b[i]) return -1;
+		}
+		return 0;
+	}
+};
