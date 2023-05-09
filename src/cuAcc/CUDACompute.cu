@@ -1,5 +1,7 @@
 #include "CUDACompute.h"
+#include "..\MortonLUT.h"
 #include "..\BSpline.hpp"
+#include "..\utils\Common.hpp"
 #include "..\utils\cuda\CUDAUtil.cuh"
 #include "..\utils\cuda\DeviceQuery.cuh"
 #include <vector>
@@ -156,6 +158,14 @@ namespace cuAcc {
 		}
 	};
 
+	// sum reduce at warp level
+	template <typename T>
+	__device__ __forceinline__ void warpReduceSum(unsigned int mask, T& sum)
+	{
+		for (int offset = warpSize >> 1; offset > 0; offset >>= 1)
+			sum += __shfl_down_sync(mask, sum, offset);
+	}
+
 	//template <typename T>
 	void launch_ThrustRowSumReduce(const int& rows,
 		const int& columns,
@@ -187,13 +197,234 @@ namespace cuAcc {
 				thrust::plus<double>());
 	}
 
-	// sum reduce at warp level
-	template <typename T>
-	__device__ __forceinline__ void warpReduceSum(unsigned int mask, T& sum)
-	{
-		for (int offset = warpSize >> 1; offset > 0; offset >>= 1)
-			sum += __shfl_down_sync(mask, sum, offset);
-	}
+	//__device__ void cpNumEdgeInterPoints(const V2i& e, const V3d& p1, const V3d& p2,
+	//	const V3d& lbbCorner, const double& width, int& numInterPoints)
+	//{
+	//	V3d modelEdgeDir = p2 - p1;
+
+	//	// back plane
+	//	double back_t = DINF;
+	//	if (modelEdgeDir.x() != 0)
+	//		back_t = (lbbCorner.x() - p1.x()) / modelEdgeDir.x();
+	//	// left plane
+	//	double left_t = DINF;
+	//	if (modelEdgeDir.y() != 0)
+	//		left_t = (lbbCorner.y() - p1.y()) / modelEdgeDir.y();
+	//	// bottom plane
+	//	double bottom_t = DINF;
+	//	if (modelEdgeDir.z() != 0)
+	//		bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
+
+	//	if (isInRange(.0, 1.0, back_t) &&
+	//		isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
+	//		isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
+	//	{
+	//		++numInterPoints;
+	//	}
+	//	if (isInRange(.0, 1.0, left_t) &&
+	//		isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
+	//		isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
+	//	{
+	//		++numInterPoints;
+	//	}
+	//	if (isInRange(.0, 1.0, bottom_t) &&
+	//		isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
+	//		isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
+	//	{
+	//		++numInterPoints;
+	//	}
+	//}
+
+	//template <typename T = Eigen::Vector3d, typename Scalar = double, bool nIsPow2, unsigned int colBlockSize>
+	//__global__ void edgeIntersectionKernel(const uint nModelEdges,
+	//	const V2i* d_modelEdgesArray, const V3d* d_modelVertsArray,
+	//	const size_t numFineNodes, const V3d* d_nodeOriginArray, const double* d_nodeWidthArray,
+	//	size_t* d_numEdgeInterPointsArray)
+	//{
+	//	int* shData = SharedMemory<int>();
+	//	cg::thread_block ctb = cg::this_thread_block();
+
+	//	const unsigned int ty = threadIdx.y + blockIdx.y * blockDim.y;
+
+	//	if (ty < nModelEdges)
+	//	{
+	//		unsigned int x_tid = threadIdx.x;
+	//		unsigned int x_gridSize = colBlockSize * gridDim.x;
+
+	//		unsigned int maskLength = (colBlockSize & 31);
+	//		maskLength = (maskLength > 0) ? (32 - maskLength) : maskLength;
+	//		const unsigned int mask = (0xffffffff) >> maskLength;
+
+	//		int numInterPoints = 0;
+
+	//		const V2i e = d_modelEdgesArray[ty];
+	//		const V3d p1 = d_modelVertsArray[e.x()], p2 = d_modelVertsArray[e.y()];
+
+	//		if (nIsPow2)
+	//		{
+	//			unsigned int i = blockIdx.x * colBlockSize * 2 + threadIdx.x;
+	//			x_gridSize <<= 1;
+
+	//			while (i < numFineNodes)
+	//			{
+	//				V3d lbbCorner = d_nodeOriginArray[i];
+	//				double width = d_nodeWidthArray[i];
+	//				cpNumEdgeInterPoints(e, p1, p2, lbbCorner, width, numInterPoints);
+
+	//				if (i + colBlockSize < numFineNodes)
+	//				{
+	//					lbbCorner = d_nodeOriginArray[i + colBlockSize];
+	//					width = d_nodeWidthArray[i + colBlockSize];
+	//					cpNumEdgeInterPoints(e, p1, p2, lbbCorner, width, numInterPoints);
+
+	//					i += x_gridSize;
+	//				}
+	//			}
+	//		}
+	//		else
+	//		{
+	//			unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
+
+	//			while (i < numFineNodes)
+	//			{
+	//				V3d lbbCorner = d_nodeOriginArray[i];
+	//				double width = d_nodeWidthArray[i];
+	//				cpNumEdgeInterPoints(e, p1, p2, lbbCorner, width, numInterPoints);
+
+	//				i += x_gridSize;
+	//			}
+	//		}
+	//		// 对每个warp执行归约求和，然后保存到shared memory中
+	//		warpReduceSum<int>(mask, numInterPoints);
+	//		const int sh_reduceNum = (colBlockSize / warpSize) > 0 ? colBlockSize / warpSize : 1;
+	//		if (x_tid % warpSize == 0)
+	//			shData[threadIdx.y * sh_reduceNum + x_tid / warpSize] = numInterPoints;
+
+	//		cg::sync(ctb);
+
+	//		const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
+	//		if (x_tid < sh_reduceNum) {
+	//			numInterPoints = shData[threadIdx.y * sh_reduceNum + x_tid];
+	//			warpReduceSum<int>(newMask, numInterPoints);
+	//		}
+
+	//		if (x_tid == 0)
+	//			d_numEdgeInterPointsArray[ty] = numInterPoints;
+	//	}
+	//}
+
+	//__device__ void cpNumFaceInterPoints(const thrust::pair<Eigen::Vector3d, Eigen::Vector3d>& edge,
+	//	const V3d& triEdge_1, const V3d& triEdge_2, const V3d& triEdge_3, const V3d& triNormal,
+	//	const V3d& p1, const V3d& p2, const V3d& p3, const double& triDir, int& numInterPoints)
+	//{
+	//	V3d edgeDir = edge.second - edge.first;
+
+	//	if (fabsf(triNormal.dot(edgeDir)) < 1e-9) return;
+
+	//	double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
+	//	if (t < 0. || t > 1.) return;
+	//	V3d interPoint = edge.first + edgeDir * t;
+
+	//	if (triEdge_1.cross(interPoint - p1).dot(triNormal) < 0) return;
+	//	if (triEdge_2.cross(interPoint - p2).dot(triNormal) < 0) return;
+	//	if (triEdge_3.cross(interPoint - p3).dot(triNormal) < 0) return;
+
+	//	++numInterPoints;
+	//}
+
+	//template <typename T = Eigen::Vector3d, typename Scalar = double, bool nIsPow2, unsigned int colBlockSize>
+	//__global__ void faceIntersectionKernel(const uint nModelTris, const Triangle<V3d>* d_modelTrisArray,
+	//	const uint numFineNodeEdges, const thrust::pair<thrust::pair<V3d, V3d>, uint32_t>* d_fineNodeEdgesArray,
+	//	size_t* d_numFaceInterPointsArray)
+	//{
+	//	int* shData = SharedMemory<int>();
+	//	cg::thread_block ctb = cg::this_thread_block();
+
+	//	const unsigned int ty = threadIdx.y + blockIdx.y * blockDim.y;
+
+	//	if (ty < nModelTris)
+	//	{
+	//		unsigned int x_tid = threadIdx.x;
+	//		unsigned int x_gridSize = colBlockSize * gridDim.x;
+
+	//		unsigned int maskLength = (colBlockSize & 31);
+	//		maskLength = (maskLength > 0) ? (32 - maskLength) : maskLength;
+	//		const unsigned int mask = (0xffffffff) >> maskLength;
+
+	//		int numInterPoints = 0;
+
+	//		Triangle<V3d> tri = d_modelTrisArray[ty];
+	//		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
+	//		V3d triNormal = tri.normal; double triDir = tri.dir;
+
+	//		if (nIsPow2)
+	//		{
+	//			unsigned int i = blockIdx.x * colBlockSize * 2 + threadIdx.x;
+	//			x_gridSize <<= 1;
+
+	//			while (i < numFineNodeEdges)
+	//			{
+	//				thrust::pair<thrust::pair<V3d, V3d>, uint32_t> nodeEdge = d_fineNodeEdgesArray[i];
+	//				cpNumFaceInterPoints(nodeEdge.first, triEdge_1, triEdge_2, triEdge_3, triNormal, tri.p1, tri.p2, tri.p3, triDir, numInterPoints);
+
+	//				if (i + colBlockSize < numFineNodes)
+	//				{
+	//					thrust::pair<thrust::pair<V3d, V3d>, uint32_t> nodeEdge = d_fineNodeEdgesArray[i + colBlockSize];
+	//					cpNumFaceInterPoints(nodeEdge.first, triEdge_1, triEdge_2, triEdge_3, triNormal, tri.p1, tri.p2, tri.p3, triDir, numInterPoints);
+
+	//					i += x_gridSize;
+	//				}
+	//			}
+	//		}
+	//		else
+	//		{
+	//			unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
+
+	//			while (i < numFineNodeEdges)
+	//			{
+	//				thrust::pair<thrust::pair<V3d, V3d>, uint32_t> nodeEdge = d_fineNodeEdgesArray[i];
+	//				cpNumFaceInterPoints(nodeEdge.first, triEdge_1, triEdge_2, triEdge_3, triNormal, tri.p1, tri.p2, tri.p3, triDir, numInterPoints);
+
+	//				i += x_gridSize;
+	//			}
+	//		}
+	//		// 对每个warp执行归约求和，然后保存到shared memory中
+	//		warpReduceSum<int>(mask, numInterPoints);
+	//		const int sh_reduceNum = (colBlockSize / warpSize) > 0 ? colBlockSize / warpSize : 1;
+	//		if (x_tid % warpSize == 0)
+	//			shData[threadIdx.y * sh_reduceNum + x_tid / warpSize] = numInterPoints;
+
+	//		cg::sync(ctb);
+
+	//		const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
+	//		if (x_tid < sh_reduceNum) {
+	//			numInterPoints = shData[threadIdx.y * sh_reduceNum + x_tid];
+	//			warpReduceSum<int>(newMask, numInterPoints);
+	//		}
+
+	//		if (x_tid == 0)
+	//			d_numFaceInterPointsArray[ty] = numInterPoints;
+	//	}
+
+	//}
+
+	//void cpIntersection(const uint& nModelEdges, const vector<V2i>& modelEdgesArray, const vector<V3d> modelVertsArray,
+	//	const size_t& numFineNodes, const vector<V3d>& nodeOriginArray, const vector<double>& nodeWidthArray,
+	//	const uint& nModelTris, const vector<Triangle<V3d>>& modelTrisArray,
+	//	const uint& numFineNodeEdges, const vector<thrust::pair<thrust::pair<V3d, V3d>, uint32_t>>& fineNodeEdgesArray)
+	//{
+	//	constexpr int MAX_STREAM = 2;
+	//	cudaStream_t streams[MAX_STREAM];
+	//	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
+
+	//	dim3 gridSize, blockSize;
+
+	//	thrust::device_vector<size_t> d_numEdgeInterPointsArray;
+
+
+
+	//	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamDestroy(streams[i]));
+	//}
 
 	/*
 	 * matrix reduce for sum of row
@@ -237,10 +468,9 @@ namespace cuAcc {
 					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
 					if (i + colBlockSize < n)
 					{
-						sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]); // (一个)线程块级别的跨度
+						sum += g_iB[i + colBlockSize] * BaseFunction4Point(d_nodeVertexArray[i + colBlockSize].first, d_nodeWidthArray[d_nodeVertexArray[i + colBlockSize].second], g_iA[ty]); // (一个)线程块级别的跨度
 						i += x_gridSize; // 网格级别的跨度：默认网格大小(block的数量)为原有数据(x维度即列数)的一半(如果nIsPow2成立，则x_gridSize扩大一倍)
 					}
-
 				}
 			}
 			else {
@@ -248,7 +478,6 @@ namespace cuAcc {
 				while (i < n)
 				{
 					//printf("#2 sum = %lf\n", sum);
-
 					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
 					i += x_gridSize;
 				}
@@ -270,14 +499,11 @@ namespace cuAcc {
 			if (x_tid < sh_reduceNum) {
 				sum = shData[threadIdx.y * sh_reduceNum + x_tid];
 				warpReduceSum<Scalar>(newMask, sum);
-
 				//printf("#4 sum = %lf\n", sum);
-
 			}
 
 			if (x_tid == 0) {
 				g_odata[ty * gridDim.x + blockIdx.x] = sum;
-
 				//printf("#4 ty = %d, sum = %lf\n", ty, sum);
 			}
 		}
@@ -585,4 +811,51 @@ namespace cuAcc {
 		if (useThrust) execMyReduce<V3d, double, true>(prop, stream, numPoints, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointsData.data().get(), d_lambda, d_bSplineVal);
 		else execMyReduce<V3d, double, false>(prop, stream, numPoints, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointsData.data().get(), d_lambda, d_bSplineVal);
 	}
+
+	/*__global__ void modelPointsMortonKernel(const uint nModelVerts,
+		const V3d* d_modelOrigin, const double* d_nodeWidth,
+		const V3d* d_modelVertsArray, uint32_t* d_vertsMorton)
+	{
+		const unsigned int tx = threadIdx.x + blockIdx.x * blockDim.x;
+
+		if (tx < nModelVerts)
+		{
+			const V3d modelOrigin = *d_modelOrigin;
+			const V3d modelVert = d_modelVertsArray[tx];
+			const double nodeWidth = *d_nodeWidth;
+
+			const V3i dis = ((modelVert - modelOrigin).array() / nodeWidth).cast<int>();
+
+			uint32_t mortonCode = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+			d_vertsMorton[tx] = mortonCode;
+		}
+	}
+
+	void cpModelPointsMorton(const V3d& modelOrigin, const double& nodeWidth,
+		const uint& nModelVerts, const vector<V3d> modelVertsArray, vector<uint32_t> vertsMorton)
+	{
+		vertsMorton.resize(nModelVerts, 0);
+		thrust::device_vector<uint32_t> d_vertsMorton;
+		thrust::device_vector<V3d> d_modelVertsArray = modelVertsArray;
+
+		V3d* d_modelOrigin = nullptr;
+		double* d_nodeWidth = nullptr;
+
+		CUDA_CHECK(cudaMalloc((void**)&d_modelOrigin, sizeof(V3d)));
+		CUDA_CHECK(cudaMemcpy(d_modelOrigin, &modelOrigin, sizeof(V3d), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMalloc((void**)&d_nodeWidth, sizeof(double)));
+		CUDA_CHECK(cudaMemcpy(d_nodeWidth, &nodeWidth, sizeof(double), cudaMemcpyHostToDevice));
+
+		int minGridSize, gridSize, blockSize;
+		getOccupancyMaxPotentialBlockSize(nModelVerts, minGridSize, gridSize, blockSize, modelPointsMortonKernel);
+
+		modelPointsMortonKernel<<<gridSize, blockSize>>>(nModelVerts, d_modelOrigin, d_nodeWidth, d_modelVertsArray.data().get(), d_vertsMorton.data().get());
+
+		CUDA_CHECK(cudaMemcpy(vertsMorton.data(), d_vertsMorton.data().get(), sizeof(uint32_t) * nModelVerts, cudaMemcpyDeviceToHost));
+		
+		cleanupThrust(d_vertsMorton);
+		cleanupThrust(d_modelVertsArray);
+		CUDA_CHECK(cudaFree(d_modelOrigin));
+		CUDA_CHECK(cudaFree(d_nodeWidth));
+	}*/
 }

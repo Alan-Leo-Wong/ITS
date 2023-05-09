@@ -28,6 +28,11 @@ namespace cuAcc {
 		thrust::device_vector<double>& row_sums,
 		const cudaStream_t& stream = nullptr);
 
+	//void cpIntersection();
+
+	/*void cpModelPointsMorton(const V3d& modelOrigin, const double& nodeWidth,
+		const uint& nModelVerts, const vector<V3d> modelVertsArray, vector<uint32_t> vertsMorton);*/
+
 	void cpBSplineVal(const uint& numNodeVerts, const uint& numNodes,
 		const V3d& pointData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
 		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, double& bSplinVal, const bool& useThrust = true);

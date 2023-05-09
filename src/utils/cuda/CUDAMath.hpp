@@ -154,6 +154,17 @@ inline _CUDA_GENERAL_CALL_ Eigen::Vector3d fmaxf(Eigen::Vector3d a, Eigen::Vecto
 	return Eigen::Vector3d(fmaxf(a.x(), b.x()), fmaxf(a.y(), b.y()), fmaxf(a.z(), b.z()));
 }
 
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3i vmini(Eigen::Vector3i a, Eigen::Vector3i b)
+{
+	return Eigen::Vector3i(mini(a.x(), b.x()), mini(a.y(), b.y()), mini(a.z(), b.z()));
+}
+
+inline _CUDA_GENERAL_CALL_ Eigen::Vector3i vmaxi(Eigen::Vector3i a, Eigen::Vector3i b)
+{
+	return Eigen::Vector3i(maxi(a.x(), b.x()), maxi(a.y(), b.y()), maxi(a.z(), b.z()));
+}
+
+
 inline _CUDA_GENERAL_CALL_ float clamp(float f, float a, float b)
 {
 	return fmaxf(a, fminf(f, b));
