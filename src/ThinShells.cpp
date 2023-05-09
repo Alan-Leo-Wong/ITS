@@ -276,7 +276,6 @@ inline void ThinShells::cpIntersectionPoints()
 			}
 		}
 
-
 		node_edge_type y_q; y_q.first.second = Eigen::Vector3d(0, tri_bbox_origin.y(), 0);
 		// Search for first element x such that _q ≤ x
 		auto y_lower = std::lower_bound(y_fineNodeEdges.begin(), y_fineNodeEdges.end(), y_q, lessYVal());
@@ -1006,4 +1005,31 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 void ThinShells::textureVisualization(const string& filename) const
 {
 	writeTexturedObjFile(filename, bSplineVal);
+}
+
+void ThinShells::pointProjection(const V3d& point)
+{
+	const auto& nodeArray = svo.svoNodeArray;
+
+	SVONode relativeNode = *nodeArray.crbegin();
+	V3d relativeNodeOrigin;
+	double relativeNodeHalfWidth;
+
+	auto getOffsetInNode = [=](const V3d& point)->uint32_t
+	{
+		V3i offset = ((point - relativeNodeOrigin).array() / relativeNodeHalfWidth).cast<int>();
+		return morton::mortonEncode_LUT((uint16_t)offset.x(), (uint16_t)offset.y(), (uint16_t)offset.z()); // 0~7
+	};
+
+	// 找到所处的最细的叶子节点
+	while (relativeNode.mortonCode != _UI32_MAX && !(relativeNode.isLeaf))
+	{
+		relativeNodeOrigin = relativeNode.origin;
+		relativeNodeHalfWidth = relativeNode.width / 2;
+
+		const uint32_t childIdx = getOffsetInNode(point);
+		relativeNode = nodeArray[relativeNode.childs[childIdx]];
+	}
+
+
 }

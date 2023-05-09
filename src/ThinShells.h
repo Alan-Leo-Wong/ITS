@@ -103,4 +103,8 @@ public:
 	void textureVisualization(const string& filename) const;
 
 	friend class CollisionDetection;
+
+public:
+	void pointProjection(const V3d& point);
+
 };
