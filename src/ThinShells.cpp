@@ -18,6 +18,15 @@
 //////////////////////
 //  Create  Shells  //
 //////////////////////
+
+
+inline int parallelAxis(const V3d& p1, const V3d& p2)
+{
+	if (fabs(p1.y() - p2.y()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9) return 1; // 与x轴平行
+	else if (fabs(p1.x() - p2.x()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9) return 2; // 与y轴平行
+	else return 3; // 与z轴平行
+};
+
 // idx: subdepth
 inline void ThinShells::cpIntersectionPoints()
 {
@@ -56,61 +65,59 @@ inline void ThinShells::cpIntersectionPoints()
 
 		Eigen::Vector2i e = modelEdges[i];
 		V3d p1 = m_V.row(e.x()); V3d p2 = m_V.row(e.y());
-		if (!isLess(p1, p2, std::less<V3d>())) std::swap(p1, p2);
+		//if (!isLess(p1, p2, std::less<V3d>())) std::swap(p1, p2);
 
 		V3d modelEdgeDir = p2 - p1;
 
 		V3i dis1 = getPointDis(p1);
 		V3i dis2 = getPointDis(p2);
 
+		V3i min_dis = clamp(vmini(dis1, dis2).array() - 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
+		V3i max_dis = clamp(vmaxi(dis1, dis2).array() + 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
+
 		//#pragma omp for nowait collapse(3)
 #pragma omp for nowait
-		for (int z = dis1.z(); z <= dis2.z(); ++z)
+		for (int z = min_dis.z(); z <= max_dis.z(); ++z)
 		{
-			for (int y = dis1.y(); y <= dis2.y(); ++y)
+			for (int y = min_dis.y(); y <= max_dis.y(); ++y)
 			{
-				for (int x = dis1.x(); x <= dis2.x(); ++x)
+				for (int x = min_dis.x(); x <= max_dis.x(); ++x)
 				{
 					uint32_t nodeMorton = morton::mortonEncode_LUT((uint16_t)x, (uint16_t)y, (uint16_t)z);
-					if (morton2Node.find(nodeMorton) != morton2Node.end())
+					if (morton2Node.find(nodeMorton) == morton2Node.end()) continue;
+					V3d lbbCorner = morton2Node.at(nodeMorton).origin; // at() is thread safe
+					double width = morton2Node.at(nodeMorton).width;
+
+					// back plane
+					double back_t = DINF;
+					if (modelEdgeDir.x() != 0) back_t = (lbbCorner.x() - p1.x()) / modelEdgeDir.x();
+					// left plane
+					double left_t = DINF;
+					if (modelEdgeDir.y() != 0) left_t = (lbbCorner.y() - p1.y()) / modelEdgeDir.y();
+					// bottom plane
+					double bottom_t = DINF;
+					if (modelEdgeDir.z() != 0) bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
+
+					if (isInRange(.0, 1.0, back_t) &&
+						isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
+						isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
 					{
-						V3d lbbCorner = morton2Node.at(nodeMorton).origin; // at() is thread safe
-						double width = morton2Node.at(nodeMorton).width;
-
-						// back plane
-						double back_t = DINF;
-						if (modelEdgeDir.x() != 0)
-							back_t = (lbbCorner.x() - p1.x()) / modelEdgeDir.x();
-						// left plane
-						double left_t = DINF;
-						if (modelEdgeDir.y() != 0)
-							left_t = (lbbCorner.y() - p1.y()) / modelEdgeDir.y();
-						// bottom plane
-						double bottom_t = DINF;
-						if (modelEdgeDir.z() != 0)
-							bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
-
-						if (isInRange(.0, 1.0, back_t) &&
-							isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
-							isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
-						{
-							//edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
-							edge_vec_private.emplace_back(p1 + back_t * modelEdgeDir);
-						}
-						if (isInRange(.0, 1.0, left_t) &&
-							isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
-							isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
-						{
-							//edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
-							edge_vec_private.emplace_back(p1 + left_t * modelEdgeDir);
-						}
-						if (isInRange(.0, 1.0, bottom_t) &&
-							isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
-							isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
-						{
-							//edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
-							edge_vec_private.emplace_back(p1 + bottom_t * modelEdgeDir);
-						}
+						//edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
+						edge_vec_private.emplace_back(p1 + back_t * modelEdgeDir);
+					}
+					if (isInRange(.0, 1.0, left_t) &&
+						isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + left_t * modelEdgeDir).x()) &&
+						isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + left_t * modelEdgeDir).z()))
+					{
+						//edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
+						edge_vec_private.emplace_back(p1 + left_t * modelEdgeDir);
+					}
+					if (isInRange(.0, 1.0, bottom_t) &&
+						isInRange(lbbCorner.x(), lbbCorner.x() + width, (p1 + bottom_t * modelEdgeDir).x()) &&
+						isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + bottom_t * modelEdgeDir).y()))
+					{
+						//edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
+						edge_vec_private.emplace_back(p1 + bottom_t * modelEdgeDir);
 					}
 				}
 			}
@@ -123,11 +130,6 @@ inline void ThinShells::cpIntersectionPoints()
 	}
 
 	std::sort(edgeInterPoints.begin(), edgeInterPoints.end(), std::less<V3d>());
-	/*struct uniqueVert {
-		bool operator()(const V3d& a, const V3d& b) {
-			return a.isApprox(b, 1e-9);
-		}
-	};*/
 	edgeInterPoints.erase(std::unique(edgeInterPoints.begin(), edgeInterPoints.end()), edgeInterPoints.end());
 	cout << "-- 三角形边与node的交点数量：" << edgeInterPoints.size() << endl;
 
@@ -136,142 +138,217 @@ inline void ThinShells::cpIntersectionPoints()
 	// 三角形面与node边线交
 	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
 	const int numFineNodeEdges = fineNodeEdges.size();
+
+	vector<node_edge_type> t_fineNodeEdges(numFineNodeEdges);
+	std::transform(fineNodeEdges.begin(), fineNodeEdges.end(), t_fineNodeEdges.begin(), [](const node_edge_type& a) {
+		if (!isLess<V3d>(a.first.first, a.first.second, std::less<V3d>())) {
+			node_edge_type _p;
+			_p.first.first = a.first.second, _p.first.second = a.first.first;
+			_p.second = a.second;
+			return _p;
+		}
+		else return a;
+		});
+
+	// 按末端点的x坐标从小到大排序
+	struct x_sortEdge
+	{
+		bool operator()(node_edge_type& a, node_edge_type& b) {
+			if (fabs(a.first.second.x() - b.first.second.x()) < 1e-9) // 若x坐标相等(剩下两个轴哪个先哪个后无所谓了)
+			{
+				if (fabs(a.first.second.y() - b.first.second.y()) < 1e-9)  // 若x和y坐标都相等
+					return a.first.second.z() < b.first.second.z(); // 返回z小的那个
+				else
+					return a.first.second.y() < b.first.second.y(); // 返回y小的那个
+			}
+			else return a.first.second.x() < b.first.second.x();
+		}
+	};
+	// 按末端点的y坐标从小到大排序
+	struct y_sortEdge
+	{
+		bool operator()(node_edge_type& a, node_edge_type& b) {
+			if (fabs(a.first.second.y() - b.first.second.y()) < 1e-9) // 若y坐标相等
+			{
+				if (fabs(a.first.second.x() - b.first.second.x()) < 1e-9)  // 若y和x坐标都相等
+					return a.first.second.z() < b.first.second.z(); // 返回z小的那个
+				else
+					return a.first.second.x() < b.first.second.x(); // 返回x小的那个
+			}
+			else return a.first.second.y() < b.first.second.y();
+		}
+	};
+	// 按末端点的z坐标从小到大排序
+	struct z_sortEdge
+	{
+		bool operator()(node_edge_type& a, node_edge_type& b) {
+			if (fabs(a.first.second.z() - b.first.second.z()) < 1e-9) // 若z坐标相等
+			{
+				if (fabs(a.first.second.x() - b.first.second.x()) < 1e-9)  // 若z和x坐标都相等
+					return a.first.second.y() < b.first.second.y(); // 返回y小的那个
+				else
+					return a.first.second.x() < b.first.second.x(); // 返回x小的那个
+			}
+			else return a.first.second.z() < b.first.second.z();
+		}
+	};
+
+	std::vector<node_edge_type> x_fineNodeEdges;
+	std::vector<node_edge_type> y_fineNodeEdges;
+	std::vector<node_edge_type> z_fineNodeEdges;
+	//#pragma omp parallel
+	{
+		std::copy_if(t_fineNodeEdges.begin(), t_fineNodeEdges.end(), std::back_inserter(x_fineNodeEdges),
+			[](const node_edge_type& val) { return parallelAxis(val.first.first, val.first.second) == 1; });
+		std::sort(x_fineNodeEdges.begin(), x_fineNodeEdges.end(), x_sortEdge());
+
+		std::copy_if(t_fineNodeEdges.begin(), t_fineNodeEdges.end(), std::back_inserter(y_fineNodeEdges),
+			[](const node_edge_type& val) { return parallelAxis(val.first.first, val.first.second) == 2; });
+		std::sort(y_fineNodeEdges.begin(), y_fineNodeEdges.end(), y_sortEdge());
+
+		std::copy_if(t_fineNodeEdges.begin(), t_fineNodeEdges.end(), std::back_inserter(z_fineNodeEdges),
+			[](const node_edge_type& val) { return parallelAxis(val.first.first, val.first.second) == 3; });
+		std::sort(z_fineNodeEdges.begin(), z_fineNodeEdges.end(), z_sortEdge());
+	}
+
 	struct lessXVal {
-		bool operator()(const node_edge_type& a, const node_edge_type& b) { // Search for first element 'a' in list such that 'b' ≤ 'a'
-			return b.first.second.x() > a.first.second.x(); // a为vector中的边，b为query点，找到第一个末端点大于等于b的a
+		bool operator()(const node_edge_type& a, const node_edge_type& b) { // Search for first element 'a' in list such that b ≤ a
+			return isLargeDouble(b.first.second.x(), a.first.second.x(), 1e-9);
 		}
 	};
 	struct lessYVal {
-		bool operator()(const node_edge_type& a, const node_edge_type& b) {
-			return b.first.second.y() > a.first.second.y();
+		bool operator()(const node_edge_type& a, const node_edge_type& b) { // Search for first element 'a' in list such that b ≤ a
+			return isLargeDouble(b.first.second.y(), a.first.second.y(), 1e-9);
 		}
 	};
 	struct lessZVal {
-		bool operator()(const node_edge_type& a, const node_edge_type& b) {
-			return b.first.second.z() > a.first.second.z();
-		}
-	};
-	struct transformEdge {
-		node_edge_type operator()(const node_edge_type& a) {
-			if (lessPoint<Eigen::Vector3d>{}(a.first.first, a.first.second) == -1) {
-				node_edge_type _p;
-				_p.first.first = a.first.second, _p.first.second = a.first.first;
-				_p.second = a.second;
-				return _p;
-			}
-			else return a;
-		}
-	};
-	struct sortEdge {
-		bool operator()(node_edge_type& a, node_edge_type& b) {
-			int _t_0 = lessPoint<Eigen::Vector3d>{}(a.first.first, b.first.first);
-			if (_t_0 == 0) {
-				int _t_1 = lessPoint<Eigen::Vector3d>{}(a.first.second, b.first.second);
-				if (_t_1 == 0) return a.second < b.second;
-				else if (_t_1 == 1) return true;
-				else return false;
-			}
-			else if (_t_0 == 1) return true;
-			else return false;
+		bool operator()(const node_edge_type& a, const node_edge_type& b) { // Search for first element 'a' in list such that b ≤ a
+			return isLargeDouble(b.first.second.z(), a.first.second.z(), 1e-9);
 		}
 	};
 
-	std::vector<node_edge_type> t_fineNodeEdges;
-	std::transform(fineNodeEdges.begin(), fineNodeEdges.end(), t_fineNodeEdges.begin(), transformEdge());
-
-	auto parallelAxis = [](const node_edge_type& e)->int
-	{
-		Eigen::Vector3d dir = e.first.second - e.first.first;
-		if (dir.cross(Eigen::Vector3d(1, 0, 0))
-			.isApprox(Eigen::Vector3d(0, 0, 0), 1e-6)) // 与x轴平行
-			return 1;
-		else if (dir.cross(Eigen::Vector3d(0, 1, 0))
-			.isApprox(Eigen::Vector3d(0, 0, 0), 1e-6)) // 与y轴平行
-			return 2;
-		else if (dir.cross(Eigen::Vector3d(0, 0, 1))
-			.isApprox(Eigen::Vector3d(0, 0, 0), 1e-6)) // 与z轴平行
-			return 3;
-	};
-	std::vector<node_edge_type> x_nodeEdgeArray;
-	std::vector<node_edge_type> y_nodeEdgeArray;
-	std::vector<node_edge_type> z_nodeEdgeArray;
-#pragma omp parallel
-	{
-		std::copy_if(t_fineNodeEdges.begin(), t_fineNodeEdges.end(),
-			std::back_inserter(x_nodeEdgeArray),
-			[=](const node_edge_type& val) { return parallelAxis(val) == 1; });
-		std::sort(x_nodeEdgeArray.begin(), x_nodeEdgeArray.end(), sortEdge());
-
-		std::copy_if(t_fineNodeEdges.begin(), t_fineNodeEdges.end(),
-			std::back_inserter(y_nodeEdgeArray),
-			[=](const node_edge_type& val) { return parallelAxis(val) == 2; });
-		std::sort(y_nodeEdgeArray.begin(), y_nodeEdgeArray.end(), sortEdge());
-
-		std::copy_if(t_fineNodeEdges.begin(), t_fineNodeEdges.end(),
-			std::back_inserter(z_nodeEdgeArray),
-			[=](const node_edge_type& val) { return parallelAxis(val) == 3; });
-		std::sort(z_nodeEdgeArray.begin(), z_nodeEdgeArray.end(), sortEdge());
-	}
+	const size_t x_numEdges = x_fineNodeEdges.size();
+	const size_t y_numEdges = y_fineNodeEdges.size();
+	const size_t z_numEdges = z_fineNodeEdges.size();
 
 #pragma omp parallel
 	for (const auto& tri : modelTris)
 	{
-		std::vector<V3d> face_vec_private;
 		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
 		V3d triNormal = tri.normal; double triDir = tri.dir;
 		V3d tri_bbox_origin = fminf(tri.p1, fminf(tri.p2, tri.p3));
 		V3d tri_bbox_end = fmaxf(tri.p1, fmaxf(tri.p2, tri.p3));
 
-#pragma omp for nowait
-		for (int j = 0; j < numFineNodeEdges; ++j)
+		// Search for first element x such that _q ≤ x
+		node_edge_type x_q; x_q.first.second = Eigen::Vector3d(tri_bbox_origin.x(), 0, 0);
+		auto x_lower = std::lower_bound(x_fineNodeEdges.begin(), x_fineNodeEdges.end(), x_q, lessXVal());;
+		if (x_lower != x_fineNodeEdges.end())
 		{
-			auto nodeEdge = fineNodeEdges[j];
-			if (lessPoint<Eigen::Vector3d>{}(nodeEdge.first.first, nodeEdge.first.second) == -1)
+			std::vector<V3d> x_face_vec_private;
+
+#pragma omp for nowait
+			for (int i = x_lower - x_fineNodeEdges.begin(); i < x_numEdges; ++i)
 			{
-				V3d t = nodeEdge.first.second;
-				nodeEdge.first.second = nodeEdge.first.first, nodeEdge.first.first = t;
+				auto e_p1 = x_fineNodeEdges[i].first.first, e_p2 = x_fineNodeEdges[i].first.second;
+
+				if (isLargeDouble(e_p1.x(), tri_bbox_end.x(), 1e-9)) break; // 起始端点大于bbox_end
+
+				V3d edgeDir = e_p2 - e_p1;
+
+				if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
+
+				double t = (-triDir - triNormal.dot(e_p1)) / (triNormal.dot(edgeDir));
+				if (t < 0. || t > 1.) continue;
+				V3d interPoint = e_p1 + edgeDir * t;
+
+				if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
+				if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
+				if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
+
+				x_face_vec_private.emplace_back(interPoint);
 			}
-			const int parallel = parallelAxis(nodeEdge);
-			if (parallel == 1) // 与x轴平行(两端点y和z值相等)
+			if (!x_face_vec_private.empty())
 			{
-				if (nodeEdge.first.first.y() < tri_bbox_origin.y() || nodeEdge.first.first.y() > tri_bbox_end.y() ||
-					nodeEdge.first.first.z() < tri_bbox_origin.z() || nodeEdge.first.first.z() > tri_bbox_end.z() ||
-					nodeEdge.first.second.x() < tri_bbox_origin.x() || nodeEdge.first.first.x() > tri_bbox_end.x()) continue;
+#pragma omp critical
+				{
+					faceInterPoints.insert(faceInterPoints.end(), x_face_vec_private.begin(), x_face_vec_private.end());
+				}
 			}
-			else if (parallel == 2) // 与y轴平行
-			{
-				if (nodeEdge.first.first.x() < tri_bbox_origin.x() || nodeEdge.first.first.x() > tri_bbox_end.x() ||
-					nodeEdge.first.first.z() < tri_bbox_origin.z() || nodeEdge.first.first.z() > tri_bbox_end.z() ||
-					nodeEdge.first.second.y() < tri_bbox_origin.y() || nodeEdge.first.first.y() > tri_bbox_end.y()) continue;
-			}
-			else // 与z轴平行
-			{
-				if (nodeEdge.first.first.x() < tri_bbox_origin.x() || nodeEdge.first.first.x() > tri_bbox_end.x() ||
-					nodeEdge.first.first.y() < tri_bbox_origin.y() || nodeEdge.first.first.y() > tri_bbox_end.y() ||
-					nodeEdge.first.second.z() < tri_bbox_origin.z() || nodeEdge.first.first.z() > tri_bbox_end.z()) continue;
-			}
-
-			thrust_edge_type edge = nodeEdge.first; 
-			V3d edgeDir = edge.second - edge.first;
-
-			if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
-
-			double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
-			if (t < 0. || t > 1.) continue;
-			V3d interPoint = edge.first + edgeDir * t;
-
-			if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
-			if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
-			if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
-
-			//faceInterPoints.emplace_back(interPoint);
-			face_vec_private.emplace_back(interPoint);
 		}
 
 
-#pragma omp critical
+		node_edge_type y_q; y_q.first.second = Eigen::Vector3d(0, tri_bbox_origin.y(), 0);
+		// Search for first element x such that _q ≤ x
+		auto y_lower = std::lower_bound(y_fineNodeEdges.begin(), y_fineNodeEdges.end(), y_q, lessYVal());
+		if (y_lower != y_fineNodeEdges.end())
 		{
-			faceInterPoints.insert(faceInterPoints.end(), face_vec_private.begin(), face_vec_private.end());
+			std::vector<V3d> y_face_vec_private;
+
+#pragma omp for nowait
+			for (int i = y_lower - y_fineNodeEdges.begin(); i < y_numEdges; ++i)
+			{
+				auto e_p1 = y_fineNodeEdges[i].first.first, e_p2 = y_fineNodeEdges[i].first.second;
+
+				if (isLargeDouble(e_p1.y(), tri_bbox_end.y(), 1e-9)) break; // 起始端点大于bbox_end
+
+				V3d edgeDir = e_p2 - e_p1;
+
+				if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
+
+				double t = (-triDir - triNormal.dot(e_p1)) / (triNormal.dot(edgeDir));
+				if (t < 0. || t > 1.) continue;
+				V3d interPoint = e_p1 + edgeDir * t;
+
+				if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
+				if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
+				if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
+
+				y_face_vec_private.emplace_back(interPoint);
+			}
+			if (!y_face_vec_private.empty())
+			{
+#pragma omp critical
+				{
+					faceInterPoints.insert(faceInterPoints.end(), y_face_vec_private.begin(), y_face_vec_private.end());
+				}
+			}
+		}
+
+		// Search for first element x such that _q ≤ x
+		node_edge_type z_q; z_q.first.second = Eigen::Vector3d(0, 0, tri_bbox_origin.z());
+		auto z_lower = std::lower_bound(z_fineNodeEdges.begin(), z_fineNodeEdges.end(), z_q, lessZVal());
+		if (z_lower != z_fineNodeEdges.end())
+		{
+			std::vector<V3d> z_face_vec_private;
+
+#pragma omp for nowait
+			for (int i = z_lower - z_fineNodeEdges.begin(); i < z_numEdges; ++i)
+			{
+				auto e_p1 = z_fineNodeEdges[i].first.first, e_p2 = z_fineNodeEdges[i].first.second;
+
+				if (isLargeDouble(e_p1.z(), tri_bbox_end.z(), 1e-9)) break; // 起始端点大于bbox_end
+
+				V3d edgeDir = e_p2 - e_p1;
+
+				if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
+
+				double t = (-triDir - triNormal.dot(e_p1)) / (triNormal.dot(edgeDir));
+				if (t < 0. || t > 1.) continue;
+				V3d interPoint = e_p1 + edgeDir * t;
+
+				if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
+				if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
+				if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
+
+				z_face_vec_private.emplace_back(interPoint);
+			}
+			if (!z_face_vec_private.empty())
+			{
+#pragma omp critical
+				{
+					faceInterPoints.insert(faceInterPoints.end(), z_face_vec_private.begin(), z_face_vec_private.end());
+				}
+			}
 		}
 	}
 
@@ -279,28 +356,52 @@ inline void ThinShells::cpIntersectionPoints()
 	//	for (const auto& tri : modelTris)
 	//	{
 	//		std::vector<V3d> face_vec_private;
-	//
 	//		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
 	//		V3d triNormal = tri.normal; double triDir = tri.dir;
+	//		V3d tri_bbox_origin = fminf(tri.p1, fminf(tri.p2, tri.p3));
+	//		V3d tri_bbox_end = fmaxf(tri.p1, fmaxf(tri.p2, tri.p3));
 	//
+	//		double d_eps = 1e-9;
 	//#pragma omp for nowait
 	//		for (int j = 0; j < numFineNodeEdges; ++j)
 	//		{
-	//			const auto& nodeEdge = fineNodeEdges[j];
-	//			thrust_edge_type edge = nodeEdge.first;
-	//			V3d edgeDir = edge.second - edge.first;
+	//			auto nodeEdge = fineNodeEdges[j];
+	//
+	//			auto e_p1 = nodeEdge.first.first, e_p2 = nodeEdge.first.second;
+	//			if (!isLess(e_p1, e_p2, std::less<V3d>())) std::swap(e_p1, e_p2);
+	//
+	//			const int parallel = parallelAxis(e_p1, e_p2);
+	//			if (parallel == 1) // 与x轴平行(两端点y和z值相等)
+	//			{
+	//				if (isLessDouble(e_p1.y(), tri_bbox_origin.y(), d_eps) || isLargeDouble(e_p1.y(), tri_bbox_end.y(), d_eps) ||
+	//					isLessDouble(e_p1.z(), tri_bbox_origin.z(), d_eps) || isLargeDouble(e_p1.z(), tri_bbox_end.z(), d_eps) ||
+	//					isLessDouble(e_p2.x(), tri_bbox_origin.x(), d_eps) || isLargeDouble(e_p1.x(), tri_bbox_end.x(), d_eps)) continue;
+	//			}
+	//			else if (parallel == 2) // 与y轴平行
+	//			{
+	//				if (isLessDouble(e_p1.x(), tri_bbox_origin.x(), d_eps) || isLargeDouble(e_p1.x(), tri_bbox_end.x(), d_eps) ||
+	//					isLessDouble(e_p1.z(), tri_bbox_origin.z(), d_eps) || isLargeDouble(e_p1.z(), tri_bbox_end.z(), d_eps) ||
+	//					isLessDouble(e_p2.y(), tri_bbox_origin.y(), d_eps) || isLargeDouble(e_p1.y(), tri_bbox_end.y(), d_eps)) continue;
+	//			}
+	//			else // 与z轴平行
+	//			{
+	//				if (isLessDouble(e_p1.x(), tri_bbox_origin.x(), d_eps) || isLargeDouble(e_p1.x(), tri_bbox_end.x(), d_eps) ||
+	//					isLessDouble(e_p1.y(), tri_bbox_origin.y(), d_eps) || isLargeDouble(e_p1.y(), tri_bbox_end.y(), d_eps) ||
+	//					isLessDouble(e_p2.z(), tri_bbox_origin.z(), d_eps) || isLargeDouble(e_p1.z(), tri_bbox_end.z(), d_eps)) continue;
+	//			}
+	//
+	//			V3d edgeDir = e_p2 - e_p1;
 	//
 	//			if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
 	//
-	//			double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
+	//			double t = (-triDir - triNormal.dot(e_p1)) / (triNormal.dot(edgeDir));
 	//			if (t < 0. || t > 1.) continue;
-	//			V3d interPoint = edge.first + edgeDir * t;
+	//			V3d interPoint = e_p1 + edgeDir * t;
 	//
 	//			if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
 	//			if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
 	//			if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
 	//
-	//			//faceInterPoints.emplace_back(interPoint);
 	//			face_vec_private.emplace_back(interPoint);
 	//		}
 	//
@@ -310,12 +411,43 @@ inline void ThinShells::cpIntersectionPoints()
 	//		}
 	//	}
 
-		//faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
+		//#pragma omp parallel
+		//	for (const auto& tri : modelTris)
+		//	{
+		//		std::vector<V3d> face_vec_private;
+		//
+		//		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
+		//		V3d triNormal = tri.normal; double triDir = tri.dir;
+		//
+		//#pragma omp for nowait
+		//		for (int j = 0; j < numFineNodeEdges; ++j)
+		//		{
+		//			const auto& nodeEdge = fineNodeEdges[j];
+		//			thrust_edge_type edge = nodeEdge.first;
+		//			V3d edgeDir = edge.second - edge.first;
+		//
+		//			if (fabsf(triNormal.dot(edgeDir)) < 1e-9) continue;
+		//
+		//			double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
+		//			if (t < 0. || t > 1.) continue;
+		//			V3d interPoint = edge.first + edgeDir * t;
+		//
+		//			if (triEdge_1.cross(interPoint - tri.p1).dot(triNormal) < 0) continue;
+		//			if (triEdge_2.cross(interPoint - tri.p2).dot(triNormal) < 0) continue;
+		//			if (triEdge_3.cross(interPoint - tri.p3).dot(triNormal) < 0) continue;
+		//
+		//			//faceInterPoints.emplace_back(interPoint);
+		//			face_vec_private.emplace_back(interPoint);
+		//		}
+		//
+		//#pragma omp critical
+		//		{
+		//			faceInterPoints.insert(faceInterPoints.end(), face_vec_private.begin(), face_vec_private.end());
+		//		}
+		//	}
 	cout << "-- 三角形面与node边的交点数量：" << faceInterPoints.size() << endl;
 
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
-
-	//allInterPoints.erase(std::unique(allInterPoints.begin(), allInterPoints.end()), allInterPoints.end());
 	cout << "-- 总交点数量：" << allInterPoints.size() << endl;
 }
 
@@ -332,16 +464,11 @@ inline void ThinShells::cpSDFOfTreeNodes()
 			pointsMat.row(esumDepthNodeVerts[d] + i) = depthNodeVertexArray[d][i].first;
 	}
 
-	//VXd S;
 	{
 		VXi I;
 		MXd C, N;
 		igl::signed_distance(pointsMat, m_V, m_F, igl::SignedDistanceType::SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER, sdfVal, I, C, N);
-		//std::for_each(sdfVal.data(), sdfVal.data() + sdfVal.size(), [](double& b) {b = (b > 0 ? b : (b < 0 ? -1 : 0)); });
 	}
-	/*sdfVal.resize(numNodeVerts + allInterPoints.size() + nModelVerts);
-	sdfVal.setZero();
-	sdfVal.block(0, 0, numNodeVerts, 1) = S;*/
 }
 
 inline void ThinShells::cpCoefficients()
@@ -369,31 +496,46 @@ inline void ThinShells::cpCoefficients()
 	// initial matrix
 	const size_t& numNodeVerts = svo.numNodeVerts;
 	vector<Trip> matApVal;
+#pragma omp parallel
 	for (int d = 0; d < treeDepth; ++d)
 	{
 		const size_t d_numNodeVerts = depthNodeVertexArray[d].size(); // 每层节点的顶点数量
 		const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
+#pragma omp for nowait
 		for (int i = 0; i < d_numNodeVerts; ++i)
 		{
 			V3d i_nodeVertex = depthNodeVertexArray[d][i].first;
 			uint32_t i_fromNodeIdx = depthNodeVertexArray[d][i].second;
 
-			matApVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+			vector<Trip> private_matApVal;
+
+			//matApVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+			private_matApVal.emplace_back(Trip(d_esumNodeVerts + i, d_esumNodeVerts + i, 1)); // self
+
+			//#pragma omp parallel for
 			for (int j = d - 1; j >= 0; --j)
 			{
 				if (nodeVertex2Idx[j].find(i_nodeVertex) == nodeVertex2Idx[j].end()) break;
-				matApVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
+				//matApVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
+				private_matApVal.emplace_back(Trip(d_esumNodeVerts + i, esumDepthNodeVerts[j] + nodeVertex2Idx[j][i_nodeVertex], 1)); // child
 			}
 
 			// parent
 			auto [inDmPoints, inDmPointsIdx] = svo.setInDomainPoints(i_fromNodeIdx, d + 1, esumDepthNodeVerts, nodeVertex2Idx);
 			const int nInDmPoints = inDmPoints.size();
 
+			//#pragma omp parallel for
 			for (int k = 0; k < nInDmPoints; ++k)
 			{
 				double val = BaseFunction4Point(inDmPoints[k].first, inDmPoints[k].second, i_nodeVertex);
 				assert(inDmPointsIdx[k] < numNodeVerts, "index of col > numNodeVertex!");
-				if (val != 0) matApVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
+				//if (val != 0) matApVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
+				if (val != 0)  private_matApVal.emplace_back(Trip(d_esumNodeVerts + i, inDmPointsIdx[k], val));
+			}
+
+#pragma omp critical
+			{
+				matApVal.insert(matApVal.end(), private_matApVal.begin(), private_matApVal.end());
 			}
 		}
 	}

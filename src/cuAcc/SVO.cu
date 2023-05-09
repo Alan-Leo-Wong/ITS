@@ -986,56 +986,58 @@ __global__ void determineNodeEdge(const size_t nNodes,
 	}
 }
 
-template <typename T>
-struct lessPoint {
-	__host__ __device__ int operator()(const T& a, const T& b) const {
-		for (size_t i = 0; i < a.size(); ++i) {
-			if (fabs(a[i] - b[i]) < 1e-9) continue;
+namespace {
+	template <typename T>
+	struct lessPoint {
+		__host__ __device__ int operator()(const T& a, const T& b) const {
+			for (size_t i = 0; i < a.size(); ++i) {
+				if (fabs(a[i] - b[i]) < 1e-9) continue;
 
-			if (a[i] < b[i]) return 1;
-			else if (a[i] > b[i]) return -1;
+				if (a[i] < b[i]) return 1;
+				else if (a[i] > b[i]) return -1;
+			}
+			return 0;
 		}
-		return 0;
-	}
-};
+	};
 
-struct sortVert {
-	__host__ __device__ bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
-		int _t = lessPoint<V3d>{}(a.first, b.first);
-		if (_t == 0) return a.second < b.second;
-		else if (_t == 1) return true;
-		else return false;
-	}
-};
-
-struct sortEdge {
-	__host__ __device__ bool operator()(node_edge_type& a, node_edge_type& b) {
-		int _t_0 = lessPoint<V3d>{}(a.first.first, b.first.first);
-		if (_t_0 == 0)
-		{
-			int _t_1 = lessPoint<V3d>{}(a.first.second, b.first.second);
-			if (_t_1 == 0) return a.second < b.second;
-			else if (_t_1 == 1) return true;
+	struct sortVert {
+		__host__ __device__ bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
+			int _t = lessPoint<V3d>{}(a.first, b.first);
+			if (_t == 0) return a.second < b.second;
+			else if (_t == 1) return true;
 			else return false;
 		}
-		else if (_t_0 == 1) return true;
-		else return false;
-	}
-};
+	};
 
-struct uniqueVert {
-	__host__ __device__ bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
-		return (a.first).isApprox(b.first, 1e-9);
-	}
-};
+	struct sortEdge {
+		__host__ __device__ bool operator()(node_edge_type& a, node_edge_type& b) {
+			int _t_0 = lessPoint<V3d>{}(a.first.first, b.first.first);
+			if (_t_0 == 0)
+			{
+				int _t_1 = lessPoint<V3d>{}(a.first.second, b.first.second);
+				if (_t_1 == 0) return a.second < b.second;
+				else if (_t_1 == 1) return true;
+				else return false;
+			}
+			else if (_t_0 == 1) return true;
+			else return false;
+		}
+	};
 
-struct uniqueEdge {
-	__host__ __device__
-		bool operator()(const node_edge_type& a, const node_edge_type& b) {
-		return ((a.first.first.isApprox(b.first.first)) && (a.first.second.isApprox(b.first.second))) ||
-			((a.first.first.isApprox(b.first.second)) && (a.first.second.isApprox(b.first.first)));
-	}
-};
+	struct uniqueVert {
+		__host__ __device__ bool operator()(const node_vertex_type& a, const node_vertex_type& b) {
+			return (a.first).isApprox(b.first, 1e-9);
+		}
+	};
+
+	struct uniqueEdge {
+		__host__ __device__
+			bool operator()(const node_edge_type& a, const node_edge_type& b) {
+			return ((a.first.first.isApprox(b.first.first)) && (a.first.second.isApprox(b.first.second))) ||
+				((a.first.first.isApprox(b.first.second)) && (a.first.second.isApprox(b.first.first)));
+		}
+	};
+}
 
 #define MAX_STREAM 16
 void SparseVoxelOctree::constructNodeVertexAndEdge(const thrust::device_vector<size_t>& d_esumTreeNodesArray, thrust::device_vector<SVONode>& d_SVONodeArray)

@@ -6,6 +6,7 @@
 class ThinShells : public BaseModel
 {
 private:
+	V3i svo_gridSize;
 	SparseVoxelOctree svo;
 	//vector<V3d> nodeWidthArray;
 
@@ -30,7 +31,7 @@ public:
 	ThinShells() {}
 
 	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z) :
-		BaseModel(filename), svo(_grid_x, _grid_y, _grid_z)
+		svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename), svo(_grid_x, _grid_y, _grid_z)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
@@ -39,7 +40,7 @@ public:
 #endif // !NDEBUG
 	}
 
-	ThinShells(const string& filename, const V3i& _grid) : BaseModel(filename), svo(_grid)
+	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), svo(_grid)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;

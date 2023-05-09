@@ -153,6 +153,21 @@ inline bool isInRange(const double& l, const double& r, const T &...query) {
 	return isInRange(query...);
 }
 
+_CUDA_GENERAL_CALL_
+inline bool isEqualDouble(const double& l, const double& r, const double& eps) {
+	return fabs(l - r) < eps;
+}
+
+_CUDA_GENERAL_CALL_
+inline bool isLessDouble(const double& l, const double& r, const double& eps) {
+	return (!isEqualDouble(l, r, eps) && l < r);
+}
+
+_CUDA_GENERAL_CALL_
+inline bool isLargeDouble(const double& l, const double& r, const double& eps) {
+	return (!isEqualDouble(l, r, eps) && l > r);
+}
+
 template <typename T, typename Derived>
 inline bool list2matrix(const std::vector<std::vector<T>>& V, Eigen::PlainObjectBase<Derived>& M)
 {

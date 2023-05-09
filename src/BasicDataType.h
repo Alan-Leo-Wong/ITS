@@ -77,8 +77,7 @@ bool isLess(A a, B b, C cmp = C{})
 }
 
 template <typename T> 
-struct lessPoint 
-{
+struct lessPoint {
 	int operator()(const T& a, const T& b) const {
 		for (size_t i = 0; i < a.size(); ++i) {
 			if (fabs(a[i] - b[i]) < 1e-9) continue;

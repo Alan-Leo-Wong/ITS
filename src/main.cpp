@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "switchmec.obj");
+	string modelName = getFileName("", "angel_candle_holder_single.stl");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -64,7 +64,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"switchmec.obj"), 256, 256, 256);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"angel_candle_holder_single.stl"), 256, 256, 256);
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
