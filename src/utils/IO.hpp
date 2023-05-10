@@ -16,6 +16,12 @@ namespace gvis
 		output << "v " << v.x() << " " << v.y() << " " << v.z() << " " << rgb.x() << " " << rgb.y() << " " << rgb.z() << std::endl;
 	}
 
+	// Helper function to write single vertex to OBJ file
+	static void write_vertex_to_xyz(std::ofstream& output, const Eigen::Vector3d& v)
+	{
+		output << v.x() << " " << v.y() << " " << v.z() << std::endl;
+	}
+
 	// Helper function to write face
 	static void write_face(std::ofstream& output, const Eigen::Vector3i& f)
 	{

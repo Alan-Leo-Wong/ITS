@@ -6,8 +6,11 @@
 class ThinShells : public BaseModel
 {
 private:
+	V3d modelOrigin;
+
 	V3i svo_gridSize;
 	SparseVoxelOctree svo;
+	double voxelWidth;
 	//vector<V3d> nodeWidthArray;
 
 	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
@@ -31,19 +34,21 @@ public:
 	ThinShells() {}
 
 	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z) :
-		svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename), svo(_grid_x, _grid_y, _grid_z)
+		svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
 #ifndef NDEBUG
 		saveTree("");
 #endif // !NDEBUG
 	}
 
-	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), svo(_grid)
+	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
 #ifndef NDEBUG
 		saveTree("");
 #endif // !NDEBUG
@@ -54,6 +59,8 @@ public:
 	// ThinShells& operator=(const ThinShells& model);
 
 private:
+	V3i getPointDis(const V3d& modelVert, const V3d& origin, const double& width);
+
 	//void cpIntersectionPoints();
 	void cpIntersectionPoints();
 
@@ -105,6 +112,8 @@ public:
 	friend class CollisionDetection;
 
 public:
+	void moveOnSurface(const V3d& modelVert, const V3d& v);
+
 	void pointProjection(const V3d& point);
 
 };

@@ -164,7 +164,6 @@ inline _CUDA_GENERAL_CALL_ Eigen::Vector3i vmaxi(Eigen::Vector3i a, Eigen::Vecto
 	return Eigen::Vector3i(maxi(a.x(), b.x()), maxi(a.y(), b.y()), maxi(a.z(), b.z()));
 }
 
-
 inline _CUDA_GENERAL_CALL_ float clamp(float f, float a, float b)
 {
 	return fmaxf(a, fminf(f, b));
@@ -193,4 +192,49 @@ inline _CUDA_GENERAL_CALL_ Eigen::Vector3d clamp(Eigen::Vector3d v, Eigen::Vecto
 inline _CUDA_GENERAL_CALL_ Eigen::Vector3i clamp(Eigen::Vector3i v, Eigen::Vector3i a, Eigen::Vector3i b)
 {
 	return Eigen::Vector3i(clamp(v.x(), a.x(), b.x()), clamp(v.y(), a.y(), b.y()), clamp(v.z(), a.z(), b.z()));
+}
+
+template<typename T>
+_CUDA_GENERAL_CALL_ T _lerp(const T& x0, const T& x1, const double& t)
+{
+#if defined(__CUDA_ARCH__)
+	return x0 + t * (x1 - x0);
+#else 
+	return std::lerp(x0, x1, t);
+#endif
+}
+
+template<typename T>
+_CUDA_GENERAL_CALL_ T bi_lerp(const T& x0, const T& x1,
+	const T& y0, const T& y1,
+	const double& tx, const double& ty)
+{
+	// x0------x1
+	//  |      |
+	//  |  	   |
+	// y0------y1
+	// 
+	// auto nx0 = _lerp(x0, x1, tx);
+	// auto nx1 = _lerp(y0, y1, tx);
+	// return _lerp(nx0, nx1, ty);
+	return x0 * (1 - tx) * (1 - ty) + x1 * tx * (1 - ty) + y0 * (1 - tx) * ty + y1 * tx * ty;
+}
+
+template<typename T>
+_CUDA_GENERAL_CALL_ T tri_lerp(const T(&val)[8],
+	const double& tx, const double& ty, const double& tz)
+{
+	//	   4----a----6
+	//	  /|        /|
+	//	 / |       / |
+	//	5--|-c----7  |
+	//	|  0----b-|--2
+	//	| /       | /
+	//	1----d----3
+
+	auto a = _lerp(val[4], val[6], ty);
+	auto b = _lerp(val[0], val[2], ty);
+	auto c = _lerp(val[5], val[7], ty);
+	auto d = _lerp(val[1], val[3], ty);
+	return bi_lerp(a, b, c, d, tz, tx);
 }

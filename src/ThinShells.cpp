@@ -18,8 +18,6 @@
 //////////////////////
 //  Create  Shells  //
 //////////////////////
-
-
 inline int parallelAxis(const V3d& p1, const V3d& p2)
 {
 	if (fabs(p1.y() - p2.y()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9) return 1; // 与x轴平行
@@ -27,7 +25,11 @@ inline int parallelAxis(const V3d& p1, const V3d& p2)
 	else return 3; // 与z轴平行
 };
 
-// idx: subdepth
+inline V3i ThinShells::getPointDis(const V3d& vert, const V3d& origin, const double& width)
+{
+	return ((vert - origin).array() / width).cast<int>();
+};
+
 inline void ThinShells::cpIntersectionPoints()
 {
 	vector<V2i> modelEdges = extractEdges();
@@ -44,19 +46,12 @@ inline void ThinShells::cpIntersectionPoints()
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 
-	std::map<uint32_t, SVONode> morton2Node;
+	std::map<uint32_t, SVONode> morton2FineNode;
 	std::transform(nodeArray.begin(), nodeArray.begin() + numFineNodes,
-		std::inserter(morton2Node, morton2Node.end()),
+		std::inserter(morton2FineNode, morton2FineNode.end()),
 		[](const SVONode& node) {
 			return std::make_pair(node.mortonCode, node);
 		});
-
-	const double nodeWidth = nodeArray[0].width;
-	const V3d modelOrigin = modelBoundingBox.boxOrigin;
-	auto getPointDis = [modelOrigin, nodeWidth](const V3d& modelVert)->V3i
-	{
-		return ((modelVert - modelOrigin).array() / nodeWidth).cast<int>();
-	};
 
 #pragma omp parallel
 	for (int i = 0; i < nModelEdges; i++)
@@ -69,8 +64,8 @@ inline void ThinShells::cpIntersectionPoints()
 
 		V3d modelEdgeDir = p2 - p1;
 
-		V3i dis1 = getPointDis(p1);
-		V3i dis2 = getPointDis(p2);
+		V3i dis1 = getPointDis(p1, modelOrigin, voxelWidth);
+		V3i dis2 = getPointDis(p2, modelOrigin, voxelWidth);
 
 		V3i min_dis = clamp(vmini(dis1, dis2).array() - 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
 		V3i max_dis = clamp(vmaxi(dis1, dis2).array() + 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
@@ -84,9 +79,9 @@ inline void ThinShells::cpIntersectionPoints()
 				for (int x = min_dis.x(); x <= max_dis.x(); ++x)
 				{
 					uint32_t nodeMorton = morton::mortonEncode_LUT((uint16_t)x, (uint16_t)y, (uint16_t)z);
-					if (morton2Node.find(nodeMorton) == morton2Node.end()) continue;
-					V3d lbbCorner = morton2Node.at(nodeMorton).origin; // at() is thread safe
-					double width = morton2Node.at(nodeMorton).width;
+					if (morton2FineNode.find(nodeMorton) == morton2FineNode.end()) continue;
+					V3d lbbCorner = morton2FineNode.at(nodeMorton).origin; // at() is thread safe
+					double width = morton2FineNode.at(nodeMorton).width;
 
 					// back plane
 					double back_t = DINF;
@@ -1005,6 +1000,94 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 void ThinShells::textureVisualization(const string& filename) const
 {
 	writeTexturedObjFile(filename, bSplineVal);
+}
+
+
+void ThinShells::moveOnSurface(const V3d& modelVert, const V3d& v)
+{
+	constexpr string saveDir = "PointMove";
+
+	// 输出初始点
+	string filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), saveDir, (string)"init.xyz");
+	checkDir(filename);
+	std::ofstream out(filename);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
+	gvis::write_vertex_to_xyz(out, modelVert);
+
+	// 初始化数据结构
+	const vector<SVONode>& nodeArray = svo.svoNodeArray;
+	vector<std::map<uint32_t, SVONode>> morton2Nodes(treeDepth);
+	for (int i = 0; i < treeDepth; ++i)
+	{
+		std::transform(nodeArray.begin(), nodeArray.begin() + numFineNodes,
+			std::inserter(morton2FineNode, morton2FineNode.end()),
+			[](const SVONode& node) {
+				return std::make_pair(node.mortonCode, node);
+			});
+	}
+	if (nodeArray.empty() || morton2Nodes.empty()) { fprintf(stderr, "Error: SVO is empty!"); return; }
+
+	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
+	const vector<size_t>& depthNumNodes = svo.depthNumNodes;
+	vector<std::map<V3d, double>> nodeVertex2BSplineVal(treeDepth);
+
+	vector<size_t> esumDepthNumNodes;
+	std::exclusive_scan(depthNumNodes.begin(), depthNumNodes.end(), esumDepthNumNodes.end(), 0);
+	esumDepthNumNodes.emplace_back(svo.numTreeNodes);
+
+	vector<vector<std::array<double, 8>>> nodeBSplineVal(treeDepth);
+#pragma omp parallel for
+	for (int d = 0; d < treeDepth; ++d)
+	{
+		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+		VXd nodeVertBSplineVal(d_numNodeVerts);
+
+		vector<V3d> nodeVertex;
+		std::transform(depthNodeVertexArray[d].begin(), depthNodeVertexArray[d].end(),
+			std::back_inserter(nodeVertex), [](const node_vertex_type& val) { return val.first; });
+
+		cuAcc::cpBSplineVal(d_numNodeVerts, svo.numNodeVerts, svo.numTreeNodes, nodeVertex,
+			svo.nodeVertexArray, nodeWidthArray, lambda, nodeVertBSplineVal);
+
+		std::transform(nodeVertex.begin(), nodeVertex.end(), nodeVertBSplineVal.begin(),
+			std::inserter(nodeVertex2BSplineVal[d], nodeVertex2BSplineVal[d].end()),
+			[](const V3d& vert, const double& val) {
+				return std::make_pair(vert, val);
+			});
+
+#pragma omp critical
+		{
+			nodeBSplineVal[d].resize(depthNumNodes[d]);
+		}
+#pragma omp for nowait
+		for (int j = 0; j < depthNumNodes[d]; ++j)
+		{
+			const SVONode& node = *(nodeArray.begin() + esumDepthNumNodes[d] + j);
+			for (int k = 0; k < 8; ++k)
+			{
+				const int xOffset = k & 1;
+				const int yOffset = (k >> 1) & 1;
+				const int zOffset = (k >> 2) & 1;
+
+				V3d corner = (node.origin) + (node.width) * V3d(xOffset, yOffset, zOffset);
+#pragma omp critical
+				{
+					nodeBSplineVal[d][j][k] = nodeVertex2BSplineVal[d].at(corner); // 得到每个节点八个顶点的sdf值
+				}
+			}
+		}
+	}
+
+	// 找到初始点所属的体素格子
+	auto getPointNode = [=](const V3d& vert, const int& depth, const V3d& origin, const double& width)->SVONode
+	{
+		V3i dis = getPointDis(vert, origin, width);
+		uint32_t nodeMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+		return morton2Nodes[depth].at(nodeMorton); // at() is thread safe
+	};
+	V3d lbbCorner = getPointNode(modelVert, 0, modelOrigin, voxelWidth).origin;
+
+	// 开始沿v移动
 }
 
 void ThinShells::pointProjection(const V3d& point)
