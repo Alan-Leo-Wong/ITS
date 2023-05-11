@@ -65,8 +65,8 @@ int main(int argc, char** argv)
 
 	startTimer(&timer);
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64);
-	bool is2Uniform = true;
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Uniform, 1.0); // to unit cube
+	bool is2Cube = true;
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;

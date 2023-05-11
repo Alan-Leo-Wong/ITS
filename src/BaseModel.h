@@ -6,7 +6,7 @@
 class BaseModel
 {
 public:
-	string uniformDir;
+	string uniformDir = "non-uniform";
 
 protected:
 	MXd m_V;
@@ -29,11 +29,15 @@ private:
 	void setModelAttributeVector();
 
 public:
-	BaseModel() {};
+	BaseModel() {}
 
-	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces), is2UnitCube(false), scaleFactor(1.0) {};
+	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces), is2UnitCube(false), scaleFactor(1.0) 
+	{
+		setUniformBoundingBox();
+		setTriAttributes();
+	}
 
-	BaseModel(const std::string& filename) :uniformDir("")
+	BaseModel(const std::string& filename)
 	{
 		readFile(filename);
 		setModelAttributeVector();
@@ -41,11 +45,11 @@ public:
 		setTriAttributes();
 	}
 
-	BaseModel(const std::string& filename, const bool& _is2UnitCube, const double& _scaleFactor) :
-		is2UnitCube(_is2UnitCube), scaleFactor(_scaleFactor), uniformDir("uniform")
+	BaseModel(const std::string& filename, const bool& _is2UnitCube, const double& _scaleFactor) 
+		: is2UnitCube(_is2UnitCube), scaleFactor(_scaleFactor)
 	{
 		readFile(filename);
-		if (_is2UnitCube) model2UnitCube();
+		if (_is2UnitCube) { uniformDir = "uniform"; model2UnitCube(); }
 		setModelAttributeVector();
 		setUniformBoundingBox();
 		setTriAttributes();
