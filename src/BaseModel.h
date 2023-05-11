@@ -5,9 +5,14 @@
 
 class BaseModel
 {
+public:
+	string uniformDir;
+
 protected:
 	MXd m_V;
 	MXi m_F;
+	bool is2UnitCube;
+	double scaleFactor;
 
 	vector<V3d> modelVerts;
 	vector<V3i> modelFaces;
@@ -20,19 +25,44 @@ protected:
 	uint nModelVerts = 0;
 	uint nModelTris = 0;
 
+private:
+	void setModelAttributeVector();
+
 public:
 	BaseModel() {};
 
-	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces) {};
+	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces), is2UnitCube(false), scaleFactor(1.0) {};
 
-	BaseModel(const std::string& filename)
+	BaseModel(const std::string& filename) :uniformDir("")
 	{
 		readFile(filename);
+		setModelAttributeVector();
+		setUniformBoundingBox();
+		setTriAttributes();
+	}
+
+	BaseModel(const std::string& filename, const bool& _is2UnitCube, const double& _scaleFactor) :
+		is2UnitCube(_is2UnitCube), scaleFactor(_scaleFactor), uniformDir("uniform")
+	{
+		readFile(filename);
+		if (_is2UnitCube) model2UnitCube();
+		setModelAttributeVector();
 		setUniformBoundingBox();
 		setTriAttributes();
 	}
 
 	~BaseModel() {}
+
+private:
+	Eigen::Matrix4d calcTransformMatrix();
+	Eigen::Matrix4d calcScaleMatrix();
+
+public:
+	void model2UnitCube();
+
+	void unitCube2Model();
+
+	void zoomModel();
 
 public:
 	vector<V2i> extractEdges();

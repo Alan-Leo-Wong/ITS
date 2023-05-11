@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "angel_candle_holder_single.stl");
+	string modelName = getFileName("", "bunny.off");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -64,24 +64,27 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"angel_candle_holder_single.stl"), 256, 256, 256);
+	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64);
+	bool is2Uniform = true;
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Uniform, 1.0); // to unit cube
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
 	printf("\nCreate shells spent %lf s.\n", time);
 
 	const int treeDepth = thinShell.treeDepth;
+	const std::string uniformDir = thinShell.uniformDir;
 
 	startTimer(&timer);
-	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
+	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
-	const int res = 250;
-	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
-	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
-	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_isosurface.obj");
+	/*const int res = 64;
+	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_innerShell.obj");
+	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_outerShell.obj");
+	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_isosurface.obj");
 	startTimer(&timer);
 	thinShell.mcVisualization(
 		innerShellFile, V3i(res, res, res),
@@ -90,17 +93,19 @@ int main(int argc, char** argv)
 	);
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
-	printf("\nMarchingCubes spent %lf s.\n", time);
+	printf("\nMarchingCubes spent %lf s.\n", time);*/
 
-	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"query_point.obj");
+	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.obj");
 	MXd randomPoints = thinShell.generateRandomPoints(queryFile, 100);
 
 	startTimer(&timer);
-	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"query_point_result.obj");
+	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.obj");
 	thinShell.multiPointQuery(queryResFile, randomPoints);
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nMulti points query spent %lf s.\n", time);*/
+
+	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 
 	deleteTimer(&timer);
 

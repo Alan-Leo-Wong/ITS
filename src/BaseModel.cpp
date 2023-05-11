@@ -48,6 +48,92 @@ void BaseModel::setUniformBoundingBox()
 	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
 }
 
+Eigen::Matrix4d BaseModel::calcTransformMatrix()
+{
+	Eigen::RowVector3d boxMin = m_V.colwise().minCoeff();
+	Eigen::RowVector3d boxMax = m_V.colwise().maxCoeff();
+
+	// Get the target solveRes (along the largest dimension)
+	double scale = boxMax[0] - boxMin[0];
+	double minScale = scale;
+	for (int d = 1; d < 3; d++)
+	{
+		scale = std::max<double>(scale, boxMax[d] - boxMin[d]);
+		minScale = std::min<double>(scale, boxMax[d] - boxMin[d]);
+	}
+	// std::cout << 1.1 + scale / minScale << std::endl;
+	// scaleFactor =
+	scale *= scaleFactor;
+	Eigen::Vector3d center = 0.5 * boxMax + 0.5 * boxMin;
+
+	for (int i = 0; i < 3; i++)
+		center[i] -= scale / 2;
+	Eigen::Matrix4d zoomMatrix = Eigen::Matrix4d::Identity();
+	Eigen::Matrix4d transMatrix = Eigen::Matrix4d::Identity();
+	for (int i = 0; i < 3; i++) 
+	{
+		zoomMatrix(i, i) = 1. / scale;
+		transMatrix(3, i) = -center[i];
+	}
+	return zoomMatrix * transMatrix;
+}
+
+Eigen::Matrix4d BaseModel::calcScaleMatrix()
+{
+	Eigen::RowVector3d boxMin = m_V.colwise().minCoeff();
+	Eigen::RowVector3d boxMax = m_V.colwise().maxCoeff();
+
+	// Get the target solveRes (along the largest dimension)
+	double scale = boxMax[0] - boxMin[0];
+	double minScale = scale;
+	for (int d = 1; d < 3; d++) 
+	{
+		scale = std::max<double>(scale, boxMax[d] - boxMin[d]);
+		minScale = std::min<double>(scale, boxMax[d] - boxMin[d]);
+	}
+	// std::cout << 1.1 + scale / minScale << std::endl;
+	// scaleFactor =
+	scale *= scaleFactor;
+	Eigen::Vector3d center = 0.5 * boxMax + 0.5 * boxMin;
+
+	for (int i = 0; i < 3; i++)
+		center[i] -= scale / 2;
+	Eigen::Matrix4d zoomMatrix = Eigen::Matrix4d::Identity();
+	for (int i = 0; i < 3; i++) 
+	{
+		zoomMatrix(i, i) = 1. / scale;
+	}
+	return zoomMatrix;
+}
+
+void BaseModel::model2UnitCube()
+{
+	auto transMat = calcTransformMatrix();
+	for (int i = 0; i < m_V.rows(); ++i)
+	{
+		m_V.row(i) += transMat.block(3, 0, 1, 3);
+		m_V.row(i) = m_V.row(i) * transMat.block(0, 0, 3, 3);
+	}
+}
+
+void BaseModel::unitCube2Model()
+{
+	auto transMat = calcTransformMatrix();
+	Eigen::Matrix3d inverseTrans = transMat.block(0, 0, 3, 3).inverse();
+	for (int i = 0; i < m_V.rows(); ++i)
+	{
+		m_V.row(i) = m_V.row(i) * inverseTrans;
+		m_V.row(i) -= transMat.block(3, 0, 1, 3);
+	}
+}
+
+void BaseModel::zoomModel()
+{
+	auto transMat = calcTransformMatrix();
+	for (int i = 0; i < m_V.rows(); ++i)
+		m_V.row(i) += transMat.block(3, 0, 1, 3);
+}
+
 void BaseModel::setTriAttributes()
 {
 	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);
@@ -532,7 +618,16 @@ vector<V3i> BaseModel::getFaces() const
 //////////////////////
 void BaseModel::readFile(const string& filename)
 {
-	if (!igl::read_triangle_mesh(filename, m_V, m_F)) { exit(EXIT_FAILURE); }
+	if (!igl::read_triangle_mesh(filename, m_V, m_F)) 
+	{ 
+		fprintf(stderr, "[I/O] Error: File %s could not open!", filename.c_str()); 
+		exit(EXIT_FAILURE); 
+	}
+	modelName = getFileName(DELIMITER, filename);
+}
+
+void BaseModel::setModelAttributeVector()
+{
 	for (int i = 0; i < m_V.rows(); i++) modelVerts.emplace_back(m_V.row(i));
 	for (int i = 0; i < m_F.rows(); i++)
 	{
@@ -544,7 +639,6 @@ void BaseModel::readFile(const string& filename)
 		));
 	}
 
-	modelName = getFileName(DELIMITER, filename);
 	nModelVerts = modelVerts.size(), nModelTris = modelFaces.size();
 }
 

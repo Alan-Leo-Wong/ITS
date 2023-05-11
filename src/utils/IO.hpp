@@ -129,6 +129,12 @@ namespace gvis
 			write_vertex(output, points[i]);
 	}
 
+	inline void writePointCloud_xyz(const std::vector<Eigen::Vector3d>& points, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.size(); ++i)
+			write_vertex_to_xyz(output, points[i]);
+	}
+
 	inline void writePointCloud(const std::vector<Eigen::Vector3d>& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
 	{
 		for (size_t i = 0; i < points.size(); ++i)
@@ -141,9 +147,15 @@ namespace gvis
 			write_vertex(output, points.row(i));
 	}
 
+	inline void writePointCloud_xyz(const MXd& points, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.rows(); ++i)
+			write_vertex_to_xyz(output, points.row(i));
+	}
+
 	inline void writePointCloud(const MXd& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
 	{
-		for (size_t i = 0; i < points.size(); ++i)
+		for (size_t i = 0; i < points.rows(); ++i)
 			write_vertex(output, points.row(i), rgbs[i]);
 	}
 
