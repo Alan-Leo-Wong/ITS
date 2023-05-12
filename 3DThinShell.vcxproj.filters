@@ -105,6 +105,9 @@
     <ClInclude Include="src\utils\cuda\DeviceQuery.cuh">
       <Filter>头文件\utils\cuda</Filter>
     </ClInclude>
+    <ClInclude Include="src\SDFHelper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

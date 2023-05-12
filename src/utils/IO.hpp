@@ -1,6 +1,6 @@
 #pragma once
 #include <fstream>
-#include <Eigen\Dense>
+#include <Eigen/Dense>
 
 namespace gvis
 {

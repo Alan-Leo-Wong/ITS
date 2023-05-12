@@ -11,7 +11,7 @@
 #include "cuda_runtime.h"
 #include <cmath>
 #include <array>
-#include <Eigen\Core>
+#include <Eigen/Core>
 
 using uint = unsigned int;
 

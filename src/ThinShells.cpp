@@ -1,19 +1,19 @@
 #include "ThinShells.h"
 #include "MortonLUT.h"
 #include "BSpline.hpp"
-#include "utils\IO.hpp"
-#include "utils\Timer.hpp"
-#include "utils\Common.hpp"
-#include "utils\String.hpp"
-#include "cuAcc\CUDACompute.h"
-#include "utils\cuda\CUDAMath.hpp"
-#include "cuAcc\MarchingCubes\MarchingCubes.h"
+#include "utils/IO.hpp"
+#include "utils/Timer.hpp"
+#include "utils/Common.hpp"
+#include "utils/String.hpp"
+#include "cuAcc/CUDACompute.h"
+#include "utils/cuda/CUDAMath.hpp"
+#include "cuAcc/MarchingCubes/MarchingCubes.h"
 #include <omp.h>
 #include <queue>
 #include <iomanip>
 #include <numeric>
-#include <Eigen\Sparse>
-#include <igl\signed_distance.h>
+#include <Eigen/Sparse>
+#include <igl/signed_distance.h>
 
 //////////////////////
 //  Create  Shells  //
@@ -820,6 +820,48 @@ void ThinShells::singlePointQuery(const std::string& out_file, const V3d& point)
 		"-- [RED] point not on the surface, [GREEN] point lie on the surface" << endl;
 
 	gvis::writePointCloud(point, rgb, out);
+}
+
+// 测试专用
+vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time)
+{
+	vector<int> result;
+	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!"); return result; }
+
+	if (nodeWidthArray.empty())
+	{
+		auto& svoNodeArray = svo.svoNodeArray;
+		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
+			[](SVONode node) {
+				return Eigen::Vector3d(node.width, node.width, node.width);
+			});
+	}
+
+	VXd q_bSplineVal;
+	VXd q_origin_bSplineVal;
+
+	TimerInterface* timer; createTimer(&timer);
+	startTimer(&timer);
+	cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes,
+		modelBoundingBox.boxOrigin, modelBoundingBox.boxWidth,
+		points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal, q_origin_bSplineVal);
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3; deleteTimer(&timer);
+
+	string t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"temp_queryValue.txt");
+	std::ofstream temp(t_filename);
+	temp << std::setiosflags(std::ios::fixed) << std::setprecision(9) << q_bSplineVal << endl;
+
+	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), q_origin_bSplineVal.begin(),
+		std::back_inserter(result),
+		[=](const double& val, const double& origin_val) {
+			// 要么在boundingbox内部计算出来的值大于等于外壳值，要么不在boundingbox内部——总的b样条值等于0且单点b样条值也等于0
+			if (val >= outerShellIsoVal || (fabs(val) < 1e-9 && fabs(origin_val) < 1e-9)) return 1;
+			else if (val <= innerShellIsoVal) return -1;
+			else return 0;
+		});
+
+	return result;
 }
 
 void ThinShells::multiPointQuery(const std::string& out_file, const vector<V3d>& points)

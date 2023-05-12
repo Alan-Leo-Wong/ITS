@@ -1,7 +1,7 @@
 #pragma once
 #include "ModelDefine.h"
 #include "BasicDataType.h"
-#include "utils\Geometry.hpp"
+#include "utils/Geometry.hpp"
 
 class BaseModel
 {
@@ -31,7 +31,7 @@ private:
 public:
 	BaseModel() {}
 
-	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces), is2UnitCube(false), scaleFactor(1.0) 
+	BaseModel(vector<V3d>verts, vector<V3i>faces) :modelVerts(verts), modelFaces(faces), is2UnitCube(false), scaleFactor(1.0)
 	{
 		setUniformBoundingBox();
 		setTriAttributes();
@@ -45,7 +45,7 @@ public:
 		setTriAttributes();
 	}
 
-	BaseModel(const std::string& filename, const bool& _is2UnitCube, const double& _scaleFactor) 
+	BaseModel(const std::string& filename, const bool& _is2UnitCube, const double& _scaleFactor)
 		: is2UnitCube(_is2UnitCube), scaleFactor(_scaleFactor)
 	{
 		readFile(filename);
@@ -56,6 +56,13 @@ public:
 	}
 
 	~BaseModel() {}
+
+public:
+	vector<V3d> getModelVerts() { return modelVerts; }
+
+	vector<V3i> getModelFaces() { return modelFaces; }
+
+	vector<Triangle<V3d>> getModelTris() { return modelTris; }
 
 private:
 	Eigen::Matrix4d calcTransformMatrix();
@@ -79,9 +86,11 @@ public:
 
 	void setTriAttributes();
 
-	Eigen::MatrixXd generateRandomPoints(const size_t& numPoints);
+	Eigen::MatrixXd generateGaussianRandomPoints(const size_t& numPoints);
+	Eigen::MatrixXd generateUniformRandomPoints(const size_t& numPoints);
 
-	Eigen::MatrixXd generateRandomPoints(const string& filename, const size_t& numPoints);
+	Eigen::MatrixXd generateGaussianRandomPoints(const string& filename, const size_t& numPoints, const V3d& originOffset = V3d(0, 0, 0), const V3d& endOffset = V3d(0, 0, 0));
+	Eigen::MatrixXd generateUniformRandomPoints(const string& filename, const size_t& numPoints, const V3d& originOffset = V3d(0, 0, 0), const V3d& endOffset = V3d(0, 0, 0));
 
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;

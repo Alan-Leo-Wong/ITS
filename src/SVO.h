@@ -1,14 +1,14 @@
 #pragma once
 #include <vector>
 #include <limits>
-#include <Eigen\Dense>
-#include <thrust\pair.h>
-#include <thrust\device_vector.h>
+#include <Eigen/Dense>
+#include <thrust/pair.h>
+#include <thrust/device_vector.h>
 //#include "ThinShells.h"
 #include "BasicDataType.h"
-#include "utils\Common.hpp"
-#include "utils\Geometry.hpp"
-#include "utils\cuda\CUDAMacro.h"
+#include "utils/Common.hpp"
+#include "utils/Geometry.hpp"
+#include "utils/cuda\CUDAMacro.h"
 
 using std::vector;
 

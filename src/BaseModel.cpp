@@ -1,12 +1,12 @@
 #include "BaseModel.h"
-#include "utils\IO.hpp"
-#include "utils\Common.hpp"
-#include "utils\String.hpp"
-#include "cuAcc\CUDACompute.h"
+#include "utils/IO.hpp"
+#include "utils/Common.hpp"
+#include "utils/String.hpp"
+#include "cuAcc/CUDACompute.h"
 #include <sstream>
 #include <iomanip>
-#include <igl\writeOBJ.h>
-#include <igl\read_triangle_mesh.h>
+#include <igl/writeOBJ.h>
+#include <igl/read_triangle_mesh.h>
 
 //////////////////////
 //   Model  Utils   //
@@ -70,7 +70,7 @@ Eigen::Matrix4d BaseModel::calcTransformMatrix()
 		center[i] -= scale / 2;
 	Eigen::Matrix4d zoomMatrix = Eigen::Matrix4d::Identity();
 	Eigen::Matrix4d transMatrix = Eigen::Matrix4d::Identity();
-	for (int i = 0; i < 3; i++) 
+	for (int i = 0; i < 3; i++)
 	{
 		zoomMatrix(i, i) = 1. / scale;
 		transMatrix(3, i) = -center[i];
@@ -86,7 +86,7 @@ Eigen::Matrix4d BaseModel::calcScaleMatrix()
 	// Get the target solveRes (along the largest dimension)
 	double scale = boxMax[0] - boxMin[0];
 	double minScale = scale;
-	for (int d = 1; d < 3; d++) 
+	for (int d = 1; d < 3; d++)
 	{
 		scale = std::max<double>(scale, boxMax[d] - boxMin[d]);
 		minScale = std::min<double>(scale, boxMax[d] - boxMin[d]);
@@ -99,7 +99,7 @@ Eigen::Matrix4d BaseModel::calcScaleMatrix()
 	for (int i = 0; i < 3; i++)
 		center[i] -= scale / 2;
 	Eigen::Matrix4d zoomMatrix = Eigen::Matrix4d::Identity();
-	for (int i = 0; i < 3; i++) 
+	for (int i = 0; i < 3; i++)
 	{
 		zoomMatrix(i, i) = 1. / scale;
 	}
@@ -129,7 +129,7 @@ void BaseModel::unitCube2Model()
 
 void BaseModel::zoomModel()
 {
-	auto transMat = calcTransformMatrix();
+	auto transMat = calcScaleMatrix();
 	for (int i = 0; i < m_V.rows(); ++i)
 		m_V.row(i) += transMat.block(3, 0, 1, 3);
 }
@@ -139,27 +139,64 @@ void BaseModel::setTriAttributes()
 	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);
 }
 
-Eigen::MatrixXd BaseModel::generateRandomPoints(const size_t& numPoints)
+Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const size_t& numPoints)
 {
 	Eigen::MatrixXd M;
 	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
 	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-	getRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	getGaussianRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
 	return M;
 }
 
-Eigen::MatrixXd BaseModel::generateRandomPoints(const string& filename, const size_t& numPoints)
+Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const size_t& numPoints)
 {
 	Eigen::MatrixXd M;
 	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
 	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-	getRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	getUniformRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	return M;
+}
+
+Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const string& filename, const size_t& numPoints,
+	const V3d& originOffset, const V3d& endOffset)
+{
+	Eigen::MatrixXd M;
+	const V3d min_area = modelBoundingBox.boxOrigin - originOffset;
+	const V3d max_area = modelBoundingBox.boxEnd + endOffset;
+	getGaussianRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
 
 	checkDir(filename);
-	std::ofstream out(filename);
+	std::ofstream out(filename, std::ofstream::out);
 	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return M; }
 	cout << "-- Save random points to " << std::quoted(filename) << endl;
-	gvis::writePointCloud(M, out);
+
+	//std::cout << getFileExtension(filename) << std::endl;
+	if (getFileExtension(filename) == ".obj")
+		gvis::writePointCloud(M, out);
+	else if (getFileExtension(filename) == ".xyz")
+		gvis::writePointCloud_xyz(M, out);
+
+	return M;
+}
+
+Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const string& filename, const size_t& numPoints,
+	const V3d& originOffset, const V3d& endOffset)
+{
+	Eigen::MatrixXd M;
+	const V3d min_area = modelBoundingBox.boxOrigin - originOffset;
+	const V3d max_area = modelBoundingBox.boxEnd + endOffset;
+	getUniformRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+
+	checkDir(filename);
+	std::ofstream out(filename, std::ofstream::out);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return M; }
+	cout << "-- Save random points to " << std::quoted(filename) << endl;
+
+	//std::cout << getFileExtension(filename) << std::endl;
+	if (getFileExtension(filename) == ".obj")
+		gvis::writePointCloud(M, out);
+	else if (getFileExtension(filename) == ".xyz")
+		gvis::writePointCloud_xyz(M, out);
 
 	return M;
 }
@@ -618,10 +655,10 @@ vector<V3i> BaseModel::getFaces() const
 //////////////////////
 void BaseModel::readFile(const string& filename)
 {
-	if (!igl::read_triangle_mesh(filename, m_V, m_F)) 
-	{ 
-		fprintf(stderr, "[I/O] Error: File %s could not open!", filename.c_str()); 
-		exit(EXIT_FAILURE); 
+	if (!igl::read_triangle_mesh(filename, m_V, m_F))
+	{
+		fprintf(stderr, "[I/O] Error: File %s could not open!", filename.c_str());
+		exit(EXIT_FAILURE);
 	}
 	modelName = getFileName(DELIMITER, filename);
 }

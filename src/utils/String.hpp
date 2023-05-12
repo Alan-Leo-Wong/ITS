@@ -79,6 +79,7 @@ inline string getFileNameWithExt(const char* delimiter, const string& filePath)
 	return fileName;
 }
 
+// such as ".obj"
 inline char* getFileExtension(char* filePath)
 {
 	char* extension = filePath;

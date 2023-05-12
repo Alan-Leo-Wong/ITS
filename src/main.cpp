@@ -1,10 +1,11 @@
 //#include "CollisionDetection.h"
+#include "SDFHelper.h"
 #include "ThinShells.h"
-#include "utils\IO.hpp"
-#include "utils\Timer.hpp"
-#include "utils\String.hpp"
-#include "utils\Common.hpp"
-#include "utils\CMDParser.hpp"
+#include "utils/IO.hpp"
+#include "utils/Timer.hpp"
+#include "utils/String.hpp"
+#include "utils/Common.hpp"
+#include "utils/CMDParser.hpp"
 
 std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** argv)
 {
@@ -31,6 +32,52 @@ std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** 
 	printf("--Octree's max depth built for the SECOND model: %u\n", dep_2);
 
 	return std::make_tuple(dep_1, dep_2, mp_1, mp_2);
+}
+
+void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string& queryFile, const string& queryResFile)
+{
+	printf("\n[Test] Point INSIDE or OUTSIDE surface\n");
+
+	printf("-- Generate random points in gaussian distribution...\n");
+	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> randomPointsMat =
+		thinShell.generateGaussianRandomPoints(queryFile, numPoints, V3d(10, 10, 10), V3d(10, 10, 10));
+	vector<V3d> randomPointsVec(numPoints);
+	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>::Map(randomPointsVec.data()->data(), numPoints, 3) = randomPointsMat;
+
+	// timer
+	TimerInterface* timer = nullptr;
+	createTimer(&timer);
+
+	// ours(cuda)
+	double time;
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time);
+	if (!our_res.empty()) printf("-- [Ours(CUDA)]: Multi points query spent %lf s.\n", time);
+	else return;
+
+	// fcpw
+	fcpw::Scene<3> scene;
+	fcpw_helper::initSDF(scene, thinShell.getModelVerts(), thinShell.getModelFaces());
+	vector<int> fcpw_res(numPoints);
+	startTimer(&timer);
+	for (size_t i = 0; i < numPoints; ++i)
+	{
+		double sdf = fcpw_helper::getSignedDistance(randomPointsMat.row(i), scene);
+		if (sdf > 0) fcpw_res[i] = 1;
+		else if (sdf < 0) fcpw_res[i] = -1;
+		else fcpw_res[i] = 0;
+	}
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("-- [FCPW(normal)]: Multi points query spent %lf s.\n", time);
+
+	deleteTimer(&timer);
+
+	// compare result
+	size_t correct = 0;
+	for (size_t i = 0; i < numPoints; ++i)
+		if (our_res[i] == fcpw_res[i]) ++correct;
+	//printf("-- Correct number = %llu\n", correct);
+	printf("-- Correct rate = %lf%%\n", (correct * 100.0) / numPoints);
 }
 
 int main(int argc, char** argv)
@@ -64,9 +111,9 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64);
-	bool is2Cube = true;
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 16, 16, 16);
+	//bool is2Cube = true;
+	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
@@ -95,15 +142,9 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nMarchingCubes spent %lf s.\n", time);*/
 
-	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.obj");
-	MXd randomPoints = thinShell.generateRandomPoints(queryFile, 100);
-
-	startTimer(&timer);
-	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.obj");
-	thinShell.multiPointQuery(queryResFile, randomPoints);
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("\nMulti points query spent %lf s.\n", time);*/
+	const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
+	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");
+	testPointInOut(thinShell, 100000, queryFile, queryResFile);
 
 	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 

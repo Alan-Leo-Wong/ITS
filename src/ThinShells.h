@@ -1,7 +1,8 @@
 #pragma once
 #include "SVO.h"
 #include "BaseModel.h"
-#include "utils\String.hpp"
+//#include "utils\Timer.hpp"
+#include "utils/String.hpp"
 
 class ThinShells : public BaseModel
 {
@@ -106,13 +107,6 @@ public:
 
 	std::array<double, 2> getShellIsoVal() { return { innerShellIsoVal, outerShellIsoVal }; }
 
-	// 点在表面的查询
-	void singlePointQuery(const std::string& out_file, const V3d& point);
-
-	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
-
-	void multiPointQuery(const std::string& out_file, const MXd& points);
-
 public:
 	void saveTree(const string& filename) const;
 
@@ -135,8 +129,7 @@ public:
 
 	void textureVisualization(const string& filename) const;
 
-	friend class CollisionDetection;
-
+	//friend class CollisionDetection;
 private:
 	void prepareMoveOnSurface(int& ac_treeDepth, 
 		vector<vector<V3d>>& nodeOrigin,
@@ -145,8 +138,16 @@ private:
 		vector<double>& nodeWidth);
 
 public:
+	// 点在表面的查询
+	void singlePointQuery(const std::string& out_file, const V3d& point);
+
+	vector<int> multiPointQuery(const vector<V3d>& points, double& time);
+
+	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
+
+	void multiPointQuery(const std::string& out_file, const MXd& points);
+
 	void moveOnSurface(const V3d& modelVert, const V3d& v, const size_t& max_move_cnt);
 
 	void pointProjection(const V3d& point);
-
 };

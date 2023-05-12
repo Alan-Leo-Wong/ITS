@@ -29,6 +29,7 @@
     <ClInclude Include="src\cuAcc\MarchingCubes\MarchingCubes.h" />
     <ClInclude Include="src\ModelDefine.h" />
     <ClInclude Include="src\MortonLUT.h" />
+    <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\SVO.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
