@@ -65,8 +65,11 @@ public:
 	vector<Triangle<V3d>> getModelTris() { return modelTris; }
 
 private:
-	Eigen::Matrix4d calcTransformMatrix();
-	Eigen::Matrix4d calcScaleMatrix();
+	Eigen::Matrix4d calcUnitCubeTransformMatrix();
+
+	Eigen::Matrix4d calcTransformMatrix(const float& _scaleFactor);
+
+	Eigen::Matrix3d calcScaleMatrix();
 
 public:
 	void model2UnitCube();
@@ -75,22 +78,24 @@ public:
 
 	void zoomModel();
 
+	void transformModel(const float& _scaleFactor);
+
 public:
 	vector<V2i> extractEdges();
 
 	//void scaleMatrix(MXd V);
 
-	void setBoundingBox(const double& scaleSize = 1);
+	void setBoundingBox(const float& _scaleFactor = 1);
 
 	void setUniformBoundingBox();
 
 	void setTriAttributes();
 
-	Eigen::MatrixXd generateGaussianRandomPoints(const size_t& numPoints);
-	Eigen::MatrixXd generateUniformRandomPoints(const size_t& numPoints);
+	Eigen::MatrixXd generateGaussianRandomPoints(const size_t& numPoints, const float& _scaleFactor, const float& dis);
+	Eigen::MatrixXd generateUniformRandomPoints(const size_t& numPoints, const float& _scaleFactor, const float& dis);
 
-	Eigen::MatrixXd generateGaussianRandomPoints(const string& filename, const size_t& numPoints, const V3d& originOffset = V3d(0, 0, 0), const V3d& endOffset = V3d(0, 0, 0));
-	Eigen::MatrixXd generateUniformRandomPoints(const string& filename, const size_t& numPoints, const V3d& originOffset = V3d(0, 0, 0), const V3d& endOffset = V3d(0, 0, 0));
+	Eigen::MatrixXd generateGaussianRandomPoints(const string& filename, const size_t& numPoints, const float& _scaleFactor, const float& dis);
+	Eigen::MatrixXd generateUniformRandomPoints(const string& filename, const size_t& numPoints, const float& _scaleFactor, const float& dis);
 
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;

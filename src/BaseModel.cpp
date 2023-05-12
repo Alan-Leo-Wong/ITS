@@ -11,7 +11,7 @@
 //////////////////////
 //   Model  Utils   //
 //////////////////////
-void BaseModel::setBoundingBox(const double& scaleSize)
+void BaseModel::setBoundingBox(const float& scaleSize)
 {
 	V3d minV = m_V.colwise().minCoeff();
 	V3d maxV = m_V.colwise().maxCoeff();
@@ -48,7 +48,8 @@ void BaseModel::setUniformBoundingBox()
 	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
 }
 
-Eigen::Matrix4d BaseModel::calcTransformMatrix()
+// 用于to unit cube
+Eigen::Matrix4d BaseModel::calcUnitCubeTransformMatrix()
 {
 	Eigen::RowVector3d boxMin = m_V.colwise().minCoeff();
 	Eigen::RowVector3d boxMax = m_V.colwise().maxCoeff();
@@ -78,37 +79,9 @@ Eigen::Matrix4d BaseModel::calcTransformMatrix()
 	return zoomMatrix * transMatrix;
 }
 
-Eigen::Matrix4d BaseModel::calcScaleMatrix()
-{
-	Eigen::RowVector3d boxMin = m_V.colwise().minCoeff();
-	Eigen::RowVector3d boxMax = m_V.colwise().maxCoeff();
-
-	// Get the target solveRes (along the largest dimension)
-	double scale = boxMax[0] - boxMin[0];
-	double minScale = scale;
-	for (int d = 1; d < 3; d++)
-	{
-		scale = std::max<double>(scale, boxMax[d] - boxMin[d]);
-		minScale = std::min<double>(scale, boxMax[d] - boxMin[d]);
-	}
-	// std::cout << 1.1 + scale / minScale << std::endl;
-	// scaleFactor =
-	scale *= scaleFactor;
-	Eigen::Vector3d center = 0.5 * boxMax + 0.5 * boxMin;
-
-	for (int i = 0; i < 3; i++)
-		center[i] -= scale / 2;
-	Eigen::Matrix4d zoomMatrix = Eigen::Matrix4d::Identity();
-	for (int i = 0; i < 3; i++)
-	{
-		zoomMatrix(i, i) = 1. / scale;
-	}
-	return zoomMatrix;
-}
-
 void BaseModel::model2UnitCube()
 {
-	auto transMat = calcTransformMatrix();
+	auto transMat = calcUnitCubeTransformMatrix();
 	for (int i = 0; i < m_V.rows(); ++i)
 	{
 		m_V.row(i) += transMat.block(3, 0, 1, 3);
@@ -118,7 +91,7 @@ void BaseModel::model2UnitCube()
 
 void BaseModel::unitCube2Model()
 {
-	auto transMat = calcTransformMatrix();
+	auto transMat = calcUnitCubeTransformMatrix();
 	Eigen::Matrix3d inverseTrans = transMat.block(0, 0, 3, 3).inverse();
 	for (int i = 0; i < m_V.rows(); ++i)
 	{
@@ -127,43 +100,88 @@ void BaseModel::unitCube2Model()
 	}
 }
 
+// 用于缩放模型
+Eigen::Matrix3d BaseModel::calcScaleMatrix()
+{
+	Eigen::RowVector3d boxMin = m_V.colwise().minCoeff();
+	Eigen::RowVector3d boxMax = m_V.colwise().maxCoeff();
+
+	// Get the target solveRes (along the largest dimension)
+	double scale = boxMax[0] - boxMin[0];
+	scale *= scaleFactor;
+	Eigen::Matrix3d zoomMatrix;
+	for (int i = 0; i < 3; i++)
+		zoomMatrix(i, i) = scale;
+	return zoomMatrix;
+}
+
 void BaseModel::zoomModel()
 {
-	auto transMat = calcScaleMatrix();
-	for (int i = 0; i < m_V.rows(); ++i)
-		m_V.row(i) += transMat.block(3, 0, 1, 3);
+	Eigen::Matrix3d zoomMat = calcScaleMatrix();
+	m_V = m_V * zoomMat;
 }
 
-void BaseModel::setTriAttributes()
+// 用于一般的transform，先缩放模型，再将新的中心点移至缩放前模型的中心点
+Eigen::Matrix4d BaseModel::calcTransformMatrix(const float& _scaleFactor)
 {
-	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);
+	Eigen::RowVector3d boxMin = m_V.colwise().minCoeff();
+	Eigen::RowVector3d boxMax = m_V.colwise().maxCoeff();
+
+	// Get the target solveRes (along the largest dimension)
+	double scale = boxMax[0] - boxMin[0];
+	for (int d = 1; d < 3; d++)
+		scale = std::max<double>(scale, boxMax[d] - boxMin[d]);
+	if (_scaleFactor > 1e-9) scale *= _scaleFactor;
+	else scale *= scaleFactor;
+	Eigen::Vector3d center = 0.5 * boxMax + 0.5 * boxMin;
+
+	for (int i = 0; i < 3; i++)
+		center[i] -= scale / 2;
+	Eigen::Matrix4d zoomMatrix = Eigen::Matrix4d::Identity();
+	Eigen::Matrix4d transMatrix = Eigen::Matrix4d::Identity();
+	for (int i = 0; i < 3; i++)
+	{
+		zoomMatrix(i, i) = scaleFactor;
+		transMatrix(3, i) = center[i] * (scaleFactor - 1);
+	}
+	return zoomMatrix * transMatrix;
 }
 
-Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const size_t& numPoints)
+void BaseModel::transformModel(const float& _scaleFactor)
+{
+	Eigen::Matrix4d transMat = calcTransformMatrix(_scaleFactor);
+	for (int i = 0; i < m_V.rows(); ++i)
+	{
+		m_V.row(i) += transMat.block(3, 0, 1, 3);
+		m_V.row(i) = m_V.row(i) * transMat.block(0, 0, 3, 3);
+	}
+}
+
+Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const size_t& numPoints, const float& _scaleFactor, const float& dis)
 {
 	Eigen::MatrixXd M;
 	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
 	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-	getGaussianRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	getGaussianRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
 	return M;
 }
 
-Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const size_t& numPoints)
+Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const size_t& numPoints, const float& _scaleFactor, const float& dis)
 {
 	Eigen::MatrixXd M;
 	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
 	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-	getUniformRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	getUniformRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
 	return M;
 }
 
 Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const string& filename, const size_t& numPoints,
-	const V3d& originOffset, const V3d& endOffset)
+	const float& _scaleFactor, const float& dis)
 {
 	Eigen::MatrixXd M;
-	const V3d min_area = modelBoundingBox.boxOrigin - originOffset;
-	const V3d max_area = modelBoundingBox.boxEnd + endOffset;
-	getGaussianRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
+	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
+	getGaussianRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
 
 	checkDir(filename);
 	std::ofstream out(filename, std::ofstream::out);
@@ -180,12 +198,12 @@ Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const string& filename, 
 }
 
 Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const string& filename, const size_t& numPoints,
-	const V3d& originOffset, const V3d& endOffset)
+	const float& _scaleFactor, const float& dis)
 {
 	Eigen::MatrixXd M;
-	const V3d min_area = modelBoundingBox.boxOrigin - originOffset;
-	const V3d max_area = modelBoundingBox.boxEnd + endOffset;
-	getUniformRandomMatrix<double>(min_area, max_area, numPoints, 0.5, 0.5, M);
+	const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
+	const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
+	getUniformRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
 
 	checkDir(filename);
 	std::ofstream out(filename, std::ofstream::out);
@@ -199,6 +217,11 @@ Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const string& filename, c
 		gvis::writePointCloud_xyz(M, out);
 
 	return M;
+}
+
+void BaseModel::setTriAttributes()
+{
+	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);
 }
 
 vector<V2i> BaseModel::extractEdges()
