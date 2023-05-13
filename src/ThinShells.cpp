@@ -25,10 +25,15 @@ inline int parallelAxis(const V3d& p1, const V3d& p2)
 	else return 3; // 与z轴平行
 };
 
+inline V3i ThinShells::getPointDis(const V3d& vert, const V3d& origin, const V3d& width)
+{
+	return ((vert - origin).array() / width.array()).cast<int>();
+}
+
 inline V3i ThinShells::getPointDis(const V3d& vert, const V3d& origin, const double& width)
 {
 	return ((vert - origin).array() / width).cast<int>();
-};
+}
 
 inline void ThinShells::cpIntersectionPoints()
 {
@@ -64,8 +69,8 @@ inline void ThinShells::cpIntersectionPoints()
 
 		V3d modelEdgeDir = p2 - p1;
 
-		V3i dis1 = getPointDis(p1, modelOrigin, voxelWidth);
-		V3i dis2 = getPointDis(p2, modelOrigin, voxelWidth);
+		V3i dis1 = getPointDis(p1, modelOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
+		V3i dis2 = getPointDis(p2, modelOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
 
 		V3i min_dis = clamp(vmini(dis1, dis2).array() - 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
 		V3i max_dis = clamp(vmaxi(dis1, dis2).array() + 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
@@ -823,30 +828,200 @@ void ThinShells::singlePointQuery(const std::string& out_file, const V3d& point)
 }
 
 // 测试专用
-vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time)
+vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time, const Test::type& choice)
 {
-	vector<int> result;
-	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!"); return result; }
+	test_type test = (test_type)choice;
 
+	size_t numPoints = points.size();
+	vector<int> result;
+	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!\n"); return result; }
+	const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
 	if (nodeWidthArray.empty())
 	{
-		auto& svoNodeArray = svo.svoNodeArray;
 		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
 			[](SVONode node) {
 				return Eigen::Vector3d(node.width, node.width, node.width);
 			});
 	}
-
 	VXd q_bSplineVal;
 	VXd q_origin_bSplineVal;
 
+	const vector<node_vertex_type>& allNodeVertexArray = svo.nodeVertexArray;
+	const size_t& numNodeVerts = svo.numNodeVerts;
+	const V3d& boxOrigin = modelBoundingBox.boxOrigin;
+	const V3d& boxWidth = modelBoundingBox.boxWidth;
+
+	auto mt_cputTest = [&]()
+	{
+		//#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			double sum = .0;
+			//#pragma omp parallel for reduction(+ : sum)
+			for (int j = 0; j < numNodeVerts; ++j)
+			{
+				V3d nodeVert = allNodeVertexArray[j].first;
+				uint32_t nodeIdx = allNodeVertexArray[j].second;
+				double t = BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point);
+				if (i == 2 && t != 0.0)
+				{
+					std::cout << "#1: inDmPoints origin = " << nodeVert.transpose()
+						<< ", inDmPoints width = " << svoNodeArray[nodeIdx].width << std::endl;
+					//system("pause");
+				}
+				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
+			}
+			q_bSplineVal[i] = sum;
+			q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+		}
+	};
+
+	// 通过找范围求b样条值
+	const auto& depthNodeVertexArray = svo.depthNodeVertexArray;
+	const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
+
+	vector<size_t> numFineNodesIdx(svo.numFineNodes);
+	std::iota(numFineNodesIdx.begin(), numFineNodesIdx.end(), 0);
+
+	// 最细的一层体素莫顿码与其下标的映射
+	std::map<uint32_t, size_t> morton2FineNodes;
+	std::transform(svoNodeArray.begin(), svoNodeArray.begin() + svo.numFineNodes,
+		numFineNodesIdx.begin(), std::inserter(morton2FineNodes, morton2FineNodes.end()),
+		[](const SVONode& node, const size_t& idx) {
+			return std::make_pair(node.mortonCode, idx);
+		});
+
+	// 每一层节点顶点到该层顶点下标的映射
+	vector<std::map<V3d, size_t>> nodeVertex2Idx(treeDepth);
+	for (int d = 0; d < treeDepth; ++d)
+	{
+		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+		vector<size_t> d_nodeVertexIdx(d_numNodeVerts);
+		std::iota(d_nodeVertexIdx.begin(), d_nodeVertexIdx.end(), 0);
+
+		std::transform(depthNodeVertexArray[d].begin(), depthNodeVertexArray[d].end(), d_nodeVertexIdx.begin(),
+			std::inserter(nodeVertex2Idx[d], nodeVertex2Idx[d].end()),
+			[](const node_vertex_type& val, size_t i) {
+				return std::make_pair(val.first, i);
+			});
+	}
+
+	auto mt_cputTest_2 = [&]()
+	{
+		const V3i endDis = getPointDis(modelBoundingBox.boxEnd, boxOrigin, voxelWidth);
+		const V3i zeroDis = V3i(0, 0, 0);
+
+		//#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+
+			//const V3i dis = getPointDis(point, boxOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
+			const V3i dis = getPointDis(point, boxOrigin, voxelWidth);
+			if (i == 2)
+			{
+				std::cout << "boxOrigin = " << boxOrigin.transpose() << ", dis = " << dis.transpose() << std::endl;
+				system("pause");
+			}
+			if ((dis.array() < zeroDis.array()).any() || (dis.array() > endDis.array()).any()) { q_bSplineVal[i] = DINF; continue; } // 不在svo范围内
+
+			double sum = .0;
+			const uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+			if (morton2FineNodes.find(pointMorton) != morton2FineNodes.end())
+			{
+				const size_t fineNodeIdx = morton2FineNodes.at(pointMorton);
+				auto inDmPoints = svo.mq_setInDomainPoints(fineNodeIdx, esumDepthNodeVerts, nodeVertex2Idx);
+				const int nInDmPoints = inDmPoints.size();
+
+				//#pragma omp parallel for reduction(+ : sum)
+				for (int j = 0; j < nInDmPoints; ++j)
+				{
+					double t = BaseFunction4Point(std::get<0>(inDmPoints[j]), std::get<1>(inDmPoints[j]), point);
+					if (i == 2)
+					{
+						if (std::get<0>(inDmPoints[j]).isApprox(V3d(-0.108921, 0.0181142, 0.0904957), 1e-6))
+						{
+							std::cout << "t = " << t << ", width = " << std::get<1>(inDmPoints[j]) << std::endl;
+							system("pause");
+						}
+					}
+
+					if (i == 2 && t != 0.0)
+					{
+						std::cout << "#2: inDmPoints origin = " << std::get<0>(inDmPoints[j]).transpose() <<
+							", inDmPoints width = " << std::get<1>(inDmPoints[j]) << std::endl;
+
+						system("pause");
+					}
+
+					sum += lambda[std::get<2>(inDmPoints[j])] *
+						(BaseFunction4Point(std::get<0>(inDmPoints[j]), std::get<1>(inDmPoints[j]), point));
+				}
+			}
+
+			q_bSplineVal[i] = sum;
+		}
+	};
+
+	auto simd_cputTest = [&]()
+	{
+#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			double sum = .0;
+#pragma omp simd simdlen(8)
+			for (int j = 0; j < numNodeVerts; ++j)
+			{
+				V3d nodeVert = allNodeVertexArray[j].first;
+				uint32_t nodeIdx = allNodeVertexArray[j].second;
+				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
+			}
+			q_bSplineVal[i] = sum;
+			q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+		}
+	};
+
 	TimerInterface* timer; createTimer(&timer);
-	startTimer(&timer);
-	cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes,
-		modelBoundingBox.boxOrigin, modelBoundingBox.boxWidth,
-		points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal, q_origin_bSplineVal);
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3; deleteTimer(&timer);
+	switch (test)
+	{
+	case Test::CPU:
+		printf("-- Using CPU\n");
+		q_bSplineVal.resize(numPoints);
+		q_origin_bSplineVal.resize(numPoints);
+		startTimer(&timer);
+
+		mt_cputTest();
+		mt_cputTest_2();
+
+		stopTimer(&timer);
+		time = getElapsedTime(&timer) * 1e-3;
+		break;
+	case Test::CPU_SIMD:
+		printf("-- Using CPU-SIMD\n");
+		q_bSplineVal.resize(numPoints);
+		q_origin_bSplineVal.resize(numPoints);
+		startTimer(&timer);
+
+		simd_cputTest();
+
+		stopTimer(&timer);
+		time = getElapsedTime(&timer) * 1e-3;
+		break;
+	default:
+	case Test::CUDA:
+		printf("-- Using CUDA\n");
+		startTimer(&timer);
+
+		cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, boxOrigin, boxWidth,
+			points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal, q_origin_bSplineVal);
+
+		stopTimer(&timer);
+		time = getElapsedTime(&timer) * 1e-3;
+		break;
+	}
+	deleteTimer(&timer);
 
 	string t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"temp_queryValue.txt");
 	std::ofstream temp(t_filename);

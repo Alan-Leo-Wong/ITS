@@ -544,7 +544,6 @@ namespace cuAcc {
 
 				while (i < n)
 				{
-					//printf("#2 sum = %lf\n", sum);
 					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
 					if (i + colBlockSize < n)
 					{
@@ -557,7 +556,6 @@ namespace cuAcc {
 				unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
 				while (i < n)
 				{
-					//printf("#2 sum = %lf\n", sum);
 					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
 					i += x_gridSize;
 				}
@@ -571,20 +569,16 @@ namespace cuAcc {
 
 			cg::sync(ctb);
 
-			//printf("#3 sum = %lf\n", sum);
-
 			// 同一个block下所有warp求和(只要将每个warp的第一个thread保存的sum加起来即可，
 			// 因为每个warp的第一个thread保存的sum就是其所属warp的所有线程的数据和)
 			const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
 			if (x_tid < sh_reduceNum) {
 				sum = shData[threadIdx.y * sh_reduceNum + x_tid];
 				warpReduceSum<Scalar>(newMask, sum);
-				//printf("#4 sum = %lf\n", sum);
 			}
 
 			if (x_tid == 0) {
 				g_odata[ty * gridDim.x + blockIdx.x] = sum;
-				//printf("#4 ty = %d, sum = %lf\n", ty, sum);
 			}
 
 			if (tx == 0) {
@@ -862,7 +856,7 @@ namespace cuAcc {
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, thrust::device_vector<Scalar>& d_value)
 	{
 		//std::cout << "rowElems = " << rowElems << std::endl;
-		int x_blockSize = 0, y_blockSize = 16; // x操纵B，y操纵A
+		int x_blockSize = 0, y_blockSize = 16; // x操纵B，y操纵A (注意：x_blockSize 必须得>=32)
 		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
 		// 分配时需要paddingCols
@@ -906,7 +900,7 @@ namespace cuAcc {
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, const T* d_modelBBOrigin, const T* d_modelBBWidth,
 		thrust::device_vector<Scalar>& d_value, thrust::device_vector<Scalar>& d_one_value)
 	{
-		int x_blockSize = 0, y_blockSize = 256; // x操纵B，y操纵A
+		int x_blockSize = 0, y_blockSize = 32; // x操纵B，y操纵A (注意：x_blockSize 必须得>=32)
 		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
 		// 分配时需要paddingCols

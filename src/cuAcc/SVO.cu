@@ -1099,7 +1099,7 @@ void SparseVoxelOctree::constructNodeAtrributes(const thrust::device_vector<size
 	constructNodeVertexAndEdge(d_esumTreeNodesArray, d_SVONodeArray);
 }
 
-std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth,
+std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t& nodeIdx, const int& nodeDepth,
 	const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx)
 {
 	int parentDepth = nodeDepth;
@@ -1135,6 +1135,42 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 	}
 
 	return std::make_tuple(dm_points, dm_pointsIdx);
+}
+
+std::vector<std::tuple<V3d, double, size_t>> SparseVoxelOctree::mq_setInDomainPoints(const uint32_t& nodeIdx,
+	const vector<size_t>& esumDepthNodeVertexArray, vector<std::map<V3d, size_t>>& nodeVertex2Idx)
+{
+	int curDepth = 0;
+	uint32_t curNodeIdx = nodeIdx;
+	vector<std::tuple<V3d, double, size_t>> dm_points; // 坐标、宽度和在所有顶点数组中的下标
+
+	auto getCorners = [&](const SVONode& node, const int& depth)
+	{
+		const V3d& nodeOrigin = node.origin;
+		const double& nodeWidth = node.width;
+		const size_t& esumNodeVerts = esumDepthNodeVertexArray[depth];
+
+		for (int k = 0; k < 8; ++k)
+		{
+			const int xOffset = k & 1;
+			const int yOffset = (k >> 1) & 1;
+			const int zOffset = (k >> 2) & 1;
+
+			V3d corner = nodeOrigin + nodeWidth * V3d(xOffset, yOffset, zOffset);
+
+			dm_points.emplace_back(std::make_tuple(corner, nodeWidth, esumNodeVerts + nodeVertex2Idx[depth].at(corner)));
+		}
+	};
+
+	while (curNodeIdx != UINT_MAX)
+	{
+		const auto& svoNode = svoNodeArray[curNodeIdx];
+		getCorners(svoNode, curDepth);
+		curNodeIdx = svoNode.parent;
+		curDepth++;
+	}
+
+	return dm_points;
 }
 
 //////////////////////

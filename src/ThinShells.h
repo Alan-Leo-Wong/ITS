@@ -1,11 +1,12 @@
 #pragma once
 #include "SVO.h"
 #include "BaseModel.h"
-//#include "utils\Timer.hpp"
 #include "utils/String.hpp"
+#include "test/TestConfig.h"
 
 class ThinShells : public BaseModel
 {
+	using test_type = Test::type;
 private:
 	V3d modelOrigin;
 
@@ -84,6 +85,8 @@ public:
 	// ThinShells& operator=(const ThinShells& model);
 
 private:
+	V3i getPointDis(const V3d& modelVert, const V3d& origin, const V3d& width);
+
 	V3i getPointDis(const V3d& modelVert, const V3d& origin, const double& width);
 
 	//void cpIntersectionPoints();
@@ -141,7 +144,7 @@ public:
 	// 点在表面的查询
 	void singlePointQuery(const std::string& out_file, const V3d& point);
 
-	vector<int> multiPointQuery(const vector<V3d>& points, double& time);
+	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const test_type& choice = Test::CUDA);
 
 	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
 

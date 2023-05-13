@@ -16,7 +16,7 @@ namespace MC {
 #endif // !NTHREADS
 
 #ifndef MAX_NUM_STREAMS
-#  define MAX_NUM_STREAMS 512 // 用于处理行方向--voxel的最大分块数
+#  define MAX_NUM_STREAMS 1024 // 用于处理行方向--voxel的最大分块数
 #endif // !MAX_NUM_STREAMS
 
 } // namespace MC

@@ -326,7 +326,7 @@ inline bool getGaussianRandomMatrix(const Eigen::Matrix<Scalar, 3, 1>& min_area,
 	Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& M)
 {
 	Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> _M(num, 3);
-	std::default_random_engine e(time(0)); // current time as seed
+	std::default_random_engine e(1314); // current time as seed
 	std::normal_distribution<Scalar> n(-1, 1);
 	_M = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>::Zero(num, 3)
 		.unaryExpr([&](Scalar val) { return static_cast<Scalar>(round((n(e) + 1e-6) * 1e6) / 1e6); });
