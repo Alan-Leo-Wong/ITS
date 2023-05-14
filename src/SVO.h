@@ -47,9 +47,10 @@ private:
 
 	Eigen::Vector3i surfaceVoxelGridSize;
 	vector<size_t> depthNumNodes; // 每一层的八叉树节点数
-	vector<vector<SVONode>> SVONodes;
+	//vector<vector<SVONode>> SVONodes;
 
-	vector<SVONode> svoNodeArray;
+	//vector<vector<SVONode>> depthSVONodeArray; // 每一层的八叉树节点
+	vector<SVONode> svoNodeArray; // 所有的八叉树节点
 
 	vector<node_vertex_type> nodeVertexArray;
 	vector<vector<node_vertex_type>> depthNodeVertexArray;
@@ -62,7 +63,7 @@ private:
 
 private:
 	void meshVoxelize(const size_t& nModelTris,
-		const vector<Triangle<V3d>>& modelTris, 
+		const vector<Triangle<V3d>>& modelTris,
 		const Eigen::Vector3i* d_surfaceVoxelGridSize,
 		const Eigen::Vector3d* d_unitVoxelSize,
 		const Eigen::Vector3d* d_gridOrigin,
@@ -82,8 +83,8 @@ private:
 	std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> setInDomainPoints(const uint32_t& nodeIdx, const int& nodeDepth,
 		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx);
 
-	std::vector<std::tuple<V3d, double, size_t>> mq_setInDomainPoints(const uint32_t& nodeIdx,
-		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx);
+	// multi point query test
+	std::vector<std::pair<V3d, double>> mq_setInDomainPoints(const uint32_t& nodeIdx);
 
 public:
 	SparseVoxelOctree() : treeDepth(0) {}

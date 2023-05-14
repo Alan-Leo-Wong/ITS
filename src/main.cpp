@@ -40,7 +40,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	printf("-- Generate random points in gaussian distribution...\n");
 	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> randomPointsMat =
-		thinShell.generateGaussianRandomPoints(queryFile, numPoints, 15, 0);
+		thinShell.generateGaussianRandomPoints(queryFile, numPoints, 2, 0);
 	vector<V3d> randomPointsVec(numPoints);
 	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>::Map(randomPointsVec.data()->data(), numPoints, 3) = randomPointsMat;
 
@@ -50,7 +50,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	// ours(cpu/cpu-simd/cuda)
 	double time;
-	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU);
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU_SIMD);
 	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
 	else return;
 
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "sphere.obj");
+	string modelName = getFileName("", "bunny.off");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -111,7 +111,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"sphere.obj"), 32, 32, 32);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 8, 8, 8);
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
-	/*const int res = 100;
+	/*const int res = 200;
 	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_innerShell.obj");
 	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_outerShell.obj");
 	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_isosurface.obj");
@@ -142,9 +142,9 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nMarchingCubes spent %lf s.\n", time);*/
 
-	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
+	const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
 	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");
-	testPointInOut(thinShell, 1000000, queryFile, queryResFile);*/
+	testPointInOut(thinShell, 1000000, queryFile, queryResFile);
 
 	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 
