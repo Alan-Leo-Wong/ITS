@@ -50,7 +50,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	// ours(cpu/cpu-simd/cuda)
 	double time;
-	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU_SIMD);
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU);
 	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
 	else return;
 

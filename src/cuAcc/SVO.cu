@@ -1137,12 +1137,45 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 	return std::make_tuple(dm_points, dm_pointsIdx);
 }
 
-std::vector<std::pair<V3d, double>> SparseVoxelOctree::mq_setInDomainPoints(const uint32_t& nodeIdx)
+std::vector<std::tuple<V3d, double, size_t>> SparseVoxelOctree::mq_setInDomainPoints(const uint32_t& _morton, const V3d& modelOrigin,
+	const double& _voxelWidth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx)
 {
-	uint32_t curNodeIdx = nodeIdx;
-	vector<std::pair<V3d, double>> dm_points; // 坐标、宽度和在所有顶点数组中的下标
+	vector<std::tuple<V3d, double, size_t>> dm_points; // 格子坐标、格子宽度和格子点在所有顶点数组中的下标
 
-	auto getCorners = [&](const SVONode& node)
+	int searchDepth = 0;
+	uint32_t pointMorton = _morton;
+	double virtualNodeWidth = _voxelWidth;
+	auto getVirtualNodeCorners = [&](const uint32_t& morton, const int& depth)
+	{
+		uint16_t x, y, z;
+		morton::morton3D_32_decode(morton, x, y, z);
+		const V3d& virtualNodeOrigin = modelOrigin + V3d((int)x, (int)y, (int)z) * virtualNodeWidth;
+
+		for (int k = 0; k < 8; ++k)
+		{
+			const int xOffset = k & 1;
+			const int yOffset = (k >> 1) & 1;
+			const int zOffset = (k >> 2) & 1;
+
+			V3d corner = virtualNodeOrigin + virtualNodeWidth * V3d(xOffset, yOffset, zOffset);
+
+			if (depthVert2Idx[depth].find(corner) != depthVert2Idx[depth].end())
+				dm_points.emplace_back(std::make_tuple(corner, virtualNodeWidth, depthVert2Idx[depth].at(corner)));
+		}
+	};
+
+	// 从0层开始找莫顿码对应的格子，如果格子不存在，看这个不存在的格子的八个顶点会不会在所有顶点数组中
+	while (depthMorton2Nodes[searchDepth].find(pointMorton) == depthMorton2Nodes[searchDepth].end() && searchDepth < treeDepth)
+	{
+		getVirtualNodeCorners(pointMorton, searchDepth);
+		pointMorton /= 8;
+		virtualNodeWidth *= 2;
+		++searchDepth;
+	}
+
+	if (searchDepth == treeDepth) return dm_points;
+
+	auto getExistNodeCorners = [&](const SVONode& node, const int& depth)
 	{
 		const V3d& nodeOrigin = node.origin;
 		const double& nodeWidth = node.width;
@@ -1155,15 +1188,17 @@ std::vector<std::pair<V3d, double>> SparseVoxelOctree::mq_setInDomainPoints(cons
 
 			V3d corner = nodeOrigin + nodeWidth * V3d(xOffset, yOffset, zOffset);
 
-			dm_points.emplace_back(std::make_pair(corner, nodeWidth));
+			dm_points.emplace_back(std::make_tuple(corner, nodeWidth, depthVert2Idx[depth].at(corner)));
 		}
 	};
 
-	while (curNodeIdx != UINT_MAX)
+	uint32_t nodeIdx = depthMorton2Nodes[searchDepth].at(pointMorton);
+	while (nodeIdx != UINT_MAX)
 	{
-		const auto& svoNode = svoNodeArray[curNodeIdx];
-		getCorners(svoNode);
-		curNodeIdx = svoNode.parent;
+		const auto& svoNode = svoNodeArray[nodeIdx];
+		getExistNodeCorners(svoNode, searchDepth);
+		nodeIdx = svoNode.parent;
+		++searchDepth;
 	}
 
 	return dm_points;

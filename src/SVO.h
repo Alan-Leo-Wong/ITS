@@ -84,7 +84,8 @@ private:
 		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx);
 
 	// multi point query test
-	std::vector<std::pair<V3d, double>> mq_setInDomainPoints(const uint32_t& nodeIdx);
+	std::vector<std::tuple<V3d, double, size_t>> mq_setInDomainPoints(const uint32_t& _morton, const V3d& modelOrigin,
+		const double& _voxelWidth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx);
 
 public:
 	SparseVoxelOctree() : treeDepth(0) {}

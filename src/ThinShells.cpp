@@ -854,12 +854,12 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 
 	auto mt_cputTest = [&]()
 	{
-		//#pragma omp parallel
+#pragma omp parallel
 		for (size_t i = 0; i < numPoints; ++i)
 		{
 			const V3d& point = points[i];
 			double sum = .0;
-			//#pragma omp parallel for reduction(+ : sum)
+#pragma omp parallel for reduction(+ : sum)
 			for (int j = 0; j < numNodeVerts; ++j)
 			{
 				V3d nodeVert = allNodeVertexArray[j].first;
@@ -867,9 +867,9 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 				double t = BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point);
 				if (i == 2 && t != 0.0)
 				{
-					std::cout << "#1: inDmPoints origin = " << nodeVert.transpose()
-						<< ", inDmPoints width = " << svoNodeArray[nodeIdx].width << std::endl;
-					//system("pause");
+					/*std::cout << "#1: inDmPoints origin = " << nodeVert.transpose()
+						<< ", inDmPoints width = " << svoNodeArray[nodeIdx].width << std::endl;*/
+						//system("pause");
 				}
 				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
 			}
@@ -879,13 +879,11 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	};
 
 	// 通过找范围求b样条值
-	const auto& nodeVertexArray = svo.nodeVertexArray;
-	const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
-	const auto& depthNumNodes = svo.depthNumNodes;
 
 	// 每一层节点莫顿码与其(全局)下标的映射
 	vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes(treeDepth);
 	size_t _esumNodes = 0;
+	const auto& depthNumNodes = svo.depthNumNodes;
 	for (int d = 0; d < treeDepth; ++d)
 	{
 		vector<size_t> d_nodeIdx(depthNumNodes[d]);
@@ -899,15 +897,23 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 		_esumNodes += depthNumNodes[d];
 	}
 
-	// 顶点到顶点下标的映射
-	std::map<V3d, size_t> vert2Idx;
-	vector<size_t> numVertIdx(svo.numNodeVerts);
-	std::iota(numVertIdx.begin(), numVertIdx.end(), 0);
-	std::transform(nodeVertexArray.begin(), nodeVertexArray.end(),
-		numVertIdx.begin(), std::inserter(vert2Idx, vert2Idx.end()),
-		[](const node_vertex_type& val, const size_t& idx) {
-			return std::make_pair(val.first, idx);
-		});
+	// 每层顶点到顶点下标(全局)的映射
+	const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
+	vector<std::map<V3d, size_t>> depthVert2Idx(treeDepth);
+	for (int d = 0; d < treeDepth; ++d)
+	{
+		const size_t d_numVerts = svo.depthNodeVertexArray[d].size();
+		vector<size_t> d_numVertIdx(d_numVerts);
+		std::iota(d_numVertIdx.begin(), d_numVertIdx.end(), 0);
+
+		const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
+		std::transform(allNodeVertexArray.begin() + d_esumNodeVerts, allNodeVertexArray.begin() + d_esumNodeVerts + d_numVerts,
+			d_numVertIdx.begin(), std::inserter(depthVert2Idx[d], depthVert2Idx[d].end()),
+			[d_esumNodeVerts](const node_vertex_type& val, const size_t& idx) {
+				return std::make_pair(val.first, d_esumNodeVerts + idx);
+			});
+	}
+
 
 	//// 顶点到节点下标的映射
 	//std::map<V3d, size_t> vert2NodeIdx;
@@ -931,7 +937,6 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 			//const V3i dis = getPointDis(point, boxOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
 			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
 			//if ((dis.array() < zeroDis.array()).any() || (dis.array() > endDis.array()).any()) { q_bSplineVal[i] = outerShellIsoVal; continue; } // 不在svo范围内，所以一定在模型外
-			int searchDepth = 0;
 			uint32_t pointMorton;
 
 			// 在所有格子(包括边缘格子和大格子)的影响范围内(注意svo_gridSize>=1，所以乘2倍后要-1)
@@ -945,36 +950,19 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 					else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
 				}
 				pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
-				// 若大于1说明在非最细层边缘格子的影响范围内，找到影响它的边缘格子的莫顿码及所属的那一层
-				while (maxOffset > 1)
-				{
-					++searchDepth;
-					maxOffset >>= 1;
-					pointMorton /= 8;
-				}
 			}
 			else { q_bSplineVal[i] = outerShellIsoVal; continue; }
 
-			// 影响point的且处于searchDepth的莫顿码格子可能不存在，但是该格子的父节点格子可能存在(所以说影响point的格子至少存在于第searchDepth层)
-			while (depthMorton2Nodes[searchDepth].find(pointMorton) == depthMorton2Nodes[searchDepth].end() && searchDepth < treeDepth)
-			{
-				pointMorton /= 8;
-				++searchDepth;
-			}
-			if (searchDepth == treeDepth) { q_bSplineVal[i] = outerShellIsoVal; continue; }
-
 			double sum = 0.0;
-			const uint32_t nodeIdx = depthMorton2Nodes[searchDepth].at(pointMorton); // 全局的nodeIdx
-			auto inDmPoints = svo.mq_setInDomainPoints(nodeIdx);
-			const int nInDmPoints = inDmPoints.size();
+			auto inDmPoints = svo.mq_setInDomainPoints(pointMorton, modelOrigin, voxelWidth, depthMorton2Nodes, depthVert2Idx);
+			const int nInDmPointsTraits = inDmPoints.size();
 
-			//#pragma omp parallel for reduction(+ : sum)
-			for (int j = 0; j < nInDmPoints; ++j)
+#pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
+			for (int j = 0; j < nInDmPointsTraits; ++j)
 			{
-				const auto& inDmPoint = inDmPoints[j];
-				double t = BaseFunction4Point(inDmPoint.first, inDmPoint.second, point);
-				sum += lambda[vert2Idx.at(inDmPoint.first)] *
-					(BaseFunction4Point(inDmPoint.first, inDmPoint.second, point));
+				const auto& inDmPointTrait = inDmPoints[j];
+				//double t = BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
+				sum += lambda[std::get<2>(inDmPointTrait)] * BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
 			}
 			//else
 			//{
@@ -1052,8 +1040,8 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), q_origin_bSplineVal.begin(),
 		std::back_inserter(result),
 		[=](const double& val, const double& origin_val) {
-			// 要么点在模型的很远处(origin_val等于0)，要么点的b样条值大于等于外壳值，才认为在模型外
-			if (val >= outerShellIsoVal /*|| fabs(origin_val) < 1e-9*/) return 1;
+			// 要么点的b样条值大于等于外壳值，要么点在模型的很远处(origin_val等于0)，才认为在模型外
+			if (val >= outerShellIsoVal/* || (val == .0 && origin_val == .0)*/) return 1;
 			else if (val <= innerShellIsoVal) return -1;
 			else return 0;
 		});
@@ -1406,7 +1394,7 @@ void ThinShells::moveOnSurface(const V3d& modelVert, const V3d& v, const size_t&
 	};
 
 	// 可视化输出
-	constexpr string saveDir = "PointMove";
+	const string saveDir = "PointMove";
 	auto writePoint = [=](const V3d& point, const size_t& cnt)
 	{
 		string filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth),
