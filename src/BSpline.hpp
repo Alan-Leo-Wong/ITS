@@ -1,5 +1,5 @@
 #pragma once
-#include "utils\cuda\CUDAMacro.h"
+#include "utils/cuda/CUDAMacro.h"
 
 inline _CUDA_GENERAL_CALL_ double BaseFunction(const double& x, const double& nodePos, const double& nodeWidth)
 {

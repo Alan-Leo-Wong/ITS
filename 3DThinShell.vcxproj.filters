@@ -31,6 +31,9 @@
     <Filter Include="头文件\utils\cuda">
       <UniqueIdentifier>{565a5fee-8ec3-487d-8af2-c81b4fbb0fe9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\Test">
+      <UniqueIdentifier>{23e95ac5-42fb-4f12-9ee1-4c2d723d82e1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\BasicDataType.h">
@@ -104,6 +107,12 @@
     </ClInclude>
     <ClInclude Include="src\utils\cuda\DeviceQuery.cuh">
       <Filter>头文件\utils\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SDFHelper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\test\TestConfig.h">
+      <Filter>头文件\Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

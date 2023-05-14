@@ -1,16 +1,16 @@
-﻿#include "..\SVO.h"
-#include "..\MortonLUT.h"
-#include "..\utils\IO.hpp"
-#include "..\utils\Geometry.hpp"
-#include "..\utils\cuda\CUDAMath.hpp"
-#include "..\utils\cuda\CUDAUtil.cuh"
-#include "..\utils\cuda\CUDACheck.cuh"
-#include "..\utils\String.hpp"
-#include <thrust\scan.h>
-#include <thrust\sort.h>
-#include <thrust\unique.h>
-#include <thrust\extrema.h>
-#include <thrust\device_vector.h>
+﻿#include "../SVO.h"
+#include "../MortonLUT.h"
+#include "../utils/IO.hpp"
+#include "../utils/Geometry.hpp"
+#include "../utils/cuda/CUDAMath.hpp"
+#include "../utils/cuda/CUDAUtil.cuh"
+#include "../utils/cuda/CUDACheck.cuh"
+#include "../utils/String.hpp"
+#include <thrust/scan.h>
+#include <thrust/sort.h>
+#include <thrust/unique.h>
+#include <thrust/extrema.h>
+#include <thrust/device_vector.h>
 #include <cuda_runtime_api.h>
 #include <iomanip>
 
@@ -1099,7 +1099,7 @@ void SparseVoxelOctree::constructNodeAtrributes(const thrust::device_vector<size
 	constructNodeVertexAndEdge(d_esumTreeNodesArray, d_SVONodeArray);
 }
 
-std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t nodeIdx, const int& nodeDepth,
+std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t& nodeIdx, const int& nodeDepth,
 	const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx)
 {
 	int parentDepth = nodeDepth;
@@ -1131,10 +1131,42 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 		const auto& svoNode = svoNodeArray[parentIdx];
 		getCorners(svoNode, parentDepth);
 		parentIdx = svoNode.parent;
-		parentDepth++;
+		++parentDepth;
 	}
 
 	return std::make_tuple(dm_points, dm_pointsIdx);
+}
+
+std::vector<std::pair<V3d, double>> SparseVoxelOctree::mq_setInDomainPoints(const uint32_t& nodeIdx)
+{
+	uint32_t curNodeIdx = nodeIdx;
+	vector<std::pair<V3d, double>> dm_points; // 坐标、宽度和在所有顶点数组中的下标
+
+	auto getCorners = [&](const SVONode& node)
+	{
+		const V3d& nodeOrigin = node.origin;
+		const double& nodeWidth = node.width;
+
+		for (int k = 0; k < 8; ++k)
+		{
+			const int xOffset = k & 1;
+			const int yOffset = (k >> 1) & 1;
+			const int zOffset = (k >> 2) & 1;
+
+			V3d corner = nodeOrigin + nodeWidth * V3d(xOffset, yOffset, zOffset);
+
+			dm_points.emplace_back(std::make_pair(corner, nodeWidth));
+		}
+	};
+
+	while (curNodeIdx != UINT_MAX)
+	{
+		const auto& svoNode = svoNodeArray[curNodeIdx];
+		getCorners(svoNode);
+		curNodeIdx = svoNode.parent;
+	}
+
+	return dm_points;
 }
 
 //////////////////////

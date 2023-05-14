@@ -1,6 +1,6 @@
 #pragma once
 #include <fstream>
-#include <Eigen\Dense>
+#include <Eigen/Dense>
 
 namespace gvis
 {
@@ -14,6 +14,12 @@ namespace gvis
 	static void write_vertex(std::ofstream& output, const Eigen::Vector3d& v, const Eigen::Vector3d& rgb)
 	{
 		output << "v " << v.x() << " " << v.y() << " " << v.z() << " " << rgb.x() << " " << rgb.y() << " " << rgb.z() << std::endl;
+	}
+
+	// Helper function to write single vertex to OBJ file
+	static void write_vertex_to_xyz(std::ofstream& output, const Eigen::Vector3d& v)
+	{
+		output << v.x() << " " << v.y() << " " << v.z() << std::endl;
 	}
 
 	// Helper function to write face
@@ -123,6 +129,12 @@ namespace gvis
 			write_vertex(output, points[i]);
 	}
 
+	inline void writePointCloud_xyz(const std::vector<Eigen::Vector3d>& points, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.size(); ++i)
+			write_vertex_to_xyz(output, points[i]);
+	}
+
 	inline void writePointCloud(const std::vector<Eigen::Vector3d>& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
 	{
 		for (size_t i = 0; i < points.size(); ++i)
@@ -135,9 +147,15 @@ namespace gvis
 			write_vertex(output, points.row(i));
 	}
 
+	inline void writePointCloud_xyz(const MXd& points, std::ofstream& output)
+	{
+		for (size_t i = 0; i < points.rows(); ++i)
+			write_vertex_to_xyz(output, points.row(i));
+	}
+
 	inline void writePointCloud(const MXd& points, const std::vector<Eigen::Vector3d>& rgbs, std::ofstream& output)
 	{
-		for (size_t i = 0; i < points.size(); ++i)
+		for (size_t i = 0; i < points.rows(); ++i)
 			write_vertex(output, points.row(i), rgbs[i]);
 	}
 

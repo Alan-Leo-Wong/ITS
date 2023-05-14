@@ -1,10 +1,11 @@
 //#include "CollisionDetection.h"
+#include "SDFHelper.h"
 #include "ThinShells.h"
-#include "utils\IO.hpp"
-#include "utils\Timer.hpp"
-#include "utils\String.hpp"
-#include "utils\Common.hpp"
-#include "utils\CMDParser.hpp"
+#include "utils/IO.hpp"
+#include "utils/Timer.hpp"
+#include "utils/String.hpp"
+#include "utils/Common.hpp"
+#include "utils/CMDParser.hpp"
 
 std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** argv)
 {
@@ -33,6 +34,52 @@ std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** 
 	return std::make_tuple(dep_1, dep_2, mp_1, mp_2);
 }
 
+void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string& queryFile, const string& queryResFile)
+{
+	printf("\n[Test] Point INSIDE or OUTSIDE surface\n");
+
+	printf("-- Generate random points in gaussian distribution...\n");
+	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> randomPointsMat =
+		thinShell.generateGaussianRandomPoints(queryFile, numPoints, 2, 0);
+	vector<V3d> randomPointsVec(numPoints);
+	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>::Map(randomPointsVec.data()->data(), numPoints, 3) = randomPointsMat;
+
+	// timer
+	TimerInterface* timer = nullptr;
+	createTimer(&timer);
+
+	// ours(cpu/cpu-simd/cuda)
+	double time;
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU_SIMD);
+	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
+	else return;
+
+	// fcpw
+	fcpw::Scene<3> scene;
+	fcpw_helper::initSDF(scene, thinShell.getModelVerts(), thinShell.getModelFaces());
+	vector<int> fcpw_res(numPoints);
+	startTimer(&timer);
+	for (size_t i = 0; i < numPoints; ++i)
+	{
+		double sdf = fcpw_helper::getSignedDistance(randomPointsMat.row(i), scene);
+		if (sdf > 0) fcpw_res[i] = 1;
+		else if (sdf < 0) fcpw_res[i] = -1;
+		else fcpw_res[i] = 0;
+	}
+	stopTimer(&timer);
+	time = getElapsedTime(&timer) * 1e-3;
+	printf("-- [FCPW(normal)]: Multi points query spent %lf s.\n", time);
+
+	deleteTimer(&timer);
+
+	// compare result
+	size_t correct = 0;
+	for (size_t i = 0; i < numPoints; ++i)
+		if (our_res[i] == fcpw_res[i]) ++correct;
+	//printf("-- Correct number = %llu\n", correct);
+	printf("-- Correct rate = %lf%%\n", (correct * 100.0) / numPoints);
+}
+
 int main(int argc, char** argv)
 {
 	//auto [dep_1, dep_2, mp_1, mp_2] = execArgParser(argc, argv);
@@ -55,7 +102,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "angel_candle_holder_single.stl");
+	string modelName = getFileName("", "bunny.off");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -64,24 +111,27 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"angel_candle_holder_single.stl"), 256, 256, 256);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 8, 8, 8);
+	//bool is2Cube = true;
+	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
 	stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;
 	printf("\nCreate shells spent %lf s.\n", time);
 
 	const int treeDepth = thinShell.treeDepth;
+	const std::string uniformDir = thinShell.uniformDir;
 
 	startTimer(&timer);
-	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"txt_shell.obj"));
+	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
-	const int res = 250;
-	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_innerShell.obj");
-	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_outerShell.obj");
-	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"mc_isosurface.obj");
+	/*const int res = 200;
+	const string innerShellFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_innerShell.obj");
+	const string outerShellFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_outerShell.obj");
+	const string isosurfaceFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"mc_isosurface.obj");
 	startTimer(&timer);
 	thinShell.mcVisualization(
 		innerShellFile, V3i(res, res, res),
@@ -90,17 +140,13 @@ int main(int argc, char** argv)
 	);
 	stopTimer(&timer);
 	time = getElapsedTime(&timer) * 1e-3;
-	printf("\nMarchingCubes spent %lf s.\n", time);
+	printf("\nMarchingCubes spent %lf s.\n", time);*/
 
-	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"query_point.obj");
-	MXd randomPoints = thinShell.generateRandomPoints(queryFile, 100);
+	const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
+	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");
+	testPointInOut(thinShell, 1000000, queryFile, queryResFile);
 
-	startTimer(&timer);
-	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"query_point_result.obj");
-	thinShell.multiPointQuery(queryResFile, randomPoints);
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("\nMulti points query spent %lf s.\n", time);*/
+	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 
 	deleteTimer(&timer);
 

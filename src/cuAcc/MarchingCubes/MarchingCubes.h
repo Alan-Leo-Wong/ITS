@@ -8,10 +8,10 @@
  * 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #pragma once
-#include "..\..\SVO.h"
-#include "..\..\utils\cuda\CUDACheck.cuh"
-#include "..\..\utils\cuda\CUDAMath.hpp"
-#include <thrust\host_vector.h>
+#include "../../SVO.h"
+#include "../../utils/cuda/CUDACheck.cuh"
+#include "../../utils/cuda/CUDAMath.hpp"
+#include <thrust/host_vector.h>
 
 namespace MCKernel {
 	template <typename T>

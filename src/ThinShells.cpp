@@ -1,25 +1,23 @@
 #include "ThinShells.h"
 #include "MortonLUT.h"
 #include "BSpline.hpp"
-#include "utils\IO.hpp"
-#include "utils\Timer.hpp"
-#include "utils\Common.hpp"
-#include "utils\String.hpp"
-#include "cuAcc\CUDACompute.h"
-#include "utils\cuda\CUDAMath.hpp"
-#include "cuAcc\MarchingCubes\MarchingCubes.h"
+#include "utils/IO.hpp"
+#include "utils/Timer.hpp"
+#include "utils/Common.hpp"
+#include "utils/String.hpp"
+#include "cuAcc/CUDACompute.h"
+#include "utils/cuda/CUDAMath.hpp"
+#include "cuAcc/MarchingCubes/MarchingCubes.h"
 #include <omp.h>
 #include <queue>
 #include <iomanip>
 #include <numeric>
-#include <Eigen\Sparse>
-#include <igl\signed_distance.h>
+#include <Eigen/Sparse>
+#include <igl/signed_distance.h>
 
 //////////////////////
 //  Create  Shells  //
 //////////////////////
-
-
 inline int parallelAxis(const V3d& p1, const V3d& p2)
 {
 	if (fabs(p1.y() - p2.y()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9) return 1; // 与x轴平行
@@ -27,7 +25,16 @@ inline int parallelAxis(const V3d& p1, const V3d& p2)
 	else return 3; // 与z轴平行
 };
 
-// idx: subdepth
+inline V3i ThinShells::getPointDis(const V3d& vert, const V3d& origin, const V3d& width)
+{
+	return ((vert - origin).array() / width.array()).cast<int>();
+}
+
+inline V3i ThinShells::getPointDis(const V3d& vert, const V3d& origin, const double& width)
+{
+	return ((vert - origin).array() / width).cast<int>();
+}
+
 inline void ThinShells::cpIntersectionPoints()
 {
 	vector<V2i> modelEdges = extractEdges();
@@ -44,19 +51,12 @@ inline void ThinShells::cpIntersectionPoints()
 	// 三角形的边与node面交， 因为隐式B样条基定义在了left/bottom/back corner上， 所以与节点只需要求与这三个面的交即可
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 
-	std::map<uint32_t, SVONode> morton2Node;
+	std::map<uint32_t, SVONode> morton2FineNode;
 	std::transform(nodeArray.begin(), nodeArray.begin() + numFineNodes,
-		std::inserter(morton2Node, morton2Node.end()),
+		std::inserter(morton2FineNode, morton2FineNode.end()),
 		[](const SVONode& node) {
 			return std::make_pair(node.mortonCode, node);
 		});
-
-	const double nodeWidth = nodeArray[0].width;
-	const V3d modelOrigin = modelBoundingBox.boxOrigin;
-	auto getPointDis = [modelOrigin, nodeWidth](const V3d& modelVert)->V3i
-	{
-		return ((modelVert - modelOrigin).array() / nodeWidth).cast<int>();
-	};
 
 #pragma omp parallel
 	for (int i = 0; i < nModelEdges; i++)
@@ -69,8 +69,8 @@ inline void ThinShells::cpIntersectionPoints()
 
 		V3d modelEdgeDir = p2 - p1;
 
-		V3i dis1 = getPointDis(p1);
-		V3i dis2 = getPointDis(p2);
+		V3i dis1 = getPointDis(p1, modelOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
+		V3i dis2 = getPointDis(p2, modelOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
 
 		V3i min_dis = clamp(vmini(dis1, dis2).array() - 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
 		V3i max_dis = clamp(vmaxi(dis1, dis2).array() + 1, V3i(0, 0, 0), svo_gridSize.array() - 1);
@@ -84,9 +84,9 @@ inline void ThinShells::cpIntersectionPoints()
 				for (int x = min_dis.x(); x <= max_dis.x(); ++x)
 				{
 					uint32_t nodeMorton = morton::mortonEncode_LUT((uint16_t)x, (uint16_t)y, (uint16_t)z);
-					if (morton2Node.find(nodeMorton) == morton2Node.end()) continue;
-					V3d lbbCorner = morton2Node.at(nodeMorton).origin; // at() is thread safe
-					double width = morton2Node.at(nodeMorton).width;
+					if (morton2FineNode.find(nodeMorton) == morton2FineNode.end()) continue;
+					V3d lbbCorner = morton2FineNode.at(nodeMorton).origin; // at() is thread safe
+					double width = morton2FineNode.at(nodeMorton).width;
 
 					// back plane
 					double back_t = DINF;
@@ -276,7 +276,6 @@ inline void ThinShells::cpIntersectionPoints()
 			}
 		}
 
-
 		node_edge_type y_q; y_q.first.second = Eigen::Vector3d(0, tri_bbox_origin.y(), 0);
 		// Search for first element x such that _q ≤ x
 		auto y_lower = std::lower_bound(y_fineNodeEdges.begin(), y_fineNodeEdges.end(), y_q, lessYVal());
@@ -449,6 +448,8 @@ inline void ThinShells::cpIntersectionPoints()
 
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
 	cout << "-- 总交点数量：" << allInterPoints.size() << endl;
+
+	saveLatentPoint("");
 }
 
 inline void ThinShells::cpSDFOfTreeNodes()
@@ -826,6 +827,240 @@ void ThinShells::singlePointQuery(const std::string& out_file, const V3d& point)
 	gvis::writePointCloud(point, rgb, out);
 }
 
+// 测试专用
+vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time, const Test::type& choice)
+{
+	test_type test = (test_type)choice;
+
+	size_t numPoints = points.size();
+	vector<int> result;
+	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!\n"); return result; }
+	const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
+	const auto& depthSVONodeArray = svo;
+	if (nodeWidthArray.empty())
+	{
+		std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
+			[](SVONode node) {
+				return Eigen::Vector3d(node.width, node.width, node.width);
+			});
+	}
+	VXd q_bSplineVal;
+	VXd q_origin_bSplineVal;
+
+	const vector<node_vertex_type>& allNodeVertexArray = svo.nodeVertexArray;
+	const size_t& numNodeVerts = svo.numNodeVerts;
+	const V3d& boxOrigin = modelBoundingBox.boxOrigin;
+	const V3d& boxWidth = modelBoundingBox.boxWidth;
+
+	auto mt_cputTest = [&]()
+	{
+		//#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			double sum = .0;
+			//#pragma omp parallel for reduction(+ : sum)
+			for (int j = 0; j < numNodeVerts; ++j)
+			{
+				V3d nodeVert = allNodeVertexArray[j].first;
+				uint32_t nodeIdx = allNodeVertexArray[j].second;
+				double t = BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point);
+				if (i == 2 && t != 0.0)
+				{
+					std::cout << "#1: inDmPoints origin = " << nodeVert.transpose()
+						<< ", inDmPoints width = " << svoNodeArray[nodeIdx].width << std::endl;
+					//system("pause");
+				}
+				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
+			}
+			q_bSplineVal[i] = sum;
+			q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+		}
+	};
+
+	// 通过找范围求b样条值
+	const auto& nodeVertexArray = svo.nodeVertexArray;
+	const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
+	const auto& depthNumNodes = svo.depthNumNodes;
+
+	// 每一层节点莫顿码与其(全局)下标的映射
+	vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes(treeDepth);
+	size_t _esumNodes = 0;
+	for (int d = 0; d < treeDepth; ++d)
+	{
+		vector<size_t> d_nodeIdx(depthNumNodes[d]);
+		std::iota(d_nodeIdx.begin(), d_nodeIdx.end(), 0);
+
+		std::transform(svoNodeArray.begin() + _esumNodes, svoNodeArray.begin() + _esumNodes + depthNumNodes[d],
+			d_nodeIdx.begin(), std::inserter(depthMorton2Nodes[d], depthMorton2Nodes[d].end()),
+			[_esumNodes](const SVONode& node, const size_t& idx) {
+				return std::make_pair(node.mortonCode, _esumNodes + idx);
+			});
+		_esumNodes += depthNumNodes[d];
+	}
+
+	// 顶点到顶点下标的映射
+	std::map<V3d, size_t> vert2Idx;
+	vector<size_t> numVertIdx(svo.numNodeVerts);
+	std::iota(numVertIdx.begin(), numVertIdx.end(), 0);
+	std::transform(nodeVertexArray.begin(), nodeVertexArray.end(),
+		numVertIdx.begin(), std::inserter(vert2Idx, vert2Idx.end()),
+		[](const node_vertex_type& val, const size_t& idx) {
+			return std::make_pair(val.first, idx);
+		});
+
+	//// 顶点到节点下标的映射
+	//std::map<V3d, size_t> vert2NodeIdx;
+	//std::transform(nodeVertexArray.begin(), nodeVertexArray.end(),
+	//	std::inserter(vert2NodeIdx, vert2NodeIdx.end()),
+	//	[](const node_vertex_type& val) {
+	//		return std::make_pair(val.first, val.second);
+	//	});
+
+	auto mt_cputTest_2 = [&]()
+	{
+		const V3i endDis = getPointDis(modelBoundingBox.boxEnd, boxOrigin, voxelWidth);
+		const V3i zeroDis = V3i(0, 0, 0);
+
+#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+
+			//const V3i dis = getPointDis(point, boxOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
+			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
+			//if ((dis.array() < zeroDis.array()).any() || (dis.array() > endDis.array()).any()) { q_bSplineVal[i] = outerShellIsoVal; continue; } // 不在svo范围内，所以一定在模型外
+			int searchDepth = 0;
+			uint32_t pointMorton;
+
+			// 在所有格子(包括边缘格子和大格子)的影响范围内(注意svo_gridSize>=1，所以乘2倍后要-1)
+			if ((dis.array() >= (-svo_gridSize.array())).all() && (dis.array() <= (svo_gridSize.array() * 2 - 1)).all())
+			{
+				int maxOffset = 0;
+				for (int i = 0; i < 3; ++i)
+				{
+					// 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
+					if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
+					else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
+				}
+				pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+				// 若大于1说明在非最细层边缘格子的影响范围内，找到影响它的边缘格子的莫顿码及所属的那一层
+				while (maxOffset > 1)
+				{
+					++searchDepth;
+					maxOffset >>= 1;
+					pointMorton /= 8;
+				}
+			}
+			else { q_bSplineVal[i] = outerShellIsoVal; continue; }
+
+			// 影响point的且处于searchDepth的莫顿码格子可能不存在，但是该格子的父节点格子可能存在(所以说影响point的格子至少存在于第searchDepth层)
+			while (depthMorton2Nodes[searchDepth].find(pointMorton) == depthMorton2Nodes[searchDepth].end() && searchDepth < treeDepth)
+			{
+				pointMorton /= 8;
+				++searchDepth;
+			}
+			if (searchDepth == treeDepth) { q_bSplineVal[i] = outerShellIsoVal; continue; }
+
+			double sum = 0.0;
+			const uint32_t nodeIdx = depthMorton2Nodes[searchDepth].at(pointMorton); // 全局的nodeIdx
+			auto inDmPoints = svo.mq_setInDomainPoints(nodeIdx);
+			const int nInDmPoints = inDmPoints.size();
+
+			//#pragma omp parallel for reduction(+ : sum)
+			for (int j = 0; j < nInDmPoints; ++j)
+			{
+				const auto& inDmPoint = inDmPoints[j];
+				double t = BaseFunction4Point(inDmPoint.first, inDmPoint.second, point);
+				sum += lambda[vert2Idx.at(inDmPoint.first)] *
+					(BaseFunction4Point(inDmPoint.first, inDmPoint.second, point));
+			}
+			//else
+			//{
+			//	q_bSplineVal[i] = outerShellIsoVal; // 不在体素格子内，那代表也一定在模型外
+			//	continue;
+			//}
+
+			q_bSplineVal[i] = sum;
+		}
+	};
+
+	auto simd_cputTest = [&]()
+	{
+#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			double sum = .0;
+#pragma omp simd simdlen(8)
+			for (int j = 0; j < numNodeVerts; ++j)
+			{
+				V3d nodeVert = allNodeVertexArray[j].first;
+				uint32_t nodeIdx = allNodeVertexArray[j].second;
+				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
+			}
+			q_bSplineVal[i] = sum;
+			q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+		}
+	};
+
+	TimerInterface* timer; createTimer(&timer);
+	switch (test)
+	{
+	case Test::CPU:
+		printf("-- Using CPU\n");
+		q_bSplineVal.resize(numPoints);
+		q_origin_bSplineVal.resize(numPoints);
+		startTimer(&timer);
+
+		//mt_cputTest();
+		mt_cputTest_2();
+
+		stopTimer(&timer);
+		time = getElapsedTime(&timer) * 1e-3;
+		break;
+	case Test::CPU_SIMD:
+		printf("-- Using CPU-SIMD\n");
+		q_bSplineVal.resize(numPoints);
+		q_origin_bSplineVal.resize(numPoints);
+		startTimer(&timer);
+
+		simd_cputTest();
+
+		stopTimer(&timer);
+		time = getElapsedTime(&timer) * 1e-3;
+		break;
+	default:
+	case Test::CUDA:
+		printf("-- Using CUDA\n");
+		startTimer(&timer);
+
+		cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, boxOrigin, boxWidth,
+			points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal, q_origin_bSplineVal);
+
+		stopTimer(&timer);
+		time = getElapsedTime(&timer) * 1e-3;
+		break;
+	}
+	deleteTimer(&timer);
+
+	string t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"temp_queryValue.txt");
+	std::ofstream temp(t_filename);
+	temp << std::setiosflags(std::ios::fixed) << std::setprecision(9) << q_bSplineVal << endl;
+
+	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), q_origin_bSplineVal.begin(),
+		std::back_inserter(result),
+		[=](const double& val, const double& origin_val) {
+			// 要么点在模型的很远处(origin_val等于0)，要么点的b样条值大于等于外壳值，才认为在模型外
+			if (val >= outerShellIsoVal /*|| fabs(origin_val) < 1e-9*/) return 1;
+			else if (val <= innerShellIsoVal) return -1;
+			else return 0;
+		});
+
+	return result;
+}
+
 void ThinShells::multiPointQuery(const std::string& out_file, const vector<V3d>& points)
 {
 	if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!"); return; }
@@ -878,7 +1113,7 @@ void ThinShells::multiPointQuery(const std::string& out_file, const MXd& pointsM
 void ThinShells::saveTree(const string& filename) const
 {
 	string t_filename = filename;
-	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"svo.obj");
+	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"svo.obj");
 
 	svo.saveSVO(t_filename);
 }
@@ -898,13 +1133,13 @@ void ThinShells::saveIntersections(const string& filename_1, const string& filen
 {
 	string t_filename = filename_1;
 	if (filename_1.empty())
-		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"edgeInter.xyz");
+		t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"edgeInter.xyz");
 	cout << "-- Save mesh EDGES and octree Nodes to " << std::quoted(t_filename) << endl;
 	saveIntersections(t_filename, edgeInterPoints);
 
 	t_filename = filename_2;
 	if (filename_2.empty())
-		t_filename = concatFilePath((string)VIS_DIR, modelName, std::to_string(treeDepth), (string)"faceInter.xyz");
+		t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"faceInter.xyz");
 	cout << "-- Save mesh FACES and octree node EDGES to " << std::quoted(t_filename) << endl;
 	saveIntersections(t_filename, faceInterPoints);
 }
@@ -913,11 +1148,11 @@ void ThinShells::saveSDFValue(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"SDFValue.txt");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"SDFValue.txt");
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
-	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!", filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!\n", filename.c_str()); return; }
 
 	cout << "-- Save SDF value to " << std::quoted(t_filename) << endl;
 	for (const auto& val : sdfVal)
@@ -929,26 +1164,46 @@ void ThinShells::saveCoefficients(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"Coefficients.txt");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"Coefficients.txt");
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
-	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!", t_filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!\n", t_filename.c_str()); return; }
 
 	cout << "-- Save coefficients to " << std::quoted(t_filename) << endl;
 	for (const auto& val : lambda)
 		out << val << endl;
 }
 
+void ThinShells::saveLatentPoint(const string& filename) const
+{
+	string t_filename = filename;
+	if (filename.empty())
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"latent_point.xyz");
+
+	checkDir(t_filename);
+	//std::ofstream out(t_filename);
+	//std::ofstream out(t_filename, std::ios_base::app);
+	std::ofstream out(t_filename, std::ofstream::out | std::ofstream::trunc);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!\n", t_filename.c_str()); return; }
+
+	cout << "-- Save latent point to " << std::quoted(t_filename) << endl;
+
+	gvis::writePointCloud_xyz(m_V, out);
+	out.close(); out.open(t_filename, std::ofstream::app);
+	gvis::writePointCloud_xyz(allInterPoints, out);
+	out.close();
+}
+
 void ThinShells::saveBSplineValue(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, std::to_string(treeDepth), (string)"BSplineValue.txt");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"BSplineValue.txt");
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
-	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!", t_filename.c_str()); return; }
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not open!\n", t_filename.c_str()); return; }
 
 	cout << "-- Save B-Spline value to " << std::quoted(t_filename) << endl;
 	out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bSplineVal << endl;
@@ -1006,4 +1261,252 @@ void ThinShells::mcVisualization(const string& innerFilename, const V3i& innerRe
 void ThinShells::textureVisualization(const string& filename) const
 {
 	writeTexturedObjFile(filename, bSplineVal);
+}
+
+//////////////////////
+//    Application   //
+//////////////////////
+void ThinShells::prepareMoveOnSurface(int& ac_treeDepth,
+	vector<vector<V3d>>& nodeOrigin,
+	vector<std::map<uint32_t, size_t>>& morton2Nodes,
+	vector<vector<std::array<double, 8>>>& nodeBSplineVal,
+	vector<double>& nodeWidth)
+{
+	if (treeDepth < 1) { fprintf(stderr, "Error: SVO is empty!"); return; }
+
+	// 初始化数据结构
+	const vector<SVONode>& nodeArray = svo.svoNodeArray;
+	const vector<size_t>& depthNumNodes = svo.depthNumNodes;
+
+	ac_treeDepth = treeDepth > 2 ? 2 : treeDepth;
+	morton2Nodes.resize(ac_treeDepth); // 2层即可
+	nodeWidth.resize(ac_treeDepth);
+	nodeOrigin.resize(ac_treeDepth);
+
+	vector<size_t> esumDepthNumNodes(ac_treeDepth);
+	std::exclusive_scan(depthNumNodes.begin(), depthNumNodes.begin() + ac_treeDepth, esumDepthNumNodes.begin(), 0);
+	esumDepthNumNodes.emplace_back((*esumDepthNumNodes.rbegin()) + depthNumNodes[ac_treeDepth - 1]); // 插入所有ac_treeDepth层的节点数
+
+	for (int d = 0; d < ac_treeDepth; ++d)
+	{
+		vector<size_t> d_numNodesIdx(depthNumNodes[d]);
+		std::iota(d_numNodesIdx.begin(), d_numNodesIdx.end(), 0);
+
+		std::transform(nodeArray.begin() + esumDepthNumNodes[d], nodeArray.begin() + esumDepthNumNodes[d] + depthNumNodes[d],
+			d_numNodesIdx.begin(), std::inserter(morton2Nodes[d], morton2Nodes[d].end()),
+			[](const SVONode& node, const size_t& idx) {
+				return std::make_pair(node.mortonCode, idx);
+			});
+
+		std::transform(nodeArray.begin() + esumDepthNumNodes[d], nodeArray.begin() + esumDepthNumNodes[d] + depthNumNodes[d],
+			std::inserter(nodeOrigin[d], nodeOrigin[d].end()),
+			[](const SVONode& node) {
+				return node.origin;
+			});
+
+		nodeWidth[d] = (*(nodeArray.begin() + esumDepthNumNodes[d])).width;
+	}
+
+	const vector<vector<node_vertex_type>>& depthNodeVertexArray = svo.depthNodeVertexArray;
+	vector<std::map<V3d, double>> nodeVertex2BSplineVal(ac_treeDepth);
+
+	nodeBSplineVal.resize(ac_treeDepth);
+
+	//#pragma omp parallel
+	for (int d = 0; d < ac_treeDepth; ++d)
+	{
+		const size_t d_numNodeVerts = depthNodeVertexArray[d].size();
+		VXd nodeVertBSplineVal(d_numNodeVerts);
+
+		vector<V3d> nodeVertex;
+		// 获得所有节点的顶点数组
+		std::transform(depthNodeVertexArray[d].begin(), depthNodeVertexArray[d].end(),
+			std::back_inserter(nodeVertex), [](const node_vertex_type& val) { return val.first; });
+		// 计算这些顶点的b样条值
+		cuAcc::cpBSplineVal(d_numNodeVerts, svo.numNodeVerts, svo.numTreeNodes, nodeVertex,
+			svo.nodeVertexArray, nodeWidthArray, lambda, nodeVertBSplineVal);
+		// 将顶点与b样条值一一对应起来
+		std::transform(nodeVertex.begin(), nodeVertex.end(), nodeVertBSplineVal.begin(),
+			std::inserter(nodeVertex2BSplineVal[d], nodeVertex2BSplineVal[d].end()),
+			[](const V3d& vert, const double& val) {
+				return std::make_pair(vert, val);
+			});
+
+		// 第d层的节点数
+		const size_t d_numNodes = depthNumNodes[d];
+		//#pragma omp critical
+		{
+			nodeBSplineVal[d].resize(d_numNodes);
+		}
+		//#pragma omp for nowait
+		for (int j = 0; j < d_numNodes; ++j)
+		{
+			// 第d层的第j个节点
+			const SVONode& node = *(nodeArray.begin() + esumDepthNumNodes[d] + j);
+			// 获取第d层的第j个节点的八个顶点
+			for (int k = 0; k < 8; ++k)
+			{
+				const int xOffset = k & 1;
+				const int yOffset = (k >> 1) & 1;
+				const int zOffset = (k >> 2) & 1;
+
+				// 第d层的第j个节点的第k个顶点坐标
+				V3d corner = (node.origin) + (node.width) * V3d(xOffset, yOffset, zOffset);
+				//#pragma omp critical
+				{
+					// 得到第d层的第j个节点的第k个顶点与其b样条值的对应
+					nodeBSplineVal[d][j][k] = nodeVertex2BSplineVal[d].at(corner);
+				}
+			}
+		}
+	}
+}
+
+void ThinShells::moveOnSurface(const V3d& modelVert, const V3d& v, const size_t& max_move_cnt)
+{
+	// 准备数据结构
+	int ac_treeDepth;
+	vector<vector<V3d>> nodeOrigin;
+	vector<double> nodeWidth;
+	vector<std::map<uint32_t, size_t>> morton2Nodes;
+	vector<vector<std::array<double, 8>>> nodeBSplineVal;
+	prepareMoveOnSurface(ac_treeDepth, nodeOrigin, morton2Nodes, nodeBSplineVal, nodeWidth);
+
+	// 找到点所属格子的莫顿码
+	auto getPointNode = [=](const V3d& vert, const int& depth)->uint32_t
+	{
+		V3i dis = getPointDis(vert, modelOrigin, nodeWidth[depth]);
+		return morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+	};
+	// 找到点所属格子的原点、宽度以及八个顶点的b样条值
+	auto getNodeBSplineVal = [=](const V3d& vert, bool& flag)->std::tuple<V3d, double, std::array<double, 8>>
+	{
+		// 如果不在第0层那肯定就在第1层
+		for (int d = 0; d < ac_treeDepth; ++d)
+		{
+			uint32_t nodeMorton = getPointNode(vert, d);
+			if (morton2Nodes[d].find(nodeMorton) != morton2Nodes[d].end())
+			{
+				size_t nodeIdx = morton2Nodes[d].at(nodeMorton); // at() is thread safe
+				//std::cout << "width = " << nodeWidth[d] << std::endl;
+				flag = true;
+				return std::make_tuple(nodeOrigin[d].at(nodeIdx), nodeWidth[d], nodeBSplineVal[d].at(nodeIdx));
+			}
+		}
+	};
+	// 得到点的b样条值
+	auto getPointBSplineVal = [=](const V3d& vert)->double
+	{
+		bool flag = false;
+		auto p = getNodeBSplineVal(vert, flag);
+		if (!flag) return DINF;
+		V3d offset = (vert - std::get<0>(p)) / std::get<1>(p);
+		//std::cout << "std::get<1>(p) = " << std::get<1>(p) << ", offset = " << offset.transpose() << std::endl;
+		return tri_lerp<double>(std::get<2>(p), offset.x(), offset.y(), offset.z());
+	};
+
+	// 可视化输出
+	constexpr string saveDir = "PointMove";
+	auto writePoint = [=](const V3d& point, const size_t& cnt)
+	{
+		string filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth),
+			saveDir, std::to_string(cnt) + (string)".xyz");
+		checkDir(filename);
+		std::ofstream out(filename);
+		if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
+		gvis::write_vertex_to_xyz(out, point);
+	};
+	// 输出初始点
+	size_t valid_move = 0;
+	printf("Init point at (%lf, %lf, %lf)\n", modelVert.x(), modelVert.y(), modelVert.z());
+	writePoint(modelVert, valid_move);
+
+	// 开始沿v移动
+	V3d point = modelVert;
+	const V3d speed = v;
+	V3d dir = v.normalized();
+	double point_bSplineVal = .0;
+	V3d toOuterShell = V3d(), toInnerShell = V3d();
+	V3d zeroVec = V3d();
+
+	std::default_random_engine e(time(0)); // current time as seed
+	std::normal_distribution<double> n(-1, 1);
+	while (valid_move < max_move_cnt)
+	{
+		V3d new_point = point;
+		bool flag = false;
+		do
+		{
+			new_point = point + ((speed.array() * dir.array()).matrix());
+			point_bSplineVal = getPointBSplineVal(new_point);
+			//std::cout << "new_point = " << new_point.transpose() << ", val = " << point_bSplineVal << std::endl;
+			//system("pause");
+
+			// 随机一个新的方向
+			e.seed(time(0));
+			dir = Eigen::Matrix<double, 3, 1>::Zero(3, 1)
+				.unaryExpr([&](double val) { return static_cast<double>(round((n(e) + 1e-6) * 1e6) / 1e6); });
+		} while (point_bSplineVal > 0.01 || point_bSplineVal < -0.01);
+		++valid_move;
+
+		//toOuterShell = ((outerShellIsoVal - point_bSplineVal) * dir).array() / speed.array();
+		//toInnerShell = ((innerShellIsoVal - point_bSplineVal) * dir).array() / speed.array();;
+		//if (toOuterShell.isApprox(zeroVec, 1e-9) || toInnerShell.isApprox(zeroVec, 1e-9)) // 本身就在外壳或者内壳上
+		//{
+		//	// 随机一个新的方向
+		//	dir = Eigen::Matrix<double, 3, 1>::Zero(3, 1)
+		//		.unaryExpr([&](double val) { return static_cast<double>(round((n(e) + 1e-6) * 1e6) / 1e6); });
+		//}
+		//
+		//V3d dis;
+		//double new_vert_bSplineVal;
+		//do
+		//{
+		//	// 随机一个新的方向
+		//	dir = Eigen::Matrix<double, 3, 1>::Zero(3, 1)
+		//		.unaryExpr([&](double val) { return static_cast<double>(round((n(e) + 1e-6) * 1e6) / 1e6); });
+		//	dis = (speed.array() * dir.array()).matrix();
+		//
+		//	if (fabs(dir.x()) > 1e-6) new_vert_bSplineVal = dis.x() / dir.x() + point_bSplineVal;
+		//	else if (fabs(dir.y()) > 1e-6) new_vert_bSplineVal = dis.y() / dir.y() + point_bSplineVal;
+		//	else if (fabs(dir.z()) > 1e-6) new_vert_bSplineVal = dis.z() / dir.z() + point_bSplineVal;
+		//
+		//	std::cout << new_vert_bSplineVal << std::endl;
+		//} while (new_vert_bSplineVal > outerShellIsoVal || new_vert_bSplineVal < innerShellIsoVal);
+		//
+		//++valid_move;
+		//point = point + dis;
+		//point_bSplineVal = new_vert_bSplineVal;
+
+		point = new_point;
+		printf("#%llu: point at (%lf, %lf, %lf), bSplineVal = %lf\n", valid_move, point.x(), point.y(), point.z(), point_bSplineVal);
+		/*if (valid_move != max_move_cnt - 1) printf("\r");
+		else printf("\n");*/
+		writePoint(point, valid_move);
+	}
+}
+
+void ThinShells::pointProjection(const V3d& point)
+{
+	const auto& nodeArray = svo.svoNodeArray;
+
+	SVONode relativeNode = *nodeArray.crbegin();
+	V3d relativeNodeOrigin;
+	double relativeNodeHalfWidth;
+
+	auto getOffsetInNode = [=](const V3d& point)->uint32_t
+	{
+		V3i offset = ((point - relativeNodeOrigin).array() / relativeNodeHalfWidth).cast<int>();
+		return morton::mortonEncode_LUT((uint16_t)offset.x(), (uint16_t)offset.y(), (uint16_t)offset.z()); // 0~7
+	};
+
+	// 找到所处的最细的叶子节点
+	while (relativeNode.mortonCode != _UI32_MAX && !(relativeNode.isLeaf))
+	{
+		relativeNodeOrigin = relativeNode.origin;
+		relativeNodeHalfWidth = relativeNode.width / 2;
+
+		const uint32_t childIdx = getOffsetInNode(point);
+		relativeNode = nodeArray[relativeNode.childs[childIdx]];
+	}
 }

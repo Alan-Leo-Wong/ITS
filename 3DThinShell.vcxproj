@@ -29,7 +29,9 @@
     <ClInclude Include="src\cuAcc\MarchingCubes\MarchingCubes.h" />
     <ClInclude Include="src\ModelDefine.h" />
     <ClInclude Include="src\MortonLUT.h" />
+    <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\SVO.h" />
+    <ClInclude Include="src\test\TestConfig.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
     <ClInclude Include="src\utils\Common.hpp" />
@@ -155,7 +157,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /openmp:experimental %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>false</OpenMPSupport>
       <FloatingPointModel>Precise</FloatingPointModel>
     </ClCompile>
@@ -181,7 +183,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /openmp:experimental %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>true</OpenMPSupport>
       <FloatingPointModel>Precise</FloatingPointModel>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>

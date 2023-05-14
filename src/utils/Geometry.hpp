@@ -1,7 +1,7 @@
 #pragma once
 #include <fstream>
-#include <Eigen\dense>
-#include "cuda\CUDAMacro.h"
+#include <Eigen/dense>
+#include "cuda/CUDAMacro.h"
 
 // An Axis Aligned Box (AAB) of a certain type - to be initialized with a boxOrigin and boxEnd
 template <typename Real>

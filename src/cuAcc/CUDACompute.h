@@ -2,11 +2,11 @@
 /*
 * 一些公用 CUDA 计算
 */
-#include "..\BasicDataType.h"
-#include "..\utils\Geometry.hpp"
-#include "..\utils\cuda\CUDACheck.cuh"
-#include "..\utils\cuda\cuBLASCheck.cuh"
-#include <thrust\device_vector.h>
+#include "../BasicDataType.h"
+#include "../utils/Geometry.hpp"
+#include "../utils/cuda/CUDACheck.cuh"
+#include "../utils/cuda/cuBLASCheck.cuh"
+#include <thrust/device_vector.h>
 
 namespace cuAcc {
 	//void accIntersection();
@@ -45,4 +45,9 @@ namespace cuAcc {
 		const thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray, const V3d* d_nodeWidthArray,
 		const double* d_lambda, const thrust::device_vector<V3d>& d_pointsData,
 		thrust::device_vector<double>& d_bSplineVal, const cudaStream_t& stream, const bool& useThrust = true);
+
+	void cpPointQuery(const uint& numPoints, const uint& numNodeVerts,
+		const uint& numNodes, const V3d& modelBBOrigin, const V3d& modelBBWidth,
+		const std::vector<V3d>& pointsData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
+		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, VXd& origin_bSplinVal, const bool& useThrust = true);
 }

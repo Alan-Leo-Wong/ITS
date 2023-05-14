@@ -201,7 +201,7 @@ namespace cuAcc {
 	//	const V3d& lbbCorner, const double& width, int& numInterPoints)
 	//{
 	//	V3d modelEdgeDir = p2 - p1;
-
+	//
 	//	// back plane
 	//	double back_t = DINF;
 	//	if (modelEdgeDir.x() != 0)
@@ -214,7 +214,7 @@ namespace cuAcc {
 	//	double bottom_t = DINF;
 	//	if (modelEdgeDir.z() != 0)
 	//		bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
-
+	//
 	//	if (isInRange(.0, 1.0, back_t) &&
 	//		isInRange(lbbCorner.y(), lbbCorner.y() + width, (p1 + back_t * modelEdgeDir).y()) &&
 	//		isInRange(lbbCorner.z(), lbbCorner.z() + width, (p1 + back_t * modelEdgeDir).z()))
@@ -243,40 +243,40 @@ namespace cuAcc {
 	//{
 	//	int* shData = SharedMemory<int>();
 	//	cg::thread_block ctb = cg::this_thread_block();
-
+	//
 	//	const unsigned int ty = threadIdx.y + blockIdx.y * blockDim.y;
-
+	//
 	//	if (ty < nModelEdges)
 	//	{
 	//		unsigned int x_tid = threadIdx.x;
 	//		unsigned int x_gridSize = colBlockSize * gridDim.x;
-
+	//
 	//		unsigned int maskLength = (colBlockSize & 31);
 	//		maskLength = (maskLength > 0) ? (32 - maskLength) : maskLength;
 	//		const unsigned int mask = (0xffffffff) >> maskLength;
-
+	//
 	//		int numInterPoints = 0;
-
+	//
 	//		const V2i e = d_modelEdgesArray[ty];
 	//		const V3d p1 = d_modelVertsArray[e.x()], p2 = d_modelVertsArray[e.y()];
-
+	//
 	//		if (nIsPow2)
 	//		{
 	//			unsigned int i = blockIdx.x * colBlockSize * 2 + threadIdx.x;
 	//			x_gridSize <<= 1;
-
+	//
 	//			while (i < numFineNodes)
 	//			{
 	//				V3d lbbCorner = d_nodeOriginArray[i];
 	//				double width = d_nodeWidthArray[i];
 	//				cpNumEdgeInterPoints(e, p1, p2, lbbCorner, width, numInterPoints);
-
+	//
 	//				if (i + colBlockSize < numFineNodes)
 	//				{
 	//					lbbCorner = d_nodeOriginArray[i + colBlockSize];
 	//					width = d_nodeWidthArray[i + colBlockSize];
 	//					cpNumEdgeInterPoints(e, p1, p2, lbbCorner, width, numInterPoints);
-
+	//
 	//					i += x_gridSize;
 	//				}
 	//			}
@@ -284,13 +284,13 @@ namespace cuAcc {
 	//		else
 	//		{
 	//			unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
-
+	//
 	//			while (i < numFineNodes)
 	//			{
 	//				V3d lbbCorner = d_nodeOriginArray[i];
 	//				double width = d_nodeWidthArray[i];
 	//				cpNumEdgeInterPoints(e, p1, p2, lbbCorner, width, numInterPoints);
-
+	//
 	//				i += x_gridSize;
 	//			}
 	//		}
@@ -299,15 +299,15 @@ namespace cuAcc {
 	//		const int sh_reduceNum = (colBlockSize / warpSize) > 0 ? colBlockSize / warpSize : 1;
 	//		if (x_tid % warpSize == 0)
 	//			shData[threadIdx.y * sh_reduceNum + x_tid / warpSize] = numInterPoints;
-
+	//
 	//		cg::sync(ctb);
-
+	//
 	//		const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
 	//		if (x_tid < sh_reduceNum) {
 	//			numInterPoints = shData[threadIdx.y * sh_reduceNum + x_tid];
 	//			warpReduceSum<int>(newMask, numInterPoints);
 	//		}
-
+	//
 	//		if (x_tid == 0)
 	//			d_numEdgeInterPointsArray[ty] = numInterPoints;
 	//	}
@@ -318,17 +318,17 @@ namespace cuAcc {
 	//	const V3d& p1, const V3d& p2, const V3d& p3, const double& triDir, int& numInterPoints)
 	//{
 	//	V3d edgeDir = edge.second - edge.first;
-
+	//
 	//	if (fabsf(triNormal.dot(edgeDir)) < 1e-9) return;
-
+	//
 	//	double t = (-triDir - triNormal.dot(edge.first)) / (triNormal.dot(edgeDir));
 	//	if (t < 0. || t > 1.) return;
 	//	V3d interPoint = edge.first + edgeDir * t;
-
+	//
 	//	if (triEdge_1.cross(interPoint - p1).dot(triNormal) < 0) return;
 	//	if (triEdge_2.cross(interPoint - p2).dot(triNormal) < 0) return;
 	//	if (triEdge_3.cross(interPoint - p3).dot(triNormal) < 0) return;
-
+	//
 	//	++numInterPoints;
 	//}
 
@@ -339,39 +339,39 @@ namespace cuAcc {
 	//{
 	//	int* shData = SharedMemory<int>();
 	//	cg::thread_block ctb = cg::this_thread_block();
-
+	//
 	//	const unsigned int ty = threadIdx.y + blockIdx.y * blockDim.y;
-
+	//
 	//	if (ty < nModelTris)
 	//	{
 	//		unsigned int x_tid = threadIdx.x;
 	//		unsigned int x_gridSize = colBlockSize * gridDim.x;
-
+	//
 	//		unsigned int maskLength = (colBlockSize & 31);
 	//		maskLength = (maskLength > 0) ? (32 - maskLength) : maskLength;
 	//		const unsigned int mask = (0xffffffff) >> maskLength;
-
+	//
 	//		int numInterPoints = 0;
-
+	//
 	//		Triangle<V3d> tri = d_modelTrisArray[ty];
 	//		V3d triEdge_1 = tri.p2 - tri.p1; V3d triEdge_2 = tri.p3 - tri.p2; V3d triEdge_3 = tri.p1 - tri.p3;
 	//		V3d triNormal = tri.normal; double triDir = tri.dir;
-
+	//
 	//		if (nIsPow2)
 	//		{
 	//			unsigned int i = blockIdx.x * colBlockSize * 2 + threadIdx.x;
 	//			x_gridSize <<= 1;
-
+	//
 	//			while (i < numFineNodeEdges)
 	//			{
 	//				thrust::pair<thrust::pair<V3d, V3d>, uint32_t> nodeEdge = d_fineNodeEdgesArray[i];
 	//				cpNumFaceInterPoints(nodeEdge.first, triEdge_1, triEdge_2, triEdge_3, triNormal, tri.p1, tri.p2, tri.p3, triDir, numInterPoints);
-
+	//
 	//				if (i + colBlockSize < numFineNodes)
 	//				{
 	//					thrust::pair<thrust::pair<V3d, V3d>, uint32_t> nodeEdge = d_fineNodeEdgesArray[i + colBlockSize];
 	//					cpNumFaceInterPoints(nodeEdge.first, triEdge_1, triEdge_2, triEdge_3, triNormal, tri.p1, tri.p2, tri.p3, triDir, numInterPoints);
-
+	//
 	//					i += x_gridSize;
 	//				}
 	//			}
@@ -379,12 +379,12 @@ namespace cuAcc {
 	//		else
 	//		{
 	//			unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
-
+	//
 	//			while (i < numFineNodeEdges)
 	//			{
 	//				thrust::pair<thrust::pair<V3d, V3d>, uint32_t> nodeEdge = d_fineNodeEdgesArray[i];
 	//				cpNumFaceInterPoints(nodeEdge.first, triEdge_1, triEdge_2, triEdge_3, triNormal, tri.p1, tri.p2, tri.p3, triDir, numInterPoints);
-
+	//
 	//				i += x_gridSize;
 	//			}
 	//		}
@@ -393,19 +393,19 @@ namespace cuAcc {
 	//		const int sh_reduceNum = (colBlockSize / warpSize) > 0 ? colBlockSize / warpSize : 1;
 	//		if (x_tid % warpSize == 0)
 	//			shData[threadIdx.y * sh_reduceNum + x_tid / warpSize] = numInterPoints;
-
+	//
 	//		cg::sync(ctb);
-
+	//
 	//		const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
 	//		if (x_tid < sh_reduceNum) {
 	//			numInterPoints = shData[threadIdx.y * sh_reduceNum + x_tid];
 	//			warpReduceSum<int>(newMask, numInterPoints);
 	//		}
-
+	//
 	//		if (x_tid == 0)
 	//			d_numFaceInterPointsArray[ty] = numInterPoints;
 	//	}
-
+	//
 	//}
 
 	//void cpIntersection(const uint& nModelEdges, const vector<V2i>& modelEdgesArray, const vector<V3d> modelVertsArray,
@@ -416,13 +416,13 @@ namespace cuAcc {
 	//	constexpr int MAX_STREAM = 2;
 	//	cudaStream_t streams[MAX_STREAM];
 	//	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
-
+	//
 	//	dim3 gridSize, blockSize;
-
+	//
 	//	thrust::device_vector<size_t> d_numEdgeInterPointsArray;
-
-
-
+	//
+	//
+	//
 	//	for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamDestroy(streams[i]));
 	//}
 
@@ -505,6 +505,84 @@ namespace cuAcc {
 			if (x_tid == 0) {
 				g_odata[ty * gridDim.x + blockIdx.x] = sum;
 				//printf("#4 ty = %d, sum = %lf\n", ty, sum);
+			}
+		}
+	}
+
+	template <typename T = Eigen::Vector3d, typename Scalar = double, bool nIsPow2, unsigned int colBlockSize>
+	__global__ void mq_reduceRowSumKernel(const unsigned int m, const unsigned int n,
+		const thrust::pair<T, uint32_t>* __restrict__ d_nodeVertexArray,
+		const T* __restrict__ d_nodeWidthArray,
+		const T* __restrict__ g_iA,
+		const Scalar* __restrict__ g_iB, // lambda
+		const T* __restrict__ d_modelBBOrigin,
+		const T* __restrict__ d_modelBBWidth,
+		Scalar* __restrict__ g_odata,
+		Scalar* __restrict__ g_o_originData)
+	{
+		Scalar* shData = SharedMemory<Scalar>();
+		cg::thread_block ctb = cg::this_thread_block();
+
+		unsigned int ty = blockIdx.y * blockDim.y + threadIdx.y;
+		unsigned int tx = blockIdx.x * blockDim.x + threadIdx.x;
+
+		if (ty < m) {
+			unsigned int x_tid = threadIdx.x;
+			unsigned int x_gridSize = colBlockSize * gridDim.x;
+
+			unsigned int maskLength = (colBlockSize & 31);
+			maskLength = (maskLength > 0) ? (32 - maskLength) : maskLength;
+			const unsigned int mask = (0xffffffff) >> maskLength;
+
+			Scalar sum = (Scalar).0;
+
+			//printf("#1 sum = %lf\n", sum);
+			// reduce multiple elements per thread
+			if (nIsPow2) {
+				unsigned int i = blockIdx.x * colBlockSize * 2 + threadIdx.x;
+				x_gridSize <<= 1;
+
+				while (i < n)
+				{
+					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
+					if (i + colBlockSize < n)
+					{
+						sum += g_iB[i + colBlockSize] * BaseFunction4Point(d_nodeVertexArray[i + colBlockSize].first, d_nodeWidthArray[d_nodeVertexArray[i + colBlockSize].second], g_iA[ty]); // (一个)线程块级别的跨度
+						i += x_gridSize; // 网格级别的跨度：默认网格大小(block的数量)为原有数据(x维度即列数)的一半(如果nIsPow2成立，则x_gridSize扩大一倍)
+					}
+				}
+			}
+			else {
+				unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
+				while (i < n)
+				{
+					sum += g_iB[i] * BaseFunction4Point(d_nodeVertexArray[i].first, d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
+					i += x_gridSize;
+				}
+			}
+
+			// 对每个warp执行归约求和，然后保存到shared memory中
+			warpReduceSum<Scalar>(mask, sum);
+			const int sh_reduceNum = (colBlockSize / warpSize) > 0 ? colBlockSize / warpSize : 1;
+			if (x_tid % warpSize == 0)
+				shData[threadIdx.y * sh_reduceNum + x_tid / warpSize] = sum;
+
+			cg::sync(ctb);
+
+			// 同一个block下所有warp求和(只要将每个warp的第一个thread保存的sum加起来即可，
+			// 因为每个warp的第一个thread保存的sum就是其所属warp的所有线程的数据和)
+			const unsigned int newMask = __ballot_sync(mask, x_tid < sh_reduceNum);
+			if (x_tid < sh_reduceNum) {
+				sum = shData[threadIdx.y * sh_reduceNum + x_tid];
+				warpReduceSum<Scalar>(newMask, sum);
+			}
+
+			if (x_tid == 0) {
+				g_odata[ty * gridDim.x + blockIdx.x] = sum;
+			}
+
+			if (tx == 0) {
+				g_o_originData[ty] = BaseFunction4Point(*d_modelBBOrigin, *d_modelBBWidth, g_iA[ty]);
 			}
 		}
 	}
@@ -635,6 +713,134 @@ namespace cuAcc {
 		}
 	}
 
+	// 用于多点查询
+	template <typename T = Eigen::Vector3d, typename Scalar = double>
+	void mq_switchKernel(const bool& isPow2, const int& threads, const dim3& gridSize,
+		const dim3& blockSize, const int& sh_memSize, const cudaStream_t& stream, const uint& rowElems,
+		const uint& cols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
+		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, const T* d_modelBBOrigin,
+		const T* d_modelBBWidth, Scalar* d_tRowSumMatrix, Scalar* d_oneValue)
+	{
+		if (isPow2) {
+			switch (threads) {
+			case 1024:
+				mq_reduceRowSumKernel<T, Scalar, true, 1024>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 512:
+				mq_reduceRowSumKernel<T, Scalar, true, 512>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 256:
+				mq_reduceRowSumKernel<T, Scalar, true, 256>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 128:
+				mq_reduceRowSumKernel<T, Scalar, true, 128>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 64:
+				mq_reduceRowSumKernel<T, Scalar, true, 64>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 32:
+				mq_reduceRowSumKernel<T, Scalar, true, 32>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 16:
+				mq_reduceRowSumKernel<T, Scalar, true, 16>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 8:
+				mq_reduceRowSumKernel<T, Scalar, true, 8>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 4:
+				mq_reduceRowSumKernel<T, Scalar, true, 4>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 2:
+				mq_reduceRowSumKernel<T, Scalar, true, 2>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 1:
+				mq_reduceRowSumKernel<T, Scalar, true, 1>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			}
+		}
+		else {
+			switch (threads) {
+			case 1024:
+				mq_reduceRowSumKernel<T, Scalar, false, 1024>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 512:
+				mq_reduceRowSumKernel<T, Scalar, false, 512>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 256:
+				mq_reduceRowSumKernel<T, Scalar, false, 256>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 128:
+				mq_reduceRowSumKernel<T, Scalar, false, 128>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 64:
+				mq_reduceRowSumKernel<T, Scalar, false, 64>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 32:
+				mq_reduceRowSumKernel<T, Scalar, false, 32>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 16:
+				mq_reduceRowSumKernel<T, Scalar, false, 16>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 8:
+				mq_reduceRowSumKernel<T, Scalar, false, 8>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 4:
+				mq_reduceRowSumKernel<T, Scalar, false, 4>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 2:
+				mq_reduceRowSumKernel<T, Scalar, false, 2>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			case 1:
+				mq_reduceRowSumKernel<T, Scalar, false, 1>
+					<< <gridSize, blockSize, sh_memSize, stream >> > (
+						rowElems, cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth, d_tRowSumMatrix, d_oneValue);
+				break;
+			}
+		}
+	}
+
 	/*
 	 * 将 A 和 B 分块，每个 block 处理一部分的求和值，
 	 * 即 A 被分为 rowElems 个行方向的 block，B 被分为 n(x_gridSize) 个列方向的
@@ -650,7 +856,7 @@ namespace cuAcc {
 		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, thrust::device_vector<Scalar>& d_value)
 	{
 		//std::cout << "rowElems = " << rowElems << std::endl;
-		int x_blockSize = 0, y_blockSize = 16; // x操纵B，y操纵A
+		int x_blockSize = 0, y_blockSize = 16; // x操纵B，y操纵A (注意：x_blockSize 必须得>=32)
 		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
 		// 分配时需要paddingCols
@@ -669,6 +875,51 @@ namespace cuAcc {
 		// 而不是 elems * x_paddingGridSize
 		switchKernel<T, Scalar>(flag, x_blockSize, gridSize, blockSize, sh_memSize, stream, rowElems,
 			cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_tRowSumMatrix.data().get());
+		getLastCudaError("Kernel: 'reduceRowSumKernel' execution failed");
+		//cudaDeviceSynchronize();
+
+		int resCols = x_gridSize;
+		if (resCols > 1) {
+			thrust::device_vector<Scalar> rowSums(rowElems);
+			if (useThrust)
+				launch_ThrustRowSumReduce(rowElems, resCols, d_tRowSumMatrix, rowSums, stream);
+			else
+				launch_BLASRowSumReduce(rowElems, resCols, d_tRowSumMatrix.data().get(), rowSums.data().get(), stream);
+			d_value = rowSums;
+		}
+		else {
+			CUDA_CHECK(cudaMemcpyAsync(d_value.data().get(), d_tRowSumMatrix.data().get(),
+				sizeof(Scalar) * rowElems, cudaMemcpyDeviceToDevice, stream));
+		}
+	}
+
+	// 用于多点查询
+	template <typename T = Eigen::Vector3d, typename Scalar = double, bool useThrust = true>
+	void mq_execMyReduce(const cudaDeviceProp& prop, const cudaStream_t& stream,
+		const uint& rowElems, const uint& cols, const uint& paddingCols, const thrust::pair<T, uint32_t>* d_nodeVertexArray,
+		const T* d_nodeWidthArray, const T* d_A, const Scalar* d_B, const T* d_modelBBOrigin, const T* d_modelBBWidth,
+		thrust::device_vector<Scalar>& d_value, thrust::device_vector<Scalar>& d_one_value)
+	{
+		int x_blockSize = 0, y_blockSize = 32; // x操纵B，y操纵A (注意：x_blockSize 必须得>=32)
+		int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
+
+		// 分配时需要paddingCols
+		getBlocksAndThreadsNum(prop, paddingCols, 65535, 1024 / y_blockSize, x_gridSize, x_blockSize);
+		dim3 blockSize(x_blockSize, y_blockSize, 1);
+		dim3 gridSize(x_gridSize, y_gridSize, 1);
+
+		unsigned int x_paddingGridSize = PADDING_TO_WARP(x_gridSize);
+		unsigned int t_rowSumMatrixSize = rowElems * x_paddingGridSize; // 分配时需要padding后的cols，单纯是为了用于后续重复计算row reduce sum
+
+		thrust::device_vector<Scalar> d_tRowSumMatrix(t_rowSumMatrixSize, (Scalar).0);
+		int sh_memSize = sizeof(Scalar) * y_blockSize * ((x_blockSize / 32) + 1); // +1 for avoiding bank conflicts
+		bool flag = isPow2(cols);
+
+		// d_tRowSumMatrix 为 row reduce sum 的结果，其实际不含 0 的数据维度为: elems * x_gridSize，
+		// 而不是 elems * x_paddingGridSize
+		mq_switchKernel<T, Scalar>(flag, x_blockSize, gridSize, blockSize, sh_memSize, stream, rowElems,
+			cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_modelBBOrigin, d_modelBBWidth,
+			d_tRowSumMatrix.data().get(), d_one_value.data().get());
 		getLastCudaError("Kernel: 'reduceRowSumKernel' execution failed");
 		//cudaDeviceSynchronize();
 
@@ -762,19 +1013,19 @@ namespace cuAcc {
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
 
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
-			printf("[%d/%d]", i + 1, MAX_NUM_STREAMS);
 
-			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
+			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;	
 			uint points_offset = i * points_elems;
-			points_elems = points_offset + points_elems > numPoints ? numPoints - points_offset : points_elems;
+			bool lastBatch = false;
+			if (points_offset + points_elems > numPoints) { lastBatch = true; points_elems = numPoints - points_offset; }
 
 			V3d* d_pointsData = nullptr;
 			CUDA_CHECK(cudaMalloc((void**)&d_pointsData, sizeof(V3d) * points_elems));
 			CUDA_CHECK(cudaMemcpyAsync(d_pointsData, pointsData.data() + points_offset, sizeof(V3d) * points_elems, cudaMemcpyHostToDevice, streams[i]));
 
-			printf(" batch_size = %u", points_elems);
-			if (i != MAX_NUM_STREAMS - 1) printf("\r");
-			else printf("\n");
+			printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, points_elems);
+			if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
+			else { printf("\n"); break; }
 
 			thrust::device_vector<double> d_value(points_elems);
 
@@ -810,6 +1061,94 @@ namespace cuAcc {
 
 		if (useThrust) execMyReduce<V3d, double, true>(prop, stream, numPoints, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointsData.data().get(), d_lambda, d_bSplineVal);
 		else execMyReduce<V3d, double, false>(prop, stream, numPoints, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointsData.data().get(), d_lambda, d_bSplineVal);
+	}
+
+	void cpPointQuery(const uint& numPoints, const uint& numNodeVerts,
+		const uint& numNodes, const V3d& modelBBOrigin, const V3d& modelBBWidth,
+		const std::vector<V3d>& pointsData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
+		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, VXd& origin_bSplinVal, const bool& useThrust)
+	{
+		// streams
+		constexpr int MAX_NUM_STREAMS = 4;
+
+		// device
+		cudaDeviceProp prop;
+		int device = getMaxComputeDevice();
+		CUDA_CHECK(cudaGetDevice(&device));
+		CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+
+		double* h_bSplineVal = nullptr;
+		double* h_origin_bSplineVal = nullptr;
+
+		thrust::pair<Eigen::Vector3d, uint32_t>* d_nodeVertexArray = nullptr;
+		V3d* d_nodeWidthArray = nullptr;
+		double* d_lambda = nullptr;
+		// 用于计算最外层boundingbox的原点的b样条值（进一步用来判断点在模型的内外）
+		V3d* d_modelBBOrigin = nullptr;
+		V3d* d_modelBBWidth = nullptr;
+
+		CUDA_CHECK(cudaHostAlloc((void**)&h_bSplineVal, sizeof(double) * numPoints, cudaHostAllocDefault));
+		CUDA_CHECK(cudaHostAlloc((void**)&h_origin_bSplineVal, sizeof(double) * numPoints, cudaHostAllocDefault));
+
+		CUDA_CHECK(cudaMalloc((void**)&d_nodeVertexArray, sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts));
+		CUDA_CHECK(cudaMalloc((void**)&d_nodeWidthArray, sizeof(V3d) * numNodes));
+		unsigned int paddingCols = PADDING_TO_WARP(numNodeVerts);
+		CUDA_CHECK(cudaMalloc((void**)&d_lambda, sizeof(double) * lambda.rows()));
+		CUDA_CHECK(cudaMalloc((void**)&d_modelBBOrigin, sizeof(V3d)));
+		CUDA_CHECK(cudaMalloc((void**)&d_modelBBWidth, sizeof(V3d)));
+
+		CUDA_CHECK(cudaMemcpy(d_nodeVertexArray, nodeVertexArray.data(), sizeof(thrust::pair<Eigen::Vector3d, uint32_t>) * numNodeVerts, cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_nodeWidthArray, nodeWidthArray.data(), sizeof(V3d) * numNodes, cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_lambda, lambda.data(), sizeof(double) * lambda.rows(), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_modelBBOrigin, &modelBBOrigin, sizeof(V3d), cudaMemcpyHostToDevice));
+		CUDA_CHECK(cudaMemcpy(d_modelBBWidth, &modelBBWidth, sizeof(V3d), cudaMemcpyHostToDevice));
+
+		cudaStream_t streams[MAX_NUM_STREAMS];
+		for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
+
+		for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
+			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
+			uint points_offset = i * points_elems;
+			bool lastBatch = false;
+			if (points_offset + points_elems > numPoints) { lastBatch = true; points_elems = numPoints - points_offset; }
+
+			V3d* d_pointsData = nullptr;
+			CUDA_CHECK(cudaMalloc((void**)&d_pointsData, sizeof(V3d) * points_elems));
+			CUDA_CHECK(cudaMemcpyAsync(d_pointsData, pointsData.data() + points_offset, sizeof(V3d) * points_elems, cudaMemcpyHostToDevice, streams[i]));
+
+			printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, points_elems);
+			if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
+			else { printf("\n"); break; }
+
+			thrust::device_vector<double> d_value(points_elems); // b样条值
+			thrust::device_vector<double> d_origin_value(points_elems); // model boundingbox单个原点的b样条值
+
+			if (useThrust) mq_execMyReduce<V3d, double, true>(prop, streams[i], points_elems, numNodeVerts, paddingCols,
+				d_nodeVertexArray, d_nodeWidthArray, d_pointsData, d_lambda, d_modelBBOrigin, d_modelBBWidth, d_value, d_origin_value);
+			else mq_execMyReduce<V3d, double, false>(prop, streams[i], points_elems, numNodeVerts, paddingCols,
+				d_nodeVertexArray, d_nodeWidthArray, d_pointsData, d_lambda, d_modelBBOrigin, d_modelBBWidth, d_value, d_origin_value);
+
+			CUDA_CHECK(cudaMemcpyAsync(h_bSplineVal + points_offset, d_value.data().get(), sizeof(double) * points_elems, cudaMemcpyDeviceToHost, streams[i]));
+			CUDA_CHECK(cudaMemcpyAsync(h_origin_bSplineVal + points_offset, d_origin_value.data().get(), sizeof(double) * points_elems, cudaMemcpyDeviceToHost, streams[i]));
+
+			CUDA_CHECK(cudaFree(d_pointsData));
+			cleanupThrust(d_value);
+		}
+
+		for (int i = 0; i < MAX_NUM_STREAMS; i++)
+			cudaStreamSynchronize(streams[i]);
+		for (int i = 0; i < MAX_NUM_STREAMS; ++i)
+			CUDA_CHECK(cudaStreamDestroy(streams[i]));
+
+		bSplinVal = Eigen::Map<Eigen::VectorXd>(h_bSplineVal, numPoints);
+		origin_bSplinVal = Eigen::Map<Eigen::VectorXd>(h_origin_bSplineVal, numPoints);
+
+		CUDA_CHECK(cudaFree(d_nodeVertexArray));
+		CUDA_CHECK(cudaFree(d_nodeWidthArray));
+		CUDA_CHECK(cudaFree(d_modelBBOrigin));
+		CUDA_CHECK(cudaFree(d_modelBBWidth));
+		CUDA_CHECK(cudaFree(d_lambda));
+		//free(h_bSplineVal);
 	}
 
 	/*__global__ void modelPointsMortonKernel(const uint nModelVerts,
@@ -852,7 +1191,7 @@ namespace cuAcc {
 		modelPointsMortonKernel<<<gridSize, blockSize>>>(nModelVerts, d_modelOrigin, d_nodeWidth, d_modelVertsArray.data().get(), d_vertsMorton.data().get());
 
 		CUDA_CHECK(cudaMemcpy(vertsMorton.data(), d_vertsMorton.data().get(), sizeof(uint32_t) * nModelVerts, cudaMemcpyDeviceToHost));
-		
+
 		cleanupThrust(d_vertsMorton);
 		cleanupThrust(d_modelVertsArray);
 		CUDA_CHECK(cudaFree(d_modelOrigin));

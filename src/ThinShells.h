@@ -1,13 +1,18 @@
 #pragma once
 #include "SVO.h"
 #include "BaseModel.h"
-#include "utils\String.hpp"
+#include "utils/String.hpp"
+#include "test/TestConfig.h"
 
 class ThinShells : public BaseModel
 {
+	using test_type = Test::type;
 private:
+	V3d modelOrigin;
+
 	V3i svo_gridSize;
 	SparseVoxelOctree svo;
+	double voxelWidth;
 	//vector<V3d> nodeWidthArray;
 
 	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
@@ -31,19 +36,45 @@ public:
 	ThinShells() {}
 
 	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z) :
-		svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename), svo(_grid_x, _grid_y, _grid_z)
+		svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
+//#ifndef NDEBUG
+		saveTree("");
+//#endif // !NDEBUG
+	}
+
+	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
+	{
+		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
+		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
 #ifndef NDEBUG
 		saveTree("");
 #endif // !NDEBUG
 	}
 
-	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), svo(_grid)
+	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z, 
+		const bool& _is2UnitCube, const double& _scaleFactor) 
+		: svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename, _is2UnitCube, _scaleFactor), 
+		modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
+#ifndef NDEBUG
+		saveTree("");
+#endif // !NDEBUG
+	}
+
+	ThinShells(const string& filename, const V3i& _grid, const bool& _is2UnitCube, const double& _scaleFactor) 
+		:svo_gridSize(_grid), BaseModel(filename, _is2UnitCube, _scaleFactor), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
+	{
+		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
+		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
 #ifndef NDEBUG
 		saveTree("");
 #endif // !NDEBUG
@@ -54,6 +85,10 @@ public:
 	// ThinShells& operator=(const ThinShells& model);
 
 private:
+	V3i getPointDis(const V3d& modelVert, const V3d& origin, const V3d& width);
+
+	V3i getPointDis(const V3d& modelVert, const V3d& origin, const double& width);
+
 	//void cpIntersectionPoints();
 	void cpIntersectionPoints();
 
@@ -75,13 +110,6 @@ public:
 
 	std::array<double, 2> getShellIsoVal() { return { innerShellIsoVal, outerShellIsoVal }; }
 
-	// 点在表面的查询
-	void singlePointQuery(const std::string& out_file, const V3d& point);
-
-	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
-
-	void multiPointQuery(const std::string& out_file, const MXd& points);
-
 public:
 	void saveTree(const string& filename) const;
 
@@ -93,6 +121,8 @@ public:
 
 	void saveCoefficients(const string& filename) const;
 
+	void saveLatentPoint(const string& filename) const;
+
 	void saveBSplineValue(const string& filename) const;
 
 public:
@@ -102,5 +132,25 @@ public:
 
 	void textureVisualization(const string& filename) const;
 
-	friend class CollisionDetection;
+	//friend class CollisionDetection;
+private:
+	void prepareMoveOnSurface(int& ac_treeDepth, 
+		vector<vector<V3d>>& nodeOrigin,
+		vector<std::map<uint32_t, size_t>>& morton2Nodes,
+		vector<vector<std::array<double, 8>>>& nodeBSplineVal,
+		vector<double>& nodeWidth);
+
+public:
+	// 点在表面的查询
+	void singlePointQuery(const std::string& out_file, const V3d& point);
+
+	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const test_type& choice = Test::CUDA);
+
+	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
+
+	void multiPointQuery(const std::string& out_file, const MXd& points);
+
+	void moveOnSurface(const V3d& modelVert, const V3d& v, const size_t& max_move_cnt);
+
+	void pointProjection(const V3d& point);
 };
