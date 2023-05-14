@@ -41,9 +41,9 @@ public:
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-#ifndef NDEBUG
+//#ifndef NDEBUG
 		saveTree("");
-#endif // !NDEBUG
+//#endif // !NDEBUG
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)

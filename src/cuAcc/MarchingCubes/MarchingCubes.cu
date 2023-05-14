@@ -491,11 +491,10 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 
 	for (int i = 0; i < MAX_NUM_STREAMS; ++i) 
 	{
-		printf("[%d/%d]", i + 1, MAX_NUM_STREAMS);
-
 		uint voxelElems = (nVoxels + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
 		uint voxelOffset = i * voxelElems;
-		voxelElems = voxelOffset + voxelElems > nVoxels ? nVoxels - voxelOffset : voxelElems;
+		bool lastBatch = false;
+		if (voxelOffset + voxelElems > nVoxels) { lastBatch = true; voxelElems = nVoxels - voxelOffset; }
 
 		uint* d_voxelOffset = nullptr;
 		CUDA_CHECK(cudaMalloc((void**)&d_voxelOffset, sizeof(uint)));
@@ -504,9 +503,9 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 		const uint numVoxelElemCorners = voxelElems * 8;
 		thrust::device_vector<V3d> d_voxelCornerData(numVoxelElemCorners);
 
-		printf(" batch_size = %u", numVoxelElemCorners);
-		if (i != MAX_NUM_STREAMS - 1) printf("\r");
-		else printf("\n");
+		printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, voxelElems);
+		if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
+		else { printf("\n"); break; }
 
 		int minGridSize, blockSize, gridSize;
 		getOccupancyMaxPotentialBlockSize(nVoxels, minGridSize, blockSize, gridSize, MCKernel::prepareVoxelCornerKernel);

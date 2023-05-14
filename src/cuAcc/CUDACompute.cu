@@ -1013,19 +1013,19 @@ namespace cuAcc {
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
 
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
-			printf("[%d/%d]", i + 1, MAX_NUM_STREAMS);
 
-			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
+			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;	
 			uint points_offset = i * points_elems;
-			points_elems = points_offset + points_elems > numPoints ? numPoints - points_offset : points_elems;
+			bool lastBatch = false;
+			if (points_offset + points_elems > numPoints) { lastBatch = true; points_elems = numPoints - points_offset; }
 
 			V3d* d_pointsData = nullptr;
 			CUDA_CHECK(cudaMalloc((void**)&d_pointsData, sizeof(V3d) * points_elems));
 			CUDA_CHECK(cudaMemcpyAsync(d_pointsData, pointsData.data() + points_offset, sizeof(V3d) * points_elems, cudaMemcpyHostToDevice, streams[i]));
 
-			printf(" batch_size = %u", points_elems);
-			if (i != MAX_NUM_STREAMS - 1) printf("\r");
-			else printf("\n");
+			printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, points_elems);
+			if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
+			else { printf("\n"); break; }
 
 			thrust::device_vector<double> d_value(points_elems);
 
@@ -1063,7 +1063,7 @@ namespace cuAcc {
 		else execMyReduce<V3d, double, false>(prop, stream, numPoints, numNodeVerts, paddingCols, d_nodeVertexArray, d_nodeWidthArray, d_pointsData.data().get(), d_lambda, d_bSplineVal);
 	}
 
-	void cpPointQuery(const uint& numPoints, const uint& numNodeVerts, 
+	void cpPointQuery(const uint& numPoints, const uint& numNodeVerts,
 		const uint& numNodes, const V3d& modelBBOrigin, const V3d& modelBBWidth,
 		const std::vector<V3d>& pointsData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
 		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, VXd& origin_bSplinVal, const bool& useThrust)
@@ -1107,26 +1107,25 @@ namespace cuAcc {
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
 
 		for (int i = 0; i < MAX_NUM_STREAMS; ++i) {
-			printf("[%d/%d]", i + 1, MAX_NUM_STREAMS);
-
 			uint points_elems = (numPoints + MAX_NUM_STREAMS - 1) / MAX_NUM_STREAMS;
 			uint points_offset = i * points_elems;
-			points_elems = points_offset + points_elems > numPoints ? numPoints - points_offset : points_elems;
+			bool lastBatch = false;
+			if (points_offset + points_elems > numPoints) { lastBatch = true; points_elems = numPoints - points_offset; }
 
 			V3d* d_pointsData = nullptr;
 			CUDA_CHECK(cudaMalloc((void**)&d_pointsData, sizeof(V3d) * points_elems));
 			CUDA_CHECK(cudaMemcpyAsync(d_pointsData, pointsData.data() + points_offset, sizeof(V3d) * points_elems, cudaMemcpyHostToDevice, streams[i]));
 
-			printf(" batch_size = %u", points_elems);
-			if (i != MAX_NUM_STREAMS - 1) printf("\r");
-			else printf("\n");
+			printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, points_elems);
+			if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
+			else { printf("\n"); break; }
 
 			thrust::device_vector<double> d_value(points_elems); // b样条值
 			thrust::device_vector<double> d_origin_value(points_elems); // model boundingbox单个原点的b样条值
 
-			if (useThrust) mq_execMyReduce<V3d, double, true>(prop, streams[i], points_elems, numNodeVerts, paddingCols, 
+			if (useThrust) mq_execMyReduce<V3d, double, true>(prop, streams[i], points_elems, numNodeVerts, paddingCols,
 				d_nodeVertexArray, d_nodeWidthArray, d_pointsData, d_lambda, d_modelBBOrigin, d_modelBBWidth, d_value, d_origin_value);
-			else mq_execMyReduce<V3d, double, false>(prop, streams[i], points_elems, numNodeVerts, paddingCols, 
+			else mq_execMyReduce<V3d, double, false>(prop, streams[i], points_elems, numNodeVerts, paddingCols,
 				d_nodeVertexArray, d_nodeWidthArray, d_pointsData, d_lambda, d_modelBBOrigin, d_modelBBWidth, d_value, d_origin_value);
 
 			CUDA_CHECK(cudaMemcpyAsync(h_bSplineVal + points_offset, d_value.data().get(), sizeof(double) * points_elems, cudaMemcpyDeviceToHost, streams[i]));
@@ -1147,7 +1146,7 @@ namespace cuAcc {
 		CUDA_CHECK(cudaFree(d_nodeVertexArray));
 		CUDA_CHECK(cudaFree(d_nodeWidthArray));
 		CUDA_CHECK(cudaFree(d_modelBBOrigin));
-		CUDA_CHECK(cudaFree(d_modelBBWidth)); 
+		CUDA_CHECK(cudaFree(d_modelBBWidth));
 		CUDA_CHECK(cudaFree(d_lambda));
 		//free(h_bSplineVal);
 	}
@@ -1192,7 +1191,7 @@ namespace cuAcc {
 		modelPointsMortonKernel<<<gridSize, blockSize>>>(nModelVerts, d_modelOrigin, d_nodeWidth, d_modelVertsArray.data().get(), d_vertsMorton.data().get());
 
 		CUDA_CHECK(cudaMemcpy(vertsMorton.data(), d_vertsMorton.data().get(), sizeof(uint32_t) * nModelVerts, cudaMemcpyDeviceToHost));
-		
+
 		cleanupThrust(d_vertsMorton);
 		cleanupThrust(d_modelVertsArray);
 		CUDA_CHECK(cudaFree(d_modelOrigin));
