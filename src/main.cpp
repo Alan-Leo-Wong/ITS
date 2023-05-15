@@ -40,7 +40,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	printf("-- Generate random points in Gaussian Distribution...\n");
 	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> randomPointsMat =
-		thinShell.generateGaussianRandomPoints(queryFile, numPoints, 8, 0);
+		thinShell.generateUniformRandomPoints(queryFile, numPoints, 8, 0);
 	vector<V3d> randomPointsVec(numPoints);
 	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>::Map(randomPointsVec.data()->data(), numPoints, 3) = randomPointsMat;
 
@@ -50,7 +50,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	// ours(cpu/cpu-simd/cuda)
 	double time;
-	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU);
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU_SIMD);
 	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
 	else return;
 
@@ -111,7 +111,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 16, 16, 16);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 4, 4, 4);
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
