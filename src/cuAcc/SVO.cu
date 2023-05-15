@@ -1138,13 +1138,13 @@ std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> SparseVoxelOctree::se
 }
 
 std::vector<std::tuple<V3d, double, size_t>> SparseVoxelOctree::mq_setInDomainPoints(const uint32_t& _morton, const V3d& modelOrigin,
-	const double& _voxelWidth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx)
+	const double& _searchNodeWidth, const int& _searchDepth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx)
 {
 	vector<std::tuple<V3d, double, size_t>> dm_points; // 格子坐标、格子宽度和格子点在所有顶点数组中的下标
 
-	int searchDepth = 0;
+	int searchDepth = _searchDepth;
 	uint32_t pointMorton = _morton;
-	double virtualNodeWidth = _voxelWidth;
+	double virtualNodeWidth = _searchNodeWidth;
 	auto getVirtualNodeCorners = [&](const uint32_t& morton, const int& depth)
 	{
 		uint16_t x, y, z;
@@ -1164,8 +1164,8 @@ std::vector<std::tuple<V3d, double, size_t>> SparseVoxelOctree::mq_setInDomainPo
 		}
 	};
 
-	// 从0层开始找莫顿码对应的格子，如果格子不存在，看这个不存在的格子的八个顶点会不会在所有顶点数组中
-	while (depthMorton2Nodes[searchDepth].find(pointMorton) == depthMorton2Nodes[searchDepth].end() && searchDepth < treeDepth)
+	// 从searchDepth开始找莫顿码对应的格子，如果格子不存在，看这个不存在的格子的八个顶点会不会在所有顶点数组中
+	while (searchDepth < treeDepth && depthMorton2Nodes[searchDepth].find(pointMorton) == depthMorton2Nodes[searchDepth].end())
 	{
 		getVirtualNodeCorners(pointMorton, searchDepth);
 		pointMorton /= 8;

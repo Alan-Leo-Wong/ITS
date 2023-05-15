@@ -85,7 +85,7 @@ private:
 
 	// multi point query test
 	std::vector<std::tuple<V3d, double, size_t>> mq_setInDomainPoints(const uint32_t& _morton, const V3d& modelOrigin,
-		const double& _voxelWidth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx);
+		const double& _searchNodeWidth, const int& _searchDepth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx);
 
 public:
 	SparseVoxelOctree() : treeDepth(0) {}

@@ -1,4 +1,5 @@
 #pragma once
+#include "CUDAMath.hpp"
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <device_launch_parameters.h>
@@ -70,18 +71,6 @@ template<typename T>
 __host__ void cleanupThrust(thrust::device_vector<T>& d_vec)
 {
 	d_vec.clear(); d_vec.shrink_to_fit();
-}
-
-inline bool isPow2(const unsigned int& x) { return ((x & (x - 1)) == 0); }
-
-inline unsigned int nextPow2(unsigned int x) {
-	--x;
-	x |= x >> 1;
-	x |= x >> 2;
-	x |= x >> 4;
-	x |= x >> 8;
-	x |= x >> 16;
-	return ++x;
 }
 
 inline __host__ void getBlocksAndThreadsNum(const cudaDeviceProp& prop,

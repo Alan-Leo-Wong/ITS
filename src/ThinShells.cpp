@@ -588,7 +588,7 @@ inline void ThinShells::cpCoefficients()
 }
 
 namespace {
-	vector<V3d> nodeWidthArray;
+	static vector<V3d> nodeWidthArray;
 }
 inline void ThinShells::cpBSplineValue()
 {
@@ -845,7 +845,6 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 			});
 	}
 	VXd q_bSplineVal;
-	//VXd q_origin_bSplineVal;
 
 	const vector<node_vertex_type>& allNodeVertexArray = svo.nodeVertexArray;
 	const size_t& numNodeVerts = svo.numNodeVerts;
@@ -855,7 +854,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	const Eigen::Array3d minRange = boxOrigin - boxWidth;
 	const Eigen::Array3d maxRange = boxEnd + boxWidth;
 
-	auto mt_cputTest = [&]()
+	auto mt_cpuTest = [&]()
 	{
 #pragma omp parallel
 		for (size_t i = 0; i < numPoints; ++i)
@@ -876,105 +875,10 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
 			}
 			q_bSplineVal[i] = sum;
-			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
 		}
 	};
 
-	// 通过找范围求b样条值
-
-	// 每一层节点莫顿码与其(全局)下标的映射
-	vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes(treeDepth);
-	size_t _esumNodes = 0;
-	const auto& depthNumNodes = svo.depthNumNodes;
-	for (int d = 0; d < treeDepth; ++d)
-	{
-		vector<size_t> d_nodeIdx(depthNumNodes[d]);
-		std::iota(d_nodeIdx.begin(), d_nodeIdx.end(), 0);
-
-		std::transform(svoNodeArray.begin() + _esumNodes, svoNodeArray.begin() + _esumNodes + depthNumNodes[d],
-			d_nodeIdx.begin(), std::inserter(depthMorton2Nodes[d], depthMorton2Nodes[d].end()),
-			[_esumNodes](const SVONode& node, const size_t& idx) {
-				return std::make_pair(node.mortonCode, _esumNodes + idx);
-			});
-		_esumNodes += depthNumNodes[d];
-	}
-
-	// 每层顶点到顶点下标(全局)的映射
-	const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
-	vector<std::map<V3d, size_t>> depthVert2Idx(treeDepth);
-	for (int d = 0; d < treeDepth; ++d)
-	{
-		const size_t d_numVerts = svo.depthNodeVertexArray[d].size();
-		vector<size_t> d_numVertIdx(d_numVerts);
-		std::iota(d_numVertIdx.begin(), d_numVertIdx.end(), 0);
-
-		const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
-		std::transform(allNodeVertexArray.begin() + d_esumNodeVerts, allNodeVertexArray.begin() + d_esumNodeVerts + d_numVerts,
-			d_numVertIdx.begin(), std::inserter(depthVert2Idx[d], depthVert2Idx[d].end()),
-			[d_esumNodeVerts](const node_vertex_type& val, const size_t& idx) {
-				return std::make_pair(val.first, d_esumNodeVerts + idx);
-			});
-	}
-
-
-	//// 顶点到节点下标的映射
-	//std::map<V3d, size_t> vert2NodeIdx;
-	//std::transform(nodeVertexArray.begin(), nodeVertexArray.end(),
-	//	std::inserter(vert2NodeIdx, vert2NodeIdx.end()),
-	//	[](const node_vertex_type& val) {
-	//		return std::make_pair(val.first, val.second);
-	//	});
-
-	auto mt_cputTest_2 = [&]()
-	{
-#pragma omp parallel
-		for (size_t i = 0; i < numPoints; ++i)
-		{
-			const V3d& point = points[i];
-			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
-
-			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
-			{
-				q_bSplineVal[i] = outerShellIsoVal;
-				continue;
-			}
-
-			//const V3i dis = getPointDis(point, boxOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
-			//if ((dis.array() < zeroDis.array()).any() || (dis.array() > endDis.array()).any()) { q_bSplineVal[i] = outerShellIsoVal; continue; } // 不在svo范围内，所以一定在模型外
-			double sum = 0.0;
-			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
-
-			// 在所有格子(包括边缘格子和大格子)的影响范围内(注意svo_gridSize>=1，所以乘2倍后要-1)
-			//if ((dis.array() >= (-svo_gridSize.array())).all() && (dis.array() <= (svo_gridSize.array() * 2 - 1)).all())
-			int maxOffset = 0;
-			for (int i = 0; i < 3; ++i)
-			{
-				// 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
-				if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
-				else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
-			}
-			uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
-			auto inDmPoints = svo.mq_setInDomainPoints(pointMorton, modelOrigin, voxelWidth, depthMorton2Nodes, depthVert2Idx);
-			const int nInDmPointsTraits = inDmPoints.size();
-
-#pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
-			for (int j = 0; j < nInDmPointsTraits; ++j)
-			{
-				const auto& inDmPointTrait = inDmPoints[j];
-				//double t = BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
-				sum += lambda[std::get<2>(inDmPointTrait)] * BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
-			}
-			//else
-			//{
-			//	q_bSplineVal[i] = outerShellIsoVal; // 不在体素格子内，那代表也一定在模型外
-			//	continue;
-			//}
-
-			q_bSplineVal[i] = sum;
-		}
-	};
-
-	auto simd_cputTest = [&]()
+	auto simd_cpuTest = [&]()
 	{
 #pragma omp parallel
 		for (size_t i = 0; i < numPoints; ++i)
@@ -994,32 +898,163 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
 			}
 			q_bSplineVal[i] = sum;
-			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
 		}
 	};
 
+	// 通过找范围求b样条值
+	vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes(treeDepth);
+	vector<std::map<V3d, size_t>> depthVert2Idx(treeDepth);
+	auto prepareDS = [&]()
+	{
+		// 每一层节点莫顿码与其(全局)下标的映射
+		size_t _esumNodes = 0;
+		const auto& depthNumNodes = svo.depthNumNodes;
+		for (int d = 0; d < treeDepth; ++d)
+		{
+			vector<size_t> d_nodeIdx(depthNumNodes[d]);
+			std::iota(d_nodeIdx.begin(), d_nodeIdx.end(), 0);
+
+			std::transform(svoNodeArray.begin() + _esumNodes, svoNodeArray.begin() + _esumNodes + depthNumNodes[d],
+				d_nodeIdx.begin(), std::inserter(depthMorton2Nodes[d], depthMorton2Nodes[d].end()),
+				[_esumNodes](const SVONode& node, const size_t& idx) {
+					return std::make_pair(node.mortonCode, _esumNodes + idx);
+				});
+			_esumNodes += depthNumNodes[d];
+		}
+
+		// 每层顶点到顶点下标(全局)的映射
+		const auto& esumDepthNodeVerts = svo.esumDepthNodeVerts;
+		for (int d = 0; d < treeDepth; ++d)
+		{
+			const size_t d_numVerts = svo.depthNodeVertexArray[d].size();
+			vector<size_t> d_numVertIdx(d_numVerts);
+			std::iota(d_numVertIdx.begin(), d_numVertIdx.end(), 0);
+
+			const size_t& d_esumNodeVerts = esumDepthNodeVerts[d]; // 顶点数量的exclusive scan
+			std::transform(allNodeVertexArray.begin() + d_esumNodeVerts, allNodeVertexArray.begin() + d_esumNodeVerts + d_numVerts,
+				d_numVertIdx.begin(), std::inserter(depthVert2Idx[d], depthVert2Idx[d].end()),
+				[d_esumNodeVerts](const node_vertex_type& val, const size_t& idx) {
+					return std::make_pair(val.first, d_esumNodeVerts + idx);
+				});
+		}
+	};
+
+	auto mt_cpuTest_2 = [&]()
+	{
+#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
+			{
+				q_bSplineVal[i] = outerShellIsoVal;
+				continue;
+			}
+
+			double sum = 0.0;
+			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
+			// 在所有格子(包括边缘格子和大格子)的影响范围内
+			int maxOffset = 0;
+			int searchDepth = 0;
+			double searchNodeWidth = voxelWidth;
+			for (int i = 0; i < 3; ++i)
+			{
+				// 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
+				if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
+				else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
+			}
+			uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+			maxOffset = nextPow2(maxOffset);
+			while (maxOffset >= 2)
+			{
+				pointMorton /= 8;
+				++searchDepth;
+				searchNodeWidth *= 2;
+				maxOffset >>= 1;
+			}
+
+			auto inDmPointsTraits = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth, depthMorton2Nodes, depthVert2Idx);
+			const int nInDmPointsTraits = inDmPointsTraits.size();
+
+
+#pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
+			for (int j = 0; j < nInDmPointsTraits; ++j)
+			{
+				const auto& inDmPointTrait = inDmPointsTraits[j];
+				sum += lambda[std::get<2>(inDmPointTrait)] * BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
+			}
+			q_bSplineVal[i] = sum;
+		}
+	};
+
+	auto simd_cpuTest_2 = [&]()
+	{
+#pragma omp parallel
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			const V3d& point = points[i];
+			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
+			{
+				q_bSplineVal[i] = outerShellIsoVal;
+				continue;
+			}
+
+			double sum = 0.0;
+			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
+			// 在所有格子(包括边缘格子和大格子)的影响范围内
+			int maxOffset = 0;
+			int searchDepth = 0;
+			double searchNodeWidth = voxelWidth;
+			for (int i = 0; i < 3; ++i)
+			{
+				// 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
+				if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
+				else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
+			}
+			uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+			maxOffset = nextPow2(maxOffset);
+			while (maxOffset >= 2)
+			{
+				pointMorton /= 8;
+				++searchDepth;
+				searchNodeWidth *= 2;
+				maxOffset >>= 1;
+			}
+			auto inDmPoints = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth, depthMorton2Nodes, depthVert2Idx);
+			const int nInDmPointsTraits = inDmPoints.size();
+
+#pragma omp simd simdlen(8)
+			for (int j = 0; j < nInDmPointsTraits; ++j)
+			{
+				const auto& inDmPointTrait = inDmPoints[j];
+				sum += lambda[std::get<2>(inDmPointTrait)] * BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
+			}
+			q_bSplineVal[i] = sum;
+		}
+	};
+
+	q_bSplineVal.resize(numPoints);
 	TimerInterface* timer; createTimer(&timer);
 	switch (test)
 	{
 	case Test::CPU:
 		printf("-- Using CPU\n");
-		q_bSplineVal.resize(numPoints);
-		//q_origin_bSplineVal.resize(numPoints);
+		prepareDS();
 		startTimer(&timer);
 
-		mt_cputTest();
-		//mt_cputTest_2();
+		//mt_cpuTest();
+		mt_cpuTest_2();
 
 		stopTimer(&timer);
 		time = getElapsedTime(&timer) * 1e-3;
 		break;
 	case Test::CPU_SIMD:
 		printf("-- Using CPU-SIMD\n");
-		q_bSplineVal.resize(numPoints);
-		//q_origin_bSplineVal.resize(numPoints);
+		prepareDS();
 		startTimer(&timer);
 
-		simd_cputTest();
+		//simd_cpuTest();
+		simd_cpuTest_2();
 
 		stopTimer(&timer);
 		time = getElapsedTime(&timer) * 1e-3;
@@ -1030,7 +1065,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 		startTimer(&timer);
 
 		cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
-			points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal,q_bSplineVal);
+			points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal, q_bSplineVal);
 
 		stopTimer(&timer);
 		time = getElapsedTime(&timer) * 1e-3;
@@ -1044,8 +1079,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 
 	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), std::back_inserter(result),
 		[=](const double& val) {
-			// 要么点的b样条值大于等于外壳值，要么点在模型的很远处(origin_val等于0)，才认为在模型外
-			if (val >= outerShellIsoVal/* || (val == .0 && origin_val == .0)*/) return 1;
+			if (val >= outerShellIsoVal) return 1;
 			else if (val <= innerShellIsoVal) return -1;
 			else return 0;
 		});

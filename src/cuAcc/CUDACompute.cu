@@ -1073,7 +1073,7 @@ namespace cuAcc {
 		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, const double& outerVal, VXd& bSplinVal, const bool& useThrust)
 	{
 		// streams
-		constexpr int MAX_NUM_STREAMS = 1;
+		constexpr int MAX_NUM_STREAMS = 4;
 		static_assert(MAX_NUM_STREAMS >= 1, "THE NUMBER OF STREAMS IS INVALID");
 
 		// device

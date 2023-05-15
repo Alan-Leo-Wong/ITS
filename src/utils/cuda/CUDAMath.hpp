@@ -15,6 +15,18 @@
 
 using uint = unsigned int;
 
+inline bool isPow2(const unsigned int& x) { return ((x & (x - 1)) == 0); }
+
+inline unsigned int nextPow2(unsigned int x) {
+	--x;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return ++x;
+}
+
 inline __host__ __device__ bool operator==(const uint3& a, const uint3& b)
 {
 	return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);
