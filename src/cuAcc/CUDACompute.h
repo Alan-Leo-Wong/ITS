@@ -47,7 +47,7 @@ namespace cuAcc {
 		thrust::device_vector<double>& d_bSplineVal, const cudaStream_t& stream, const bool& useThrust = true);
 
 	void cpPointQuery(const uint& numPoints, const uint& numNodeVerts,
-		const uint& numNodes, const V3d& modelBBOrigin, const V3d& modelBBWidth,
+		const uint& numNodes, const Eigen::Array3d& minRange, const Eigen::Array3d& maxRange,
 		const std::vector<V3d>& pointsData, const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>>& nodeVertexArray,
-		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, VXd& bSplinVal, VXd& origin_bSplinVal, const bool& useThrust = true);
+		const std::vector<V3d>& nodeWidthArray, const VXd& lambda, const double& outerVal, VXd& bSplinVal, const bool& useThrust = true);
 }

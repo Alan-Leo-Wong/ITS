@@ -486,6 +486,7 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 	time_point<system_clock> start, end;
 
 	// streams
+	static_assert(MAX_NUM_STREAMS >= 1, "THE NUMBER OF STREAMS IS INVALID");
 	cudaStream_t streams[MAX_NUM_STREAMS];
 	for (int i = 0; i < MAX_NUM_STREAMS; ++i) CUDA_CHECK(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
 
@@ -503,10 +504,6 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 		const uint numVoxelElemCorners = voxelElems * 8;
 		thrust::device_vector<V3d> d_voxelCornerData(numVoxelElemCorners);
 
-		printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, voxelElems);
-		if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
-		else { printf("\n"); break; }
-
 		int minGridSize, blockSize, gridSize;
 		getOccupancyMaxPotentialBlockSize(nVoxels, minGridSize, blockSize, gridSize, MCKernel::prepareVoxelCornerKernel);
 		MCKernel::prepareVoxelCornerKernel << <gridSize, blockSize >> > (voxelElems, d_voxelOffset, d_gridOrigin, d_voxelSize, d_res, d_voxelCornerData.data().get());
@@ -519,6 +516,10 @@ inline void MC::launch_computSDFKernel(const uint& nVoxels,
 		cleanupThrust(d_voxelElemSDF);
 		cleanupThrust(d_voxelCornerData);
 		CUDA_CHECK(cudaFree(d_voxelOffset));
+
+		printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, voxelElems);
+		if (i != MAX_NUM_STREAMS - 1 && !lastBatch) printf("\r");
+		else { printf("\n"); break; }
 	}
 
 	for (int i = 0; i < MAX_NUM_STREAMS; i++)

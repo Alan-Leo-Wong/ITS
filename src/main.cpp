@@ -38,9 +38,9 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 {
 	printf("\n[Test] Point INSIDE or OUTSIDE surface\n");
 
-	printf("-- Generate random points in gaussian distribution...\n");
+	printf("-- Generate random points in Gaussian Distribution...\n");
 	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> randomPointsMat =
-		thinShell.generateGaussianRandomPoints(queryFile, numPoints, 2, 0);
+		thinShell.generateGaussianRandomPoints(queryFile, numPoints, 4, 0);
 	vector<V3d> randomPointsVec(numPoints);
 	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>::Map(randomPointsVec.data()->data(), numPoints, 3) = randomPointsMat;
 
@@ -50,7 +50,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	// ours(cpu/cpu-simd/cuda)
 	double time;
-	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU);
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CUDA);
 	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
 	else return;
 
@@ -144,7 +144,7 @@ int main(int argc, char** argv)
 
 	const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
 	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");
-	testPointInOut(thinShell, 1000000, queryFile, queryResFile);
+	testPointInOut(thinShell, 20, queryFile, queryResFile);
 
 	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 

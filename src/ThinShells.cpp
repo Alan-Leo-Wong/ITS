@@ -845,12 +845,15 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 			});
 	}
 	VXd q_bSplineVal;
-	VXd q_origin_bSplineVal;
+	//VXd q_origin_bSplineVal;
 
 	const vector<node_vertex_type>& allNodeVertexArray = svo.nodeVertexArray;
 	const size_t& numNodeVerts = svo.numNodeVerts;
 	const V3d& boxOrigin = modelBoundingBox.boxOrigin;
+	const V3d& boxEnd = modelBoundingBox.boxEnd;
 	const V3d& boxWidth = modelBoundingBox.boxWidth;
+	const Eigen::Array3d minRange = boxOrigin - boxWidth;
+	const Eigen::Array3d maxRange = boxEnd + boxWidth;
 
 	auto mt_cputTest = [&]()
 	{
@@ -858,6 +861,11 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 		for (size_t i = 0; i < numPoints; ++i)
 		{
 			const V3d& point = points[i];
+			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
+			{
+				q_bSplineVal[i] = outerShellIsoVal;
+				continue;
+			}
 			double sum = .0;
 #pragma omp parallel for reduction(+ : sum)
 			for (int j = 0; j < numNodeVerts; ++j)
@@ -865,16 +873,10 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 				V3d nodeVert = allNodeVertexArray[j].first;
 				uint32_t nodeIdx = allNodeVertexArray[j].second;
 				double t = BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point);
-				if (i == 2 && t != 0.0)
-				{
-					/*std::cout << "#1: inDmPoints origin = " << nodeVert.transpose()
-						<< ", inDmPoints width = " << svoNodeArray[nodeIdx].width << std::endl;*/
-						//system("pause");
-				}
 				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
 			}
 			q_bSplineVal[i] = sum;
-			q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
 		}
 	};
 
@@ -925,35 +927,33 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 
 	auto mt_cputTest_2 = [&]()
 	{
-		const V3i endDis = getPointDis(modelBoundingBox.boxEnd, boxOrigin, voxelWidth);
-		const V3i zeroDis = V3i(0, 0, 0);
-
 #pragma omp parallel
 		for (size_t i = 0; i < numPoints; ++i)
 		{
 			const V3d& point = points[i];
 			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
 
+			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
+			{
+				q_bSplineVal[i] = outerShellIsoVal;
+				continue;
+			}
+
 			//const V3i dis = getPointDis(point, boxOrigin, V3d(voxelWidth, voxelWidth, voxelWidth));
-			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
 			//if ((dis.array() < zeroDis.array()).any() || (dis.array() > endDis.array()).any()) { q_bSplineVal[i] = outerShellIsoVal; continue; } // 不在svo范围内，所以一定在模型外
-			uint32_t pointMorton;
+			double sum = 0.0;
+			V3i dis = getPointDis(point, boxOrigin, voxelWidth);
 
 			// 在所有格子(包括边缘格子和大格子)的影响范围内(注意svo_gridSize>=1，所以乘2倍后要-1)
-			if ((dis.array() >= (-svo_gridSize.array())).all() && (dis.array() <= (svo_gridSize.array() * 2 - 1)).all())
+			//if ((dis.array() >= (-svo_gridSize.array())).all() && (dis.array() <= (svo_gridSize.array() * 2 - 1)).all())
+			int maxOffset = 0;
+			for (int i = 0; i < 3; ++i)
 			{
-				int maxOffset = 0;
-				for (int i = 0; i < 3; ++i)
-				{
-					// 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
-					if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
-					else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
-				}
-				pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+				// 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
+				if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
+				else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
 			}
-			else { q_bSplineVal[i] = outerShellIsoVal; continue; }
-
-			double sum = 0.0;
+			uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
 			auto inDmPoints = svo.mq_setInDomainPoints(pointMorton, modelOrigin, voxelWidth, depthMorton2Nodes, depthVert2Idx);
 			const int nInDmPointsTraits = inDmPoints.size();
 
@@ -980,6 +980,11 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 		for (size_t i = 0; i < numPoints; ++i)
 		{
 			const V3d& point = points[i];
+			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
+			{
+				q_bSplineVal[i] = outerShellIsoVal;
+				continue;
+			}
 			double sum = .0;
 #pragma omp simd simdlen(8)
 			for (int j = 0; j < numNodeVerts; ++j)
@@ -989,7 +994,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 				sum += lambda[j] * (BaseFunction4Point(nodeVert, svoNodeArray[nodeIdx].width, point));
 			}
 			q_bSplineVal[i] = sum;
-			q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
+			//q_origin_bSplineVal[i] = BaseFunction4Point(boxOrigin, boxWidth, point);
 		}
 	};
 
@@ -999,11 +1004,11 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	case Test::CPU:
 		printf("-- Using CPU\n");
 		q_bSplineVal.resize(numPoints);
-		q_origin_bSplineVal.resize(numPoints);
+		//q_origin_bSplineVal.resize(numPoints);
 		startTimer(&timer);
 
-		//mt_cputTest();
-		mt_cputTest_2();
+		mt_cputTest();
+		//mt_cputTest_2();
 
 		stopTimer(&timer);
 		time = getElapsedTime(&timer) * 1e-3;
@@ -1011,7 +1016,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	case Test::CPU_SIMD:
 		printf("-- Using CPU-SIMD\n");
 		q_bSplineVal.resize(numPoints);
-		q_origin_bSplineVal.resize(numPoints);
+		//q_origin_bSplineVal.resize(numPoints);
 		startTimer(&timer);
 
 		simd_cputTest();
@@ -1024,8 +1029,8 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 		printf("-- Using CUDA\n");
 		startTimer(&timer);
 
-		cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, boxOrigin, boxWidth,
-			points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal, q_origin_bSplineVal);
+		cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
+			points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal,q_bSplineVal);
 
 		stopTimer(&timer);
 		time = getElapsedTime(&timer) * 1e-3;
@@ -1037,9 +1042,8 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	std::ofstream temp(t_filename);
 	temp << std::setiosflags(std::ios::fixed) << std::setprecision(9) << q_bSplineVal << endl;
 
-	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), q_origin_bSplineVal.begin(),
-		std::back_inserter(result),
-		[=](const double& val, const double& origin_val) {
+	std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), std::back_inserter(result),
+		[=](const double& val) {
 			// 要么点的b样条值大于等于外壳值，要么点在模型的很远处(origin_val等于0)，才认为在模型外
 			if (val >= outerShellIsoVal/* || (val == .0 && origin_val == .0)*/) return 1;
 			else if (val <= innerShellIsoVal) return -1;
