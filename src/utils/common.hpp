@@ -1,5 +1,6 @@
 #pragma once
 #include "../Config.h"
+#include "Geometry.hpp"
 #include "cuda/CUDAMacro.h"
 #include <string>
 #include <random>
@@ -312,6 +313,112 @@ inline bool getUniformRandomMatrix(const Eigen::Matrix<Scalar, Eigen::Dynamic, E
 	M = M * zoomMatrix * transMatrix;
 	M = M.block(0, 0, num, 3);
 	M = (M.array() < 1e-6).select(0, M);
+
+	return true;
+}
+
+template <typename Scalar>
+inline bool getUniformRandomMatrix(const AABox<Scalar>& _area,
+	const size_t& num, const double& scaleFactor, const V3d& dis, vector<Scalar>& randomPoints)
+{
+	if (scaleFactor <= .0) return false;
+
+	//using BoxType = AABox<Scalar>::type;
+
+	AABox<Scalar> area = _area;
+	area.scaleAndTranslate(scaleFactor, dis);
+
+	// 生成Halton序列的第index个值
+	auto haltonSequence = [](int index, int base)
+	{
+		double result = 0.0;
+		double f = 1.0 / base;
+		int i = index;
+
+		while (i > 0)
+		{
+			result += f * (i % base);
+			i = std::floor(i / base);
+			f /= base;
+		}
+
+		return result;
+	};
+
+	// 将Halton序列值映射到[min, max]范围内
+	auto mapToRange = [](double value, double min, double max)
+	{
+		return min + value * (max - min);
+	};
+
+	// 在[minArea, maxArea]范围内进行蓝噪声采样
+	const Scalar& minArea = area.boxOrigin;
+	const Scalar& maxArea = area.boxEnd;
+
+	int baseX = 2; // X轴上的基数
+	int baseY = 3; // Y轴上的基数
+	int baseZ = 5; // Z轴上的基数
+
+	for (int i = 0; i < num; ++i)
+	{
+		double x = mapToRange(haltonSequence(i, baseX), minArea.x(), maxArea.x());
+		double y = mapToRange(haltonSequence(i, baseY), minArea.y(), maxArea.y());
+		double z = mapToRange(haltonSequence(i, baseZ), minArea.z(), maxArea.z());
+		randomPoints.emplace_back(Scalar(x, y, z));
+	}
+
+	return true;
+}
+
+template <typename Scalar>
+inline bool getUniformRandomMatrix(const AABox<Scalar>& _area,
+	const size_t& num, const float& scaleFactor, const V3f& dis, Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& M)
+{
+	vector<Scalar> randomPoints;
+	if (getUniformRandomMatrix<Scalar>(_area, num, scaleFactor, dis, randomPoints))
+	{
+		Eigen::Map<Eigen::Matrix<Scalar, Eigen::Dynamic, 3, Eigen::RowMajor>> mat(reinterpret_cast<double*>(randomPoints.data()), num, 3);
+		M = mat;
+		return true;
+	}
+	return false;
+}
+
+template <typename Scalar>
+inline bool getGaussianRandomMatrix(const AABox<Scalar>& _area,
+	const size_t& num, const double& scaleFactor, const V3d& dis, vector<Scalar>& randomPoints)
+{
+	if (scaleFactor <= .0) return false;
+
+	AABox<Scalar> area = _area;
+	area.scaleAndTranslate(scaleFactor, dis);
+
+	static std::random_device rd; // 创建一个真随机数生成器
+	// 伪随机数生成器gen (不适用rd生成随机数是因为std::random_device可能会产生比较慢的真随机数)
+	//static std::mt19937 gen(rd()); // 使用真随机数生成器生成种子(通过rd())，将该种子传递给std::mt19937对象gen进行初始化
+	static std::mt19937 gen(1314); // 使用常数种子传递给std::mt19937对象gen进行初始化
+	auto gaussianSample = [gen](const Scalar& mean, const Scalar& stddev) {
+		std::normal_distribution<double> dist(0.0, 1.0);
+
+		Scalar sample;
+		for (int i = 0; i < 3; ++i)
+			sample(i) = mean(i) + stddev(i) * dist(gen);
+
+		return sample;
+	};
+
+	const Scalar& minArea = area.boxOrigin;
+	const Scalar& maxArea = area.boxEnd;
+
+	Scalar mean = (maxArea + minArea) / 2.0;
+	Scalar stddev = (maxArea - minArea) / 6.0;
+
+	for (int i = 0; i < num; ++i)
+	{
+		// 生成高斯样本
+		Scalar sample = gaussianSample(mean, stddev);
+		randomPoints.emplace_back(sample);
+	}
 
 	return true;
 }

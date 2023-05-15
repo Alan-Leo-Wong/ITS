@@ -219,6 +219,46 @@ Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const string& filename, c
 	return M;
 }
 
+vector<V3d> BaseModel::generateUniformRandomPoints(const string& filename, const size_t& numPoints,
+	const double& _scaleFactor, const V3d& dis)
+{
+	vector<V3d> randomPoints;
+	getUniformRandomMatrix<V3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
+
+	checkDir(filename);
+	std::ofstream out(filename, std::ofstream::out);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return randomPoints; }
+	cout << "-- Save random points to " << std::quoted(filename) << endl;
+
+	//std::cout << getFileExtension(filename) << std::endl;
+	if (getFileExtension(filename) == ".obj")
+		gvis::writePointCloud(randomPoints, out);
+	else if (getFileExtension(filename) == ".xyz")
+		gvis::writePointCloud_xyz(randomPoints, out);
+
+	return randomPoints;
+}
+
+vector<V3d> BaseModel::generateGaussianRandomPoints(const string& filename, const size_t& numPoints,
+	const double& _scaleFactor, const V3d& dis)
+{
+	vector<V3d> randomPoints;
+	getGaussianRandomMatrix<V3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
+
+	checkDir(filename);
+	std::ofstream out(filename, std::ofstream::out);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return randomPoints; }
+	cout << "-- Save random points to " << std::quoted(filename) << endl;
+
+	//std::cout << getFileExtension(filename) << std::endl;
+	if (getFileExtension(filename) == ".obj")
+		gvis::writePointCloud(randomPoints, out);
+	else if (getFileExtension(filename) == ".xyz")
+		gvis::writePointCloud_xyz(randomPoints, out);
+
+	return randomPoints;
+}
+
 void BaseModel::setTriAttributes()
 {
 	cuAcc::launch_modelTriAttributeKernel(nModelTris, modelTris);

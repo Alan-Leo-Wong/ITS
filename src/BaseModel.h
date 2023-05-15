@@ -97,6 +97,9 @@ public:
 	Eigen::MatrixXd generateGaussianRandomPoints(const string& filename, const size_t& numPoints, const float& _scaleFactor, const float& dis);
 	Eigen::MatrixXd generateUniformRandomPoints(const string& filename, const size_t& numPoints, const float& _scaleFactor, const float& dis);
 
+	vector<V3d> generateUniformRandomPoints(const string& filename, const size_t& numPoints, const double& _scaleFactor, const V3d& dis);
+	vector<V3d> generateGaussianRandomPoints(const string& filename, const size_t& numPoints, const double& _scaleFactor, const V3d& dis);
+
 	// 提取等值线
 	vector<vector<V3d>> extractIsoline(const vector<double>& scalarField, const double& val)const;
 

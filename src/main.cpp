@@ -39,10 +39,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 	printf("\n[Test] Point INSIDE or OUTSIDE surface\n");
 
 	printf("-- Generate random points in Gaussian Distribution...\n");
-	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> randomPointsMat =
-		thinShell.generateUniformRandomPoints(queryFile, numPoints, 8, 0);
-	vector<V3d> randomPointsVec(numPoints);
-	Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>::Map(randomPointsVec.data()->data(), numPoints, 3) = randomPointsMat;
+	vector<V3d> randomPointsVec = thinShell.generateUniformRandomPoints(queryFile, numPoints, 6, V3d(0, 0, 0));
 
 	// timer
 	TimerInterface* timer = nullptr;
@@ -50,7 +47,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 
 	// ours(cpu/cpu-simd/cuda)
 	double time;
-	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU_SIMD);
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU);
 	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
 	else return;
 
@@ -61,7 +58,7 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 	startTimer(&timer);
 	for (size_t i = 0; i < numPoints; ++i)
 	{
-		double sdf = fcpw_helper::getSignedDistance(randomPointsMat.row(i), scene);
+		double sdf = fcpw_helper::getSignedDistance(randomPointsVec[i], scene);
 		if (sdf > 0) fcpw_res[i] = 1;
 		else if (sdf < 0) fcpw_res[i] = -1;
 		else fcpw_res[i] = 0;
@@ -111,7 +108,7 @@ int main(int argc, char** argv)
 	createTimer(&timer);
 
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 4, 4, 4);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 128, 128, 128);
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
