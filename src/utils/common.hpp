@@ -397,7 +397,7 @@ inline bool getGaussianRandomMatrix(const AABox<Scalar>& _area,
 	// 伪随机数生成器gen (不适用rd生成随机数是因为std::random_device可能会产生比较慢的真随机数)
 	//static std::mt19937 gen(rd()); // 使用真随机数生成器生成种子(通过rd())，将该种子传递给std::mt19937对象gen进行初始化
 	static std::mt19937 gen(1314); // 使用常数种子传递给std::mt19937对象gen进行初始化
-	auto gaussianSample = [gen](const Scalar& mean, const Scalar& stddev) {
+	auto gaussianSample = [](const Scalar& mean, const Scalar& stddev) {
 		std::normal_distribution<double> dist(0.0, 1.0);
 
 		Scalar sample;

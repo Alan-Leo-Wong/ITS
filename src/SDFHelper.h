@@ -1,7 +1,7 @@
 #pragma once
 #include "BasicDataType.h"
-//#define FCPW_USE_ENOKI
-//#define FCPW_SIMD_WIDTH 4
+#define FCPW_USE_ENOKI
+#define FCPW_SIMD_WIDTH 4
 #include <fcpw/fcpw.h>
 
 namespace fcpw_helper

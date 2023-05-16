@@ -144,7 +144,7 @@ public:
 	// 点在表面的查询
 	void singlePointQuery(const std::string& out_file, const V3d& point);
 
-	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const test_type& choice = Test::CUDA);
+	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const int& session, const test_type& choice = Test::CUDA);
 
 	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
 

@@ -38,24 +38,26 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 {
 	printf("\n[Test] Point INSIDE or OUTSIDE surface\n");
 
-	printf("-- Generate random points in Gaussian Distribution...\n");
-	vector<V3d> randomPointsVec = thinShell.generateUniformRandomPoints(queryFile, numPoints, 6, V3d(0, 0, 0));
+	printf("-- Generate '%llu' random points in Gaussian Distribution...\n", numPoints);
+	vector<V3d> randomPointsVec = thinShell.generateUniformRandomPoints(queryFile, numPoints, 5, V3d(0, 0, 0));
 
 	// timer
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
 	// ours(cpu/cpu-simd/cuda)
-	double time;
-	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time, Test::CPU);
-	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time);
+	int session = 3;
+	double time_1;
+	auto testChoice = Test::CPU;
+	vector<int> our_res = thinShell.multiPointQuery(randomPointsVec, time_1, session, testChoice);
+	if (!our_res.empty()) printf("-- [Ours]: Multi points query spent %lf s.\n", time_1);
 	else return;
 
 	// fcpw
 	fcpw::Scene<3> scene;
 	fcpw_helper::initSDF(scene, thinShell.getModelVerts(), thinShell.getModelFaces());
 	vector<int> fcpw_res(numPoints);
-	startTimer(&timer);
+	// 预热
 	for (size_t i = 0; i < numPoints; ++i)
 	{
 		double sdf = fcpw_helper::getSignedDistance(randomPointsVec[i], scene);
@@ -63,18 +65,52 @@ void testPointInOut(ThinShells& thinShell, const size_t& numPoints, const string
 		else if (sdf < 0) fcpw_res[i] = -1;
 		else fcpw_res[i] = 0;
 	}
-	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
-	printf("-- [FCPW(normal)]: Multi points query spent %lf s.\n", time);
+	// 开始测试
+	for (int k = 0; k < 1; ++k)
+	{
+		printf("-- [FCPW] [Session: %d/%d]", k + 1, session);
+		if (k != session - 1) printf("\r");
+		else printf("\n");
 
-	deleteTimer(&timer);
+		startTimer(&timer);
+		for (size_t i = 0; i < numPoints; ++i)
+		{
+			double sdf = fcpw_helper::getSignedDistance(randomPointsVec[i], scene);
+			if (sdf > 0) fcpw_res[i] = 1;
+			else if (sdf < 0) fcpw_res[i] = -1;
+			else fcpw_res[i] = 0;
+		}
+		stopTimer(&timer);
+	}
+	double time_2 = getAverageTimerValue(&timer) * 1e-3;
+	printf("-- [FCPW(normal)]: Multi points query spent %lf s.\n", time_2);
+
+	resetTimer(&timer);
 
 	// compare result
 	size_t correct = 0;
+	vector<V3d> errorPointsVec;
 	for (size_t i = 0; i < numPoints; ++i)
+	{
 		if (our_res[i] == fcpw_res[i]) ++correct;
+		else errorPointsVec.emplace_back(randomPointsVec[i]);
+	}
 	//printf("-- Correct number = %llu\n", correct);
 	printf("-- Correct rate = %lf%%\n", (correct * 100.0) / numPoints);
+
+	// 对错误点再调用fcpw
+	const size_t numErrorPoints = errorPointsVec.size();
+	for (int k = 0; k < session; ++k)
+	{
+		startTimer(&timer);
+		for (size_t i = 0; i < numErrorPoints; ++i)
+			fcpw_helper::getSignedDistance(errorPointsVec[i], scene);
+		stopTimer(&timer);
+	}
+	double time_3 = getAverageTimerValue(&timer) * 1e-3;
+	printf("-- [Ours+FCPW]: Multi points query spent %lf s.\n", time_1 + time_3);
+
+	deleteTimer(&timer);
 }
 
 int main(int argc, char** argv)
@@ -99,7 +135,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "bunny.off");
+	string modelName = getFileName("", "metatron.stl");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -107,8 +143,9 @@ int main(int argc, char** argv)
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
+	int svo_res = 16;
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 128, 128, 128);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"metatron.stl"), svo_res, svo_res, svo_res);
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
@@ -141,7 +178,7 @@ int main(int argc, char** argv)
 
 	const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
 	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");
-	testPointInOut(thinShell, 5000000, queryFile, queryResFile);
+	testPointInOut(thinShell, 1000000, queryFile, queryResFile);
 
 	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 

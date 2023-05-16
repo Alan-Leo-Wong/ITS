@@ -827,8 +827,12 @@ void ThinShells::singlePointQuery(const std::string& out_file, const V3d& point)
 	gvis::writePointCloud(point, rgb, out);
 }
 
+namespace {
+	static vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes;
+	static vector<std::map<V3d, size_t>> depthVert2Idx;
+}
 // 测试专用
-vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time, const Test::type& choice)
+vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time, const int& session, const Test::type& choice)
 {
 	test_type test = (test_type)choice;
 
@@ -902,10 +906,11 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	};
 
 	// 通过找范围求b样条值
-	vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes(treeDepth);
-	vector<std::map<V3d, size_t>> depthVert2Idx(treeDepth);
 	auto prepareDS = [&]()
 	{
+		depthMorton2Nodes.resize(treeDepth);
+		depthVert2Idx.resize(treeDepth);
+
 		// 每一层节点莫顿码与其(全局)下标的映射
 		size_t _esumNodes = 0;
 		const auto& depthNumNodes = svo.depthNumNodes;
@@ -1038,37 +1043,62 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	switch (test)
 	{
 	case Test::CPU:
-		printf("-- Using CPU\n");
-		prepareDS();
-		startTimer(&timer);
-
-		//mt_cpuTest();
+		printf("-- [Ours]: Using CPU\n");
+		if (depthMorton2Nodes.empty() && depthVert2Idx.empty()) prepareDS();
 		mt_cpuTest_2();
+		for (int k = 0; k < session; ++k)
+		{
+			printf("-- [Ours] [Session: %d/%d]", k + 1, session);
+			if (k != session - 1) printf("\r");
+			else printf("\n");
 
-		stopTimer(&timer);
-		time = getElapsedTime(&timer) * 1e-3;
+			startTimer(&timer);
+
+			//mt_cpuTest();
+			mt_cpuTest_2();
+
+			stopTimer(&timer);
+		}
+		time = getAverageTimerValue(&timer) * 1e-3;
 		break;
 	case Test::CPU_SIMD:
-		printf("-- Using CPU-SIMD\n");
-		prepareDS();
-		startTimer(&timer);
-
-		//simd_cpuTest();
+		printf("-- [Ours]: Using CPU-SIMD\n");
+		if (depthMorton2Nodes.empty() && depthVert2Idx.empty()) prepareDS();
 		simd_cpuTest_2();
+		for (int k = 0; k < session; ++k)
+		{
+			printf("-- [Ours] [Session: %d/%d]", k + 1, session);
+			if (k != session - 1) printf("\r");
+			else printf("\n");
 
-		stopTimer(&timer);
-		time = getElapsedTime(&timer) * 1e-3;
+			startTimer(&timer);
+
+			//simd_cpuTest();
+			simd_cpuTest_2();
+
+			stopTimer(&timer);
+		}
+		time = getAverageTimerValue(&timer) * 1e-3;
 		break;
 	default:
 	case Test::CUDA:
-		printf("-- Using CUDA\n");
-		startTimer(&timer);
-
+		printf("-- [Ours]: Using CUDA\n");
 		cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
 			points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal, q_bSplineVal);
+		for (int k = 0; k < session; ++k)
+		{
+			printf("-- [Ours] [Session: %d/%d]", k + 1, session);
+			if (k != session - 1) printf("\r");
+			else printf("\n");
 
-		stopTimer(&timer);
-		time = getElapsedTime(&timer) * 1e-3;
+			startTimer(&timer);
+
+			cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
+				points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal, q_bSplineVal);
+
+			stopTimer(&timer);
+		}
+		time = getAverageTimerValue(&timer) * 1e-3;
 		break;
 	}
 	deleteTimer(&timer);
