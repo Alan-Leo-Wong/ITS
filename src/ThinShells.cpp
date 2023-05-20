@@ -950,7 +950,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 		for (size_t i = 0; i < numPoints; ++i)
 		{
 			const V3d& point = points[i];
-			if ((point.array() < minRange).any() || (point.array() > maxRange).any())
+			if ((point.array() <= boxOrigin.array()).any() || (point.array() >= boxEnd.array()).any())
 			{
 				q_bSplineVal[i] = outerShellIsoVal;
 				continue;
@@ -980,7 +980,6 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 
 			auto inDmPointsTraits = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth, depthMorton2Nodes, depthVert2Idx);
 			const int nInDmPointsTraits = inDmPointsTraits.size();
-
 
 #pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
 			for (int j = 0; j < nInDmPointsTraits; ++j)
@@ -1045,7 +1044,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 	case Test::CPU:
 		printf("-- [Ours]: Using CPU\n");
 		if (depthMorton2Nodes.empty() && depthVert2Idx.empty()) prepareDS();
-		mt_cpuTest_2();
+		//mt_cpuTest_2();
 		for (int k = 0; k < session; ++k)
 		{
 			printf("-- [Ours] [Session: %d/%d]", k + 1, session);
@@ -1093,6 +1092,7 @@ vector<int> ThinShells::multiPointQuery(const vector<V3d>& points, double& time,
 
 			startTimer(&timer);
 
+			/// TODO: 还没改成点超过bbox就不算b样条值的版本
 			cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
 				points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal, q_bSplineVal);
 

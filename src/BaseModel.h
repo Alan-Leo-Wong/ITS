@@ -106,9 +106,9 @@ public:
 	// ÇÐ·ÖÄ£ÐÍ
 	std::pair<BaseModel, BaseModel> splitModelByIsoline(const vector<double>& scalarField, const double& val) const;
 
-	vector<V3d> getVertices() const;
+	MXd getVertices() const;
 
-	vector<V3i> getFaces() const;
+	MXi getFaces() const;
 
 public:
 	void readFile(const string& filename);

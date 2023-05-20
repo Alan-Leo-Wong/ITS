@@ -225,16 +225,16 @@ vector<V3d> BaseModel::generateUniformRandomPoints(const string& filename, const
 	vector<V3d> randomPoints;
 	getUniformRandomMatrix<V3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
 
-	//checkDir(filename);
-	//std::ofstream out(filename, std::ofstream::out);
-	//if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return randomPoints; }
-	//cout << "-- Save random points to " << std::quoted(filename) << endl;
+	checkDir(filename);
+	std::ofstream out(filename, std::ofstream::out);
+	if (!out) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return randomPoints; }
+	cout << "-- Save random points to " << std::quoted(filename) << endl;
 
-	////std::cout << getFileExtension(filename) << std::endl;
-	//if (getFileExtension(filename) == ".obj")
-	//	gvis::writePointCloud(randomPoints, out);
-	//else if (getFileExtension(filename) == ".xyz")
-	//	gvis::writePointCloud_xyz(randomPoints, out);
+	//std::cout << getFileExtension(filename) << std::endl;
+	if (getFileExtension(filename) == ".obj")
+		gvis::writePointCloud(randomPoints, out);
+	else if (getFileExtension(filename) == ".xyz")
+		gvis::writePointCloud_xyz(randomPoints, out);
 
 	return randomPoints;
 }
@@ -703,14 +703,14 @@ std::pair<BaseModel, BaseModel> BaseModel::splitModelByIsoline(const vector<doub
 	return make_pair(BaseModel(vertsLarger, faceLarger), BaseModel(vertsLess, faceLess));
 }
 
-vector<V3d> BaseModel::getVertices() const
+MXd BaseModel::getVertices() const
 {
-	return modelVerts;
+	return m_V;
 }
 
-vector<V3i> BaseModel::getFaces() const
+MXi BaseModel::getFaces() const
 {
-	return modelFaces;
+	return m_F;
 }
 
 //////////////////////
