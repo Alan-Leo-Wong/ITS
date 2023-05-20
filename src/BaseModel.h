@@ -2,6 +2,7 @@
 #include "ModelDefine.h"
 #include "BasicDataType.h"
 #include "utils/Geometry.hpp"
+#include <igl/AABB.h>
 
 class BaseModel
 {
@@ -10,13 +11,18 @@ public:
 
 protected:
 	MXd m_V;
+	MXd m_VN;
 	MXi m_F;
+	MXd m_FN;
+
 	bool is2UnitCube;
 	double scaleFactor;
 
 	vector<V3d> modelVerts;
 	vector<V3i> modelFaces;
 	vector<Triangle<V3d>> modelTris;
+
+	igl::AABB<MXd, 3> aabbTree;
 
 protected:
 	string modelName;
@@ -109,6 +115,11 @@ public:
 	MXd getVertices() const;
 
 	MXi getFaces() const;
+
+protected:
+	MXd getClosestPoint(const MXd& queryPointMat) const;
+
+	virtual MXd getSurfacePointNormal(const MXd& queryPointMat);
 
 public:
 	void readFile(const string& filename);

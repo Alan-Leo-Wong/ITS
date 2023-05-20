@@ -81,11 +81,12 @@ private:
 		thrust::device_vector<SVONode>& d_SVONodeArray);
 
 	std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> setInDomainPoints(const uint32_t& nodeIdx, const int& nodeDepth,
-		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx);
+		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx) const;
 
 	// multi point query test
 	std::vector<std::tuple<V3d, double, size_t>> mq_setInDomainPoints(const uint32_t& _morton, const V3d& modelOrigin,
-		const double& _searchNodeWidth, const int& _searchDepth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, vector<std::map<V3d, size_t>>& depthVert2Idx);
+		const double& _searchNodeWidth, const int& _searchDepth, vector<std::map<uint32_t, uint32_t>>& depthMorton2Nodes, 
+		vector<std::map<V3d, size_t>>& depthVert2Idx) const;
 
 public:
 	SparseVoxelOctree() : treeDepth(0) {}

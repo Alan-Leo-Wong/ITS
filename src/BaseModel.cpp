@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <igl/writeOBJ.h>
 #include <igl/read_triangle_mesh.h>
+#include <igl/per_vertex_normals.h>
+#include <igl/point_mesh_squared_distance.h>
 
 //////////////////////
 //   Model  Utils   //
@@ -42,7 +44,7 @@ void BaseModel::setUniformBoundingBox()
 	// Suspected cause: If a triangle is axis-aligned and lies perfectly on a voxel edge, it sometimes gets counted / not counted
 	// Probably due to a numerical instability (division by zero?)
 	// Ugly fix: we pad the bounding box on all sides by 1/10001th of its total length, bringing all triangles ever so slightly off-grid
-	Eigen::Vector3d epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 11.0; // 之前是10001
+	Eigen::Vector3d epsilon = (modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin) / 1.0; // 之前是10001
 	modelBoundingBox.boxOrigin -= epsilon;
 	modelBoundingBox.boxEnd += epsilon;
 	modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
@@ -713,6 +715,37 @@ MXi BaseModel::getFaces() const
 	return m_F;
 }
 
+MXd BaseModel::getClosestPoint(const MXd& queryPointMat) const
+{
+	Eigen::VectorXd sqrD;
+	Eigen::VectorXi I;
+	Eigen::MatrixXd C;
+
+	// the output sqrD contains the (unsigned) squared distance from each point in P 
+	// to its closest point given in C which lies on the element in F given by I
+	aabbTree.squared_distance(m_V, m_F, queryPointMat, sqrD, I, C);
+
+	return C;
+}
+
+inline MXd BaseModel::getSurfacePointNormal(const MXd& queryPointMat)
+{
+	const size_t numPoint = queryPointMat.rows();
+
+	Eigen::VectorXd sqrD;
+	Eigen::VectorXi I;
+	Eigen::MatrixXd C;
+	getClosestPoint(queryPointMat);
+
+	Eigen::MatrixXd resNormal(numPoint, 3);
+	for (int i = 0; i < numPoint; ++i)
+	{
+		Eigen::Vector3d normal = m_FN.row(I(i)).normalized();
+		resNormal.row(i) = normal;
+	}
+	return resNormal;
+}
+
 //////////////////////
 //    I/O: Model    //
 //////////////////////
@@ -740,6 +773,11 @@ void BaseModel::setModelAttributeVector()
 	}
 
 	nModelVerts = modelVerts.size(), nModelTris = modelFaces.size();
+
+	igl::per_vertex_normals(m_V, m_F, m_VN);
+	igl::per_face_normals_stable(m_V, m_F, m_FN);
+
+	aabbTree.init(m_V, m_F);
 }
 
 void BaseModel::readOffFile(const string& filename)

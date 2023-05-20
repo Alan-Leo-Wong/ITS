@@ -149,7 +149,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "Sapphos_Head.stl");
+	string modelName = getFileName("", "bunny.off");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -157,9 +157,9 @@ int main(int argc, char** argv)
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
-	int svo_res = 64;
+	int svo_res = 128;
 	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"Sapphos_Head.stl"), svo_res, svo_res, svo_res);
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), svo_res, svo_res, svo_res);
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
@@ -190,10 +190,13 @@ int main(int argc, char** argv)
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("\nMarchingCubes spent %lf s.\n", time);*/
 
-	const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
+	/*const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
 	const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");
 	for(int i = 1; i <= 10; i++)
-		testPointInOut(thinShell, 10000, queryFile, queryResFile, i);
+		testPointInOut(thinShell, 10000, queryFile, queryResFile, i);*/
+
+	const string particleResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"optimized_particle.xyz");
+	thinShell.launchParticleSystem(10, particleResFile);
 
 	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 

@@ -1,10 +1,11 @@
 #pragma once
 #include "SVO.h"
 #include "BaseModel.h"
+#include "ParticleMesh.h"
 #include "utils/String.hpp"
 #include "test/TestConfig.h"
 
-class ThinShells : public BaseModel
+class ThinShells : public BaseModel, public ParticleMesh
 {
 	using test_type = Test::type;
 private:
@@ -13,7 +14,9 @@ private:
 	V3i svo_gridSize;
 	SparseVoxelOctree svo;
 	double voxelWidth;
+	vector<V3d> nodeWidthArray;
 	//vector<V3d> nodeWidthArray;
+	std::map<uint32_t, SVONode> morton2FineNode;
 
 	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
 	vector<V3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
@@ -41,9 +44,9 @@ public:
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-//#ifndef NDEBUG
+		//#ifndef NDEBUG
 		saveTree("");
-//#endif // !NDEBUG
+		//#endif // !NDEBUG
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
@@ -56,9 +59,9 @@ public:
 #endif // !NDEBUG
 	}
 
-	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z, 
-		const bool& _is2UnitCube, const double& _scaleFactor) 
-		: svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename, _is2UnitCube, _scaleFactor), 
+	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z,
+		const bool& _is2UnitCube, const double& _scaleFactor)
+		: svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename, _is2UnitCube, _scaleFactor),
 		modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
@@ -69,7 +72,7 @@ public:
 #endif // !NDEBUG
 	}
 
-	ThinShells(const string& filename, const V3i& _grid, const bool& _is2UnitCube, const double& _scaleFactor) 
+	ThinShells(const string& filename, const V3i& _grid, const bool& _is2UnitCube, const double& _scaleFactor)
 		:svo_gridSize(_grid), BaseModel(filename, _is2UnitCube, _scaleFactor), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
 	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
@@ -85,9 +88,9 @@ public:
 	// ThinShells& operator=(const ThinShells& model);
 
 private:
-	V3i getPointDis(const V3d& modelVert, const V3d& origin, const V3d& width);
+	V3i getPointDis(const V3d& modelVert, const V3d& origin, const V3d& width) const;
 
-	V3i getPointDis(const V3d& modelVert, const V3d& origin, const double& width);
+	V3i getPointDis(const V3d& modelVert, const V3d& origin, const double& width) const;
 
 	//void cpIntersectionPoints();
 	void cpIntersectionPoints();
@@ -134,17 +137,32 @@ public:
 
 	//friend class CollisionDetection;
 private:
-	void prepareMoveOnSurface(int& ac_treeDepth, 
+	vector<std::map<uint32_t, uint32_t>> depthMorton2Nodes;
+	vector<std::map<V3d, size_t>> depthVert2Idx;
+
+	void prepareTestDS();
+
+	void prepareMoveOnSurface(int& ac_treeDepth,
 		vector<vector<V3d>>& nodeOrigin,
 		vector<std::map<uint32_t, size_t>>& morton2Nodes,
 		vector<vector<std::array<double, 8>>>& nodeBSplineVal,
 		vector<double>& nodeWidth);
 
+	MXd getSurfacePointNormal(const MXd& queryPointMat) override;
+
+	VXd getPointBSplineVal(const MXd& queryPointMat);
+
+	std::pair<VXd, MXd> getPointValGradient(const MXd& queryPointMat);
+
+	MXd getProjectPoint(const MXd& queryPointMat, const int& iter);
+
+	void lbfgs_optimization(const int& maxIterations, const std::string& out_file) override;
+
 public:
 	// 点在表面的查询
 	void singlePointQuery(const std::string& out_file, const V3d& point);
 
-	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const int& session, const test_type& choice = Test::CUDA);
+	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const int& session, const test_type& choice = Test::CPU);
 
 	void multiPointQuery(const std::string& out_file, const vector<V3d>& points);
 
@@ -152,5 +170,5 @@ public:
 
 	void moveOnSurface(const V3d& modelVert, const V3d& v, const size_t& max_move_cnt);
 
-	void pointProjection(const V3d& point);
+	void launchParticleSystem(const int& maxIterations, const std::string& out_file);
 };

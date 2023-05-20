@@ -27,8 +27,10 @@
     <ClInclude Include="src\cuAcc\MarchingCubes\MCDefine.h" />
     <ClInclude Include="src\cuAcc\MarchingCubes\LookTable.h" />
     <ClInclude Include="src\cuAcc\MarchingCubes\MarchingCubes.h" />
+    <ClInclude Include="src\KNNHelper.h" />
     <ClInclude Include="src\ModelDefine.h" />
     <ClInclude Include="src\MortonLUT.h" />
+    <ClInclude Include="src\ParticleMesh.h" />
     <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\SVO.h" />
     <ClInclude Include="src\test\TestConfig.h" />

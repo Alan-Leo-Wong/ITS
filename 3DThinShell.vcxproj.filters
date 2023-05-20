@@ -34,6 +34,9 @@
     <Filter Include="头文件\test">
       <UniqueIdentifier>{23e95ac5-42fb-4f12-9ee1-4c2d723d82e1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="源文件\test">
+      <UniqueIdentifier>{052af21b-5851-4ab4-b0fe-146be9bd35b0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\BasicDataType.h">
@@ -112,6 +115,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\test\TestConfig.h">
+      <Filter>头文件\test</Filter>
+    </ClInclude>
+    <ClInclude Include="src\KNNHelper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ParticleMesh.h">
       <Filter>头文件\test</Filter>
     </ClInclude>
   </ItemGroup>
