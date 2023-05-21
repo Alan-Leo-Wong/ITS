@@ -1553,7 +1553,7 @@ MXd ThinShells::getSurfacePointNormal(const MXd& queryPointMat)
 	const int numPoints = queryPointMat.rows();
 	MXd pointNormal(numPoints, 3);
 
-	if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
+	//if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
 
 #pragma omp parallel
 	for (int i = 0; i < numPoints; ++i)
@@ -1569,6 +1569,55 @@ MXd ThinShells::getSurfacePointNormal(const MXd& queryPointMat)
 		const int nInDmPointsTraits = inDmPointsTraits.size();
 
 		//#pragma omp parallel for reduction(+ : gradient) // for循环中的变量必须得是有符号整型
+		for (int j = 0; j < nInDmPointsTraits; ++j)
+		{
+			const auto& inDmPointTrait = inDmPointsTraits[j];
+			gradient += lambda[std::get<2>(inDmPointTrait)] * de_BaseFunction4Point(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
+		}
+		pointNormal.row(i) = (gradient.normalized());
+	}
+
+	return pointNormal;
+}
+
+MXd ThinShells::getPointNormal(const MXd& queryPointMat)
+{
+	const int numPoints = queryPointMat.rows();
+	MXd pointNormal(numPoints, 3);
+	pointNormal.setZero();
+	VXd q_bSplineVal(numPoints);
+	q_bSplineVal.setZero();
+
+	const V3d& boxOrigin = modelBoundingBox.boxOrigin;
+	const V3d& boxEnd = modelBoundingBox.boxEnd;
+	const V3d& boxWidth = modelBoundingBox.boxWidth;
+	/*const Eigen::Array3d minRange = boxOrigin - boxWidth;
+	const Eigen::Array3d maxRange = boxEnd + boxWidth;*/
+
+#pragma omp parallel
+	for (size_t i = 0; i < numPoints; ++i)
+	{
+		const V3d& point = queryPointMat.row(i);
+		if ((point.array() < boxOrigin.array()).any() || (point.array() > boxEnd.array()).any())
+		{
+			std::cout << "Point is outside boundingbox!\n";
+			//std::cout << "point = " << point.transpose() << std::endl;
+			continue; // 要保证在boundingbox里面
+		}
+		//if ((point.array() <= minRange).any() || (point.array() >= maxRange).any()) continue;
+
+		V3d gradient; gradient.setZero();
+		V3i dis = getPointDis(point, boxOrigin, voxelWidth);
+		// 在所有格子(包括边缘格子和大格子)的影响范围内
+		//int maxOffset = 0;
+		int searchDepth = 0;
+		double searchNodeWidth = voxelWidth;
+		uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
+
+		auto inDmPointsTraits = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth, depthMorton2Nodes, depthVert2Idx);
+		const int nInDmPointsTraits = inDmPointsTraits.size();
+
+		//#pragma omp parallel for reduction(+ : gradient) // for循环中的变量必须得是有符号整型，reduction子句中的变量必须是标量算术类型
 		for (int j = 0; j < nInDmPointsTraits; ++j)
 		{
 			const auto& inDmPointTrait = inDmPointsTraits[j];
@@ -1656,14 +1705,14 @@ inline std::pair<VXd, MXd> ThinShells::getPointValGradient(const MXd& queryPoint
 	const Eigen::Array3d minRange = boxOrigin - boxWidth;
 	const Eigen::Array3d maxRange = boxEnd + boxWidth;
 
-//#pragma omp parallel
+#pragma omp parallel
 	for (size_t i = 0; i < numPoints; ++i)
 	{
 		const V3d& point = queryPointMat.row(i);
 		if ((point.array() < boxOrigin.array()).any() || (point.array() > boxEnd.array()).any())
 		{
 			std::cout << "Point is outside boundingbox!\n";
-			std::cout << "point = " << point.transpose() << std::endl;
+			//std::cout << "point = " << point.transpose() << std::endl;
 			continue; // 要保证在boundingbox里面
 		}
 		//if ((point.array() <= minRange).any() || (point.array() >= maxRange).any()) continue;
@@ -1739,11 +1788,13 @@ inline MXd ThinShells::getProjectPoint(const MXd& queryPointMat, const int& iter
 		VXd pointBSplineVal = pointValGradient.first;
 		MXd pointGradient = pointValGradient.second;
 
-//#pragma omp parallel
+#pragma omp parallel for
 		for (int i = 0; i < numPoints; ++i)
 		{
 			const V3d& point = proj_point.row(i);
 			V3d gradient = pointGradient.row(i);
+
+			if (gradient.isApprox(V3d(0, 0, 0))) std::cout << "gradient is 0!\n";
 
 			double k = -pointBSplineVal(i) / (gradient.squaredNorm());
 
@@ -1775,15 +1826,19 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 	// Compute normal
 	MXd normal;
 
-	//std::vector<MXd> neighPointList(numParticles);
-	std::vector<std::vector<V3d>> fineNodeParticle(svo.numFineNodes);
+	std::vector<std::vector<V3d>> neighPointList(numParticles);
+	std::vector<std::vector<V3d>> fineNodeParticle(svo.numTreeNodes);
 	std::map<V3d, uint32_t> particle2Node;
 
 	auto updateNeighbor = [&](const MXd& queryPointMat)
 	{
-		//neighPointList.clear();
+		for (auto& innerVec : neighPointList) innerVec.clear();
+		neighPointList.clear(); neighPointList.resize(numParticles);
+
+		for (auto& innerVec : fineNodeParticle) innerVec.clear();
+		fineNodeParticle.clear(); fineNodeParticle.resize(svo.numTreeNodes);
+
 		particle2Node.clear();
-		fineNodeParticle.clear();
 
 		int t = 0;
 		//#pragma omp parallel for
@@ -1792,23 +1847,47 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 			const V3d& particle = queryPointMat.row(i);
 			const V3i dis = getPointDis(particle, modelOrigin, voxelWidth);
 			uint32_t mortonCode = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
-			if (depthMorton2Nodes[0].find(mortonCode) != depthMorton2Nodes[0].end())
+			int depth = 0;
+			while (depth < treeDepth && depthMorton2Nodes[depth].find(mortonCode) == depthMorton2Nodes[depth].end())
 			{
-				uint32_t svoNodeIdx = depthMorton2Nodes[0].at(mortonCode);
-
-				//#pragma omp critical
-				{
-					fineNodeParticle[svoNodeIdx].emplace_back(particle);
-					particle2Node[particle] = svoNodeIdx;
-				}
+				++depth;
+				mortonCode /= 8;
 			}
-			else
+			if (depth == treeDepth)
 			{
-				++t;
+				printf("out of bounding box\n");
+				continue;
+			}
+
+			uint32_t svoNodeIdx = depthMorton2Nodes[depth].at(mortonCode);
+
+			if (svoNodeIdx >= fineNodeParticle.size()) printf("111\n");
+
+			//#pragma omp critical
+			{
+				fineNodeParticle[svoNodeIdx].emplace_back(particle);
+				particle2Node.emplace(std::make_pair(particle, svoNodeIdx));
+				//particle2Node.insert(std::make_pair(particle, svoNodeIdx));
 			}
 		}
 
-		std::cout << "#1 t = " << t << std::endl;
+		for (int i = 0; i < numParticles; ++i)
+		{
+			const V3d& particle = queryPointMat.row(i);
+			if (particle2Node.find(particle) != particle2Node.end())
+			{
+				const uint32_t nodeIdx = particle2Node.at(particle);
+				if (!fineNodeParticle[nodeIdx].empty())
+				{
+					for (int j = 0; j < fineNodeParticle[nodeIdx].size(); ++j)
+					{
+						const V3d j_neiParticle = fineNodeParticle[nodeIdx][j];
+						neighPointList[i].emplace_back(j_neiParticle);
+					}
+				}
+			}
+		}
+
 	};
 
 	int numSearch = 100;
@@ -1823,9 +1902,12 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 			before_particleMat.row(i) = Eigen::Vector3d(before_particle(i * 3), before_particle(i * 3 + 1), before_particle(i * 3 + 2));
 
 		// Nearest point search
-		KDTree kdTree(3, before_particleMat, 100);
+		/*KDTree kdTree(3, before_particleMat, 100);
 		std::vector<MXd> neighPointList;
-		knn_helper::getNeighborPoint(kdTree, before_particleMat, numSearch, neighPointList);
+		knn_helper::getNeighborPoint(kdTree, before_particleMat, numSearch, neighPointList);*/
+
+		//updateNeighbor(before_particleMat);
+		//normal = getPointNormal(before_particleMat);
 
 		for (int i = 0; i < numParticles; ++i)
 		{
@@ -1833,16 +1915,33 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 			//const V3d i_particle = V3d(before_particle(i * 3), before_particle(i * 3 + 1), before_particle(i * 3 + 2));
 
 			// Compute gradient of i'th particle
-			Eigen::Vector3d i_force;
-			i_force.setZero();
+			Eigen::Vector3d i_force; i_force.setZero();
 
-			for (int j = 0; j < numSearch; ++j)
+			/*for (int j = 0; j < numSearch; ++j)
 			{
 				const V3d j_neiParticle = neighPointList[i].row(j);
 
 				const double& ij_energy = std::exp(-((i_particle - j_neiParticle).squaredNorm()) / (4 * theta * theta));
 				systemEnergy += ij_energy;
 				i_force += ((i_particle - j_neiParticle) / (2 * theta * theta)) * ij_energy;
+			}*/
+
+			for (int j = 0; j < neighPointList[i].size(); ++j)
+			{
+				const V3d j_neiParticle = neighPointList[i][j];
+				if (i_particle == j_neiParticle) continue;
+
+				double ij_energy = std::exp(-((i_particle - j_neiParticle).squaredNorm()) / (4 * theta * theta));
+				if (fabs(ij_energy) < 1e-20) ij_energy = 0;
+				systemEnergy += ij_energy;
+
+				i_force += ((i_particle - j_neiParticle) / (2 * theta * theta)) * ij_energy;
+
+				for (int i = 0; i < i_force.rows(); ++i)
+					if (std::isnan(i_force(i))) {
+						std::cout << i_particle.transpose() << ", " << j_neiParticle.transpose() << ", " << ij_energy << std::endl;
+						std::cout << "#1 nan!\n"; system("pause");
+					}
 			}
 
 			/*if (particle2Node.find(i_particle) != particle2Node.end())
@@ -1860,7 +1959,7 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 
 			// Project 'i_force' to the surface tangent
 			const V3d i_normal = normal.row(i);
-			i_force = i_force - (i_force.dot(i_normal)) * i_normal;
+			i_force = i_force - ((i_force.dot(i_normal)) * i_normal);
 			//i_force.normalize();
 
 			// Update gradient
@@ -1868,7 +1967,8 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 			grad(i * 3 + 1) = i_force.y();
 			grad(i * 3 + 2) = i_force.z();
 		}
-		std::cout << "systemEnergy = " << systemEnergy << std::endl;
+
+		std::cout << "Line Search: systemEnergy = " << systemEnergy << std::endl;
 		std::cout << "=========\n";
 		return systemEnergy;
 	};
@@ -1879,12 +1979,15 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 	double energy;
 
 	Eigen::VectorXd particle_x;
+	int proj_iter = 1;
 	for (int iter = 1; iter <= maxIterations; ++iter)
 	{
 		if (iter == 1) { proj_particleMat = particleArray; normal = m_VN; }
 		else normal = getSurfacePointNormal(proj_particleMat);
 
-		//updateNeighbor(proj_particleMat);
+		if (iter % 5 == 0) proj_iter += 2;
+
+		updateNeighbor(proj_particleMat);
 
 		Eigen::MatrixXd trans_proj_particleMat = proj_particleMat;
 		trans_proj_particleMat.transposeInPlace();
@@ -1894,7 +1997,7 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 		printf("-- [Iter: %d/%d] System energy = %lf\n", iter, maxIterations, energy);
 
 		Eigen::MatrixXd particleMat(numParticles, 3);
-//#pragma omp parallel for
+		//#pragma omp parallel for
 		for (int i = 0; i < numParticles; ++i)
 			particleMat.row(i) = Eigen::Vector3d(particle_x(i * 3), particle_x(i * 3 + 1), particle_x(i * 3 + 2));
 
@@ -1903,12 +2006,21 @@ void ThinShells::lbfgs_optimization(const int& maxIterations, const std::string&
 		gvis::writePointCloud_xyz(particleMat, out1);
 		system("pause");
 
-		proj_particleMat = getProjectPoint(particleMat, 1);
+		proj_particleMat = getProjectPoint(particleMat, proj_iter);
 		const string tempProjFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"proj_particle.xyz");
 		std::ofstream out2(tempProjFile);
 		gvis::writePointCloud_xyz(proj_particleMat, out2);
 		system("pause");
 	}
+	proj_particleMat = getProjectPoint(proj_particleMat, 10); // 最后的投影
+	Eigen::VectorXd sqrD;
+	Eigen::VectorXi I;
+	Eigen::MatrixXd C;
+
+	// the output sqrD contains the (unsigned) squared distance from each point in P 
+	// to its closest point given in C which lies on the element in F given by I
+	aabbTree.squared_distance(m_V, m_F, proj_particleMat, sqrD, I, C);
+	proj_particleMat = C;
 
 	if (!out_file.empty())
 	{

@@ -148,6 +148,8 @@ private:
 		vector<vector<std::array<double, 8>>>& nodeBSplineVal,
 		vector<double>& nodeWidth);
 
+	MXd getPointNormal(const MXd& queryPointMat);
+
 	MXd getSurfacePointNormal(const MXd& queryPointMat) override;
 
 	VXd getPointBSplineVal(const MXd& queryPointMat);
