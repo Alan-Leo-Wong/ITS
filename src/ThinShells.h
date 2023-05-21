@@ -16,7 +16,7 @@ private:
 	double voxelWidth;
 	vector<V3d> nodeWidthArray;
 	//vector<V3d> nodeWidthArray;
-	std::map<uint32_t, SVONode> morton2FineNode;
+	std::map<uint32_t, uint32_t> morton2FineNodeIdx;
 
 	vector<V3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
 	vector<V3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
@@ -44,9 +44,9 @@ public:
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-		//#ifndef NDEBUG
+#ifdef IO_SAVE
 		saveTree("");
-		//#endif // !NDEBUG
+#endif // !IO_SAVE
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
@@ -54,22 +54,22 @@ public:
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-#ifndef NDEBUG
+#ifdef IO_SAVE
 		saveTree("");
-#endif // !NDEBUG
+#endif // !IO_SAVE
 	}
 
 	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z,
 		const bool& _is2UnitCube, const double& _scaleFactor)
 		: svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename, _is2UnitCube, _scaleFactor),
 		modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
-	{
+	{	
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-#ifndef NDEBUG
+#ifdef IO_SAVE
 		saveTree("");
-#endif // !NDEBUG
+#endif // !IO_SAVE
 	}
 
 	ThinShells(const string& filename, const V3i& _grid, const bool& _is2UnitCube, const double& _scaleFactor)
@@ -78,9 +78,9 @@ public:
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-#ifndef NDEBUG
+#ifndef IO_SAVE
 		saveTree("");
-#endif // !NDEBUG
+#endif // !IO_SAVE
 	}
 
 	~ThinShells() {}
@@ -99,7 +99,7 @@ private:
 
 	void cpCoefficients();
 
-	void cpBSplineValue();
+	void cpLatentBSplineValue();
 
 	void initBSplineTree();
 
@@ -154,9 +154,9 @@ private:
 
 	VXd getPointBSplineVal(const MXd& queryPointMat);
 
-	std::pair<VXd, MXd> getPointValGradient(const MXd& queryPointMat);
+	std::pair<VXd, MXd> getPointValGradient(const MXd& before_queryPointMat, const MXd& queryPointMat);
 
-	MXd getProjectPoint(const MXd& queryPointMat, const int& iter);
+	MXd getProjectPoint(const MXd& before_queryPointMat, const MXd& queryPointMat, const int& iter);
 
 	void lbfgs_optimization(const int& maxIterations, const std::string& out_file) override;
 

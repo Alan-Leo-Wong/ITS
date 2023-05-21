@@ -80,8 +80,11 @@ private:
 	void constructNodeAtrributes(const thrust::device_vector<size_t>& d_esumTreeNodesArray,
 		thrust::device_vector<SVONode>& d_SVONodeArray);
 
-	std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> setInDomainPoints(const uint32_t& nodeIdx, const int& nodeDepth,
-		const vector<size_t>& esumDepthNodeVertexSize, vector<std::map<V3d, size_t>>& nodeVertex2Idx) const;
+	/*std::tuple<vector<std::pair<V3d, double>>, vector<size_t>> setInDomainPoints(const uint32_t& nodeIdx, 
+		const int& nodeDepth, vector<std::map<V3d, size_t>>& nodeVertex2Idx) const;*/
+
+	std::vector<std::tuple<V3d, double, size_t>> setInDomainPoints(const uint32_t& _nodeIdx, const int& nodeDepth, 
+		vector<std::map<V3d, size_t>>& depthVert2Idx);
 
 	// multi point query test
 	std::vector<std::tuple<V3d, double, size_t>> mq_setInDomainPoints(const uint32_t& _morton, const V3d& modelOrigin,

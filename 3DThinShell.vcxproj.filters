@@ -123,6 +123,9 @@
     <ClInclude Include="src\ParticleMesh.h">
       <Filter>头文件\test</Filter>
     </ClInclude>
+    <ClInclude Include="src\TestAllTime.h">
+      <Filter>头文件\test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdint.h>
 #include <Eigen\dense>
+#include "TestAllTime.h"
 
 using uint = unsigned int;
 

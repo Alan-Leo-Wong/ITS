@@ -7,6 +7,12 @@
 #include "utils/Common.hpp"
 #include "utils/CMDParser.hpp"
 #include <igl/signed_distance.h>
+#include "TestAllTime.h"
+
+namespace test_time
+{
+	double test_allTime = .0;
+}
 
 std::tuple<UINT, UINT, const char*, const char*> execArgParser(int argc, char** argv)
 {
@@ -149,7 +155,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "bunny.off");
+	string modelName = getFileName("", "Art-Institute-Chicago-Lion.stl");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -157,15 +163,16 @@ int main(int argc, char** argv)
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
-	int svo_res = 128;
-	startTimer(&timer);
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), svo_res, svo_res, svo_res);
+	int svo_res = 256;
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"Art-Institute-Chicago-Lion.stl"), svo_res, svo_res, svo_res);
+
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
-	stopTimer(&timer);
-	double time = getElapsedTime(&timer) * 1e-3;
-	printf("\nCreate shells spent %lf s.\n", time);
+	/*stopTimer(&timer);
+	double time = getElapsedTime(&timer) * 1e-3;*/
+	//printf("\nCreate shells spent %lf s.\n", time);
+	printf("\nCreate shells spent %lf s.\n", test_time::test_allTime);
 
 	const int treeDepth = thinShell.treeDepth;
 	const std::string uniformDir = thinShell.uniformDir;
@@ -173,7 +180,7 @@ int main(int argc, char** argv)
 	startTimer(&timer);
 	thinShell.textureVisualization(concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"txt_shell.obj"));
 	stopTimer(&timer);
-	time = getElapsedTime(&timer) * 1e-3;
+	double time = getElapsedTime(&timer) * 1e-3;
 	printf("\nTexture Visualization spent %lf s.\n", time);
 
 	/*const int res = 200;
@@ -195,8 +202,8 @@ int main(int argc, char** argv)
 	for(int i = 1; i <= 10; i++)
 		testPointInOut(thinShell, 10000, queryFile, queryResFile, i);*/
 
-	const string particleResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"optimized_particle.xyz");
-	thinShell.launchParticleSystem(10, particleResFile);
+	/*const string particleResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"optimized_particle.xyz");
+	thinShell.launchParticleSystem(13, particleResFile);*/
 
 	//thinShell.moveOnSurface(V3d(-0.0139834, 0.12456, 0.0302671), V3d(-1e-3, 1e-3, -1e-3), 3);
 

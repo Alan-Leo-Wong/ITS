@@ -33,6 +33,7 @@
     <ClInclude Include="src\ParticleMesh.h" />
     <ClInclude Include="src\SDFHelper.h" />
     <ClInclude Include="src\SVO.h" />
+    <ClInclude Include="src\TestAllTime.h" />
     <ClInclude Include="src\test\TestConfig.h" />
     <ClInclude Include="src\ThinShells.h" />
     <ClInclude Include="src\utils\CMDParser.hpp" />
