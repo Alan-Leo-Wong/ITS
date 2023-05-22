@@ -2,6 +2,7 @@
 #include "../MortonLUT.h"
 #include "../utils/IO.hpp"
 #include "../utils/Timer.hpp"
+#include "../utils/String.hpp"
 #include "../utils/Geometry.hpp"
 #include "../utils/cuda/CUDAMath.hpp"
 #include "../utils/cuda/CUDAUtil.cuh"
@@ -843,6 +844,15 @@ void SparseVoxelOctree::createOctree(const size_t& nModelTris, const vector<Tria
 	test_time::test_allTime += time;
 
 	deleteTimer(&timer);
+
+	size_t t_esumNodes = 0;
+	for (int i = 0; i < treeDepth; ++i)
+	{
+		std::vector<SVONode> hd_svoNodeArray;
+		hd_svoNodeArray.insert(hd_svoNodeArray.end(), svoNodeArray.begin() + t_esumNodes, svoNodeArray.begin() + t_esumNodes + depthNumNodes[i]);
+		depthSVONodeArray.emplace_back(hd_svoNodeArray);
+		t_esumNodes += depthNumNodes[i];
+	}
 }
 
 namespace {
@@ -1255,35 +1265,54 @@ std::vector<std::tuple<V3d, double, size_t>> SparseVoxelOctree::mq_setInDomainPo
 //////////////////////
 void SparseVoxelOctree::saveSVO(const std::string& filename) const
 {
-	checkDir(filename);
+	/*checkDir(filename);
 	std::ofstream output(filename.c_str(), std::ios::out);
-	if (!output) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
+	if (!output) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }*/
 	//assert(output);
 
-#ifndef SILENT
+#ifndef IO_SILENT
 	std::cout << "[I/O] Writing Sparse Voxel Octree data in obj format to file " << std::quoted(filename.c_str()) << std::endl;
 	// Write stats
 	size_t voxels_seen = 0;
 	const size_t write_stats_25 = numTreeNodes / 4.0f;
 	fprintf(stdout, "[I/O] Writing to file: 0%%...");
-#endif
+#endif // !IO_SILENT
 
-	size_t faceBegIdx = 0;
+	/*size_t faceBegIdx = 0;
 	for (const auto& node : svoNodeArray)
 	{
-#ifndef SILENT			
+#ifndef IO_SILENT
 		voxels_seen++;
 		if (voxels_seen == write_stats_25) { fprintf(stdout, "25%%..."); }
 		else if (voxels_seen == write_stats_25 * size_t(2)) { fprintf(stdout, "50%%..."); }
 		else if (voxels_seen == write_stats_25 * size_t(3)) { fprintf(stdout, "75%%..."); }
-#endif
+#endif // !IO_SILENT
 		gvis::writeCube(node.origin, Eigen::Vector3d(node.width, node.width, node.width), output, faceBegIdx);
 	}
-#ifndef SILENT
+#ifndef IO_SILENT
 	fprintf(stdout, "100%% \n");
-#endif
+#endif // !IO_SILENT*/
 
-	output.close();
+//output.close();
+
+// 分层输出
+	for (int i = 0; i < treeDepth; ++i)
+	{
+		size_t faceBegIdx = 0;
+
+		const std::string& d_filename = concatFilePath(filename, (string)"svo_" + std::to_string(i + 1) + (string)".obj");
+		checkDir(d_filename);
+		std::ofstream output(d_filename.c_str(), std::ios::out);
+		if (!output) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }
+
+		for (int j = 0; j < depthSVONodeArray[i].size(); ++j)
+		{
+			const auto& node = depthSVONodeArray[i][j];
+			gvis::writeCube(node.origin, Eigen::Vector3d(node.width, node.width, node.width), output, faceBegIdx);
+		}
+		output.close();
+	}
+
 }
 
 void SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d>& modelBBox, const vector<uint32_t>& voxelArray,

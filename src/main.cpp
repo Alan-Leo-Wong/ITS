@@ -155,7 +155,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "Art-Institute-Chicago-Lion.stl");
+	string modelName = getFileName("", "dan-m-crowdproject.stl");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -163,8 +163,8 @@ int main(int argc, char** argv)
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
-	int svo_res = 256;
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"Art-Institute-Chicago-Lion.stl"), svo_res, svo_res, svo_res);
+	int svo_res = 128;
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"dan-m-crowdproject.stl"), svo_res, svo_res, svo_res);
 
 	//bool is2Cube = true;
 	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube

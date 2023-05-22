@@ -49,7 +49,7 @@ private:
 	vector<size_t> depthNumNodes; // 每一层的八叉树节点数
 	//vector<vector<SVONode>> SVONodes;
 
-	//vector<vector<SVONode>> depthSVONodeArray; // 每一层的八叉树节点
+	vector<vector<SVONode>> depthSVONodeArray; // 每一层的八叉树节点
 	vector<SVONode> svoNodeArray; // 所有的八叉树节点
 
 	vector<node_vertex_type> nodeVertexArray;

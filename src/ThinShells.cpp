@@ -978,7 +978,8 @@ void ThinShells::multiPointQuery(const std::string& out_file, const MXd& pointsM
 void ThinShells::saveTree(const string& filename) const
 {
 	string t_filename = filename;
-	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"svo.obj");
+	//if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"svo.obj");
+	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth));
 
 	svo.saveSVO(t_filename);
 }
