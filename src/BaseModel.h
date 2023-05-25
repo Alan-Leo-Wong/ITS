@@ -8,6 +8,7 @@ class BaseModel
 {
 public:
 	string uniformDir = "non-uniform";
+	string noiseDir = "non-noise";
 
 protected:
 	MXd m_V;
@@ -61,6 +62,23 @@ public:
 		setTriAttributes();
 	}
 
+	BaseModel(const std::string& filename, const bool& _is2UnitCube, const double& _scaleFactor,
+		const bool& _isAddNoise, const double& noisePercentage)
+		: is2UnitCube(_is2UnitCube), scaleFactor(_scaleFactor)
+	{
+		readFile(filename);
+		if (_is2UnitCube) { uniformDir = "uniform"; model2UnitCube(); }
+		if (_isAddNoise)
+		{
+			printf("Add %lf%% noise on model...\n", noisePercentage * 100.0);
+			noiseDir = (string)"noise_" + std::to_string(noisePercentage * 100.0);
+			addNoise(noisePercentage);
+		}
+		setModelAttributeVector();
+		setUniformBoundingBox();
+		setTriAttributes();
+	}
+
 	~BaseModel() {}
 
 public:
@@ -76,6 +94,8 @@ private:
 	Eigen::Matrix4d calcTransformMatrix(const float& _scaleFactor);
 
 	Eigen::Matrix3d calcScaleMatrix();
+
+	void addNoise(const double& noisePercentage, const double& min_val = -0.1, const double& max_val = 0.1);
 
 public:
 	void model2UnitCube();

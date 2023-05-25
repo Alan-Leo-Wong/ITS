@@ -155,7 +155,7 @@ int main(int argc, char** argv)
 	cout << "**                                               **\n";
 	cout << "***************************************************\n";
 
-	string modelName = getFileName("", "dan-m-crowdproject.stl");
+	string modelName = getFileName("", "bunny.off");
 	//const double alpha = 1000;
 	cout << "-- Model: " << modelName << endl;
 	//cout << "-- alpha: " << alpha << endl;
@@ -163,16 +163,18 @@ int main(int argc, char** argv)
 	TimerInterface* timer = nullptr;
 	createTimer(&timer);
 
-	int svo_res = 128;
-	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"dan-m-crowdproject.stl"), svo_res, svo_res, svo_res);
+	int svo_res = 256;
+	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"dan-m-crowdproject.stl"), svo_res, svo_res, svo_res);
 
-	//bool is2Cube = true;
-	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), 64, 64, 64, is2Cube, 1.0); // to unit cube
+	bool is2Cube = true, isAddNoise = false;
+	double noisePercentage = 0.0025;
+	//ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"Octocat.stl"), svo_res, svo_res, svo_res, is2Cube, 1.0, isAddNoise, noisePercentage); // to unit cube
+	ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"bunny.off"), svo_res, svo_res, svo_res, is2Cube, 1.0); // to unit cube
 	thinShell.creatShell();
 	/*stopTimer(&timer);
 	double time = getElapsedTime(&timer) * 1e-3;*/
 	//printf("\nCreate shells spent %lf s.\n", time);
-	printf("\nCreate shells spent %lf s.\n", test_time::test_allTime);
+	printf("\nCreate shells spent %.4lf s.\n", test_time::test_allTime);
 
 	const int treeDepth = thinShell.treeDepth;
 	const std::string uniformDir = thinShell.uniformDir;

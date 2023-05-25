@@ -117,6 +117,28 @@ Eigen::Matrix3d BaseModel::calcScaleMatrix()
 	return zoomMatrix;
 }
 
+void BaseModel::addNoise(const double& noisePercentage, const double& min_val, const double& max_val)
+{
+	// 计算需要扰动的节点数量
+	int numNodes = m_V.rows();
+	int numNoisyNodes = static_cast<int>(noisePercentage * numNodes);
+
+	// 设置随机数生成器
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<double> dis(min_val, max_val); // 设置扰动范围为 [-0.1, 0.1]
+
+	// 随机扰动节点位置
+	for (int i = 0; i < numNoisyNodes; i++) 
+	{
+		// 随机选择一个节点索引
+		int nodeIndex = std::rand() % numNodes;
+
+		// 在节点位置上添加随机扰动
+		m_V.row(nodeIndex) += dis(gen) * Eigen::RowVector3d::Random();
+	}
+}
+
 void BaseModel::zoomModel()
 {
 	Eigen::Matrix3d zoomMat = calcScaleMatrix();

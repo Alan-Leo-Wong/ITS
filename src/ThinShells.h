@@ -44,9 +44,9 @@ public:
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;
-//#ifdef IO_SAVE
+#ifdef IO_SAVE
 		saveTree("");
-//#endif // !IO_SAVE
+#endif // !IO_SAVE
 	}
 
 	ThinShells(const string& filename, const V3i& _grid) :svo_gridSize(_grid), BaseModel(filename), modelOrigin(modelBoundingBox.boxOrigin), svo(_grid)
@@ -64,6 +64,19 @@ public:
 		: svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename, _is2UnitCube, _scaleFactor),
 		modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
 	{	
+		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
+		treeDepth = svo.treeDepth;
+		voxelWidth = svo.svoNodeArray[0].width;
+#ifdef IO_SAVE
+		saveTree("");
+#endif // !IO_SAVE
+	}
+
+	ThinShells(const string& filename, const int& _grid_x, const int& _grid_y, const int& _grid_z,
+		const bool& _is2UnitCube, const double& _scaleFactor, const bool& _isAddNoise, const double& noisePercentage)
+		: svo_gridSize(_grid_x, _grid_y, _grid_z), BaseModel(filename, _is2UnitCube, _scaleFactor, _isAddNoise, noisePercentage),
+		modelOrigin(modelBoundingBox.boxOrigin), svo(_grid_x, _grid_y, _grid_z)
+	{
 		svo.createOctree(nModelTris, modelTris, modelBoundingBox, concatFilePath((string)VIS_DIR, modelName));
 		treeDepth = svo.treeDepth;
 		voxelWidth = svo.svoNodeArray[0].width;

@@ -473,7 +473,9 @@ inline void ThinShells::cpIntersectionPoints()
 
 	deleteTimer(&timer);
 
+#ifdef IO_SAVE
 	saveLatentPoint("");
+#endif
 }
 
 inline void ThinShells::cpSDFOfTreeNodes()
@@ -749,6 +751,7 @@ inline void ThinShells::cpLatentBSplineValue()
 
 	std::cout << "-- innerShellIsoVal: " << innerShellIsoVal << std::endl;
 	std::cout << "-- outerShellIsoVal: " << outerShellIsoVal << std::endl;
+	std::cout << "-- Thickness: " << std::setprecision(3) << (outerShellIsoVal - innerShellIsoVal) << std::endl;
 }
 
 inline void ThinShells::initBSplineTree()
@@ -799,9 +802,9 @@ inline void ThinShells::initBSplineTree()
 	time = getElapsedTime(&timer) * 1e-3;
 	printf("-- Elapsed time: %lf s.\n", time);
 	cout << "=====================\n";
-#ifdef IO_SAVE
+//#ifdef IO_SAVE
 	saveBSplineValue("");
-#endif // IO_SAVE
+//#endif // IO_SAVE
 
 	deleteTimer(&timer);
 }
@@ -979,7 +982,8 @@ void ThinShells::saveTree(const string& filename) const
 {
 	string t_filename = filename;
 	//if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"svo.obj");
-	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth));
+	//if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth));
+	if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth));
 
 	svo.saveSVO(t_filename);
 }
@@ -999,13 +1003,13 @@ void ThinShells::saveIntersections(const string& filename_1, const string& filen
 {
 	string t_filename = filename_1;
 	if (filename_1.empty())
-		t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"edgeInter.xyz");
+		t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth), (string)"edgeInter.xyz");
 	cout << "-- Save mesh EDGES and octree Nodes to " << std::quoted(t_filename) << endl;
 	saveIntersections(t_filename, edgeInterPoints);
 
 	t_filename = filename_2;
 	if (filename_2.empty())
-		t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"faceInter.xyz");
+		t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth), (string)"faceInter.xyz");
 	cout << "-- Save mesh FACES and octree node EDGES to " << std::quoted(t_filename) << endl;
 	saveIntersections(t_filename, faceInterPoints);
 }
@@ -1014,7 +1018,7 @@ void ThinShells::saveSDFValue(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"SDFValue.txt");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth), (string)"SDFValue.txt");
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
@@ -1030,7 +1034,7 @@ void ThinShells::saveCoefficients(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"Coefficients.txt");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth), (string)"Coefficients.txt");
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
@@ -1045,7 +1049,7 @@ void ThinShells::saveLatentPoint(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"latent_point.xyz");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth), (string)"latent_point.xyz");
 
 	checkDir(t_filename);
 	//std::ofstream out(t_filename);
@@ -1065,7 +1069,7 @@ void ThinShells::saveBSplineValue(const string& filename) const
 {
 	string t_filename = filename;
 	if (filename.empty())
-		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"BSplineValue.txt");
+		t_filename = concatFilePath((string)OUT_DIR, modelName, uniformDir, noiseDir, std::to_string(treeDepth), (string)"BSplineValue.txt");
 
 	checkDir(t_filename);
 	std::ofstream out(t_filename);
