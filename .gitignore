@@ -3,6 +3,8 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+.idea/
+
 # User-specific files
 *.rsuser
 *.suo
@@ -17,6 +19,7 @@
 mono_crash.*
 
 # Build results
+build/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -32,6 +35,8 @@ bld/
 [Oo]ut/
 [Ll]og/
 [Ll]ogs/
+cmake-build-debug/
+cmake-build-release/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

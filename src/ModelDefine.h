@@ -1,14 +1,14 @@
 #pragma once
 
 #ifndef MODEL_DIR
-#  define MODEL_DIR ".\\model"
+#  define MODEL_DIR R"(D:\VSProjects\3DThinShell\model)"
 #endif
 #ifndef SHARED_PATH
-#  define SHARED_PATH "..\\data"
+#  define SHARED_PATH R"(D:\VSProjects\3DThinShell\data)"
 #endif
 #ifndef VIS_DIR
-#  define VIS_DIR ".\\vis"
+#  define VIS_DIR R"(D:\VSProjects\3DThinShell\vis)"
 #endif
 #ifndef OUT_DIR
-#  define OUT_DIR ".\\output"
+#  define OUT_DIR R"(D:\VSProjects\3DThinShell\output)"
 #endif

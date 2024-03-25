@@ -1,199 +1,209 @@
+//
+// Created by lei on 10/26/2023.
+//
+
 #pragma once
+
 #define __STDC_WANT_LIB_EXT1__ 1
-#include <io.h>
+
+#include "Config.hpp"
 #include <string>
-#include <string.h>
+#include <cstring>
+#include <sstream>
 
-using std::string;
+#if defined(WIN32) || defined(_WIN32)
 
-#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-#  define DELIMITER "\\"
+#include <io.h>
+
+#elif defined(__linux__)
+
+#include <sys/io.h>
+
+#define strtok_s strtok_r
+
+#include<unistd.h>
+
+#define _access access
+
+#endif
+
+#if defined(WIN32) || defined(_WIN32)
+constexpr char DELIMITER = '\\';
 #else
-#  define DELIMITER "/"
+constexpr char DELIMITER = '/';
 #endif
 
-#ifndef CONTACT(x,y)
-#  define CONTACT(x,y) x##y
-#endif
+namespace str_util {
+    using std::string;
 
-template<typename T = string>
-string concatFilePath(T firstArg)
-{
-	return firstArg;
-}
+    template<typename T = string>
+    FORCE_INLINE string concatFilePath(T firstArg) {
+        std::stringstream ss;
+        ss << firstArg;
+        return ss.str();
+    }
 
-// Ä¿Ç°Ö»Ö§³Ö²ÎÊıÈ«ÎªstringÀàĞÍµÄÇé¿ö£¬´ı´¦Àí²ÎÊı°üÖĞĞ¯´øconst char*(const char[])µÄÕâÖÖÇé¿ö
-template<typename T = string, typename...Types>
-string concatFilePath(T firstArg, Types ... args)
-{
-	firstArg = firstArg + (string)DELIMITER;
-	return firstArg + concatFilePath(args...);
-}
+    // ç›®å‰åªæ”¯æŒå‚æ•°å…¨ä¸ºstringç±»å‹çš„æƒ…å†µï¼Œå¾…å¤„ç†å‚æ•°åŒ…ä¸­æºå¸¦const char*(const char[])çš„è¿™ç§æƒ…å†µ
+    template<typename T = string, typename...Types>
+    FORCE_INLINE string concatFilePath(T firstArg, Types ... args) {
+        std::stringstream ss;
+        ss << firstArg << DELIMITER << concatFilePath(args...);
+        return ss.str();
+    }
 
-inline char* getFileNameWithExt(const char delimiter, char* filePath)
-{
-	char* fileName = filePath;
-	const size_t len = strlen(filePath);
-	for (int i = 0; i < len; ++i)
-	{
-		if (filePath[i] == delimiter)
-			fileName = &filePath[i + 1];
-	}
-	return fileName;
-}
+    FORCE_INLINE char const *getFileNameWithExt(char *filePath) {
+        char *fileName = filePath;
+        const size_t len = strlen(filePath);
+        for (int i = 0; i < len; ++i) {
+            if (filePath[i] == DELIMITER)
+                fileName = &filePath[i + 1];
+        }
+        return fileName;
+    }
 
-inline char* getFileNameWithExt(const char* delimiter, const char* filePath)
-{
-	char* filePath_c = new char[strlen(filePath) + 1];
-	strcpy(filePath_c, filePath);
-	char* fileName = nullptr;
+    FORCE_INLINE char const *getFileNameWithExt(const char *filePath) {
+        char *filePath_c = new char[strlen(filePath) + 1];
+        strcpy(filePath_c, filePath);
+        char *fileName = nullptr;
 
 #ifdef __STDC_LIB_EXT1__
-	char* token = strtok(filePath_c, &delimiter); // 'filePath_c' is changed after calles strtok
-	while (token != nullptr)
-	{
-		if (fileName != nullptr) { delete[] fileName; fileName = nullptr; }
-		fileName = new char[strlen(token) + 1];
-		strcpy(fileName, token);
-		token = strtok(NULL, &delimiter); // strtokµÚÒ»¸ö²ÎÊı´«Èënullptr£¬´ú±íÊ¹ÓÃÖ®Ç°strtokÄÚ²¿±£´æµÄSAVE_PTR¶¨Î»µ½ÏÂÒ»¸ö´ı´¦ÀíµÄ×Ö·ûµÄÎ»ÖÃ
-	}
+        char* token = strtok(filePath_c, &delimiter); // 'filePath_c' is changed after calles strtok
+        while (token != nullptr)
+        {
+            if (fileName != nullptr) { delete[] fileName; fileName = nullptr; }
+            fileName = new char[strlen(token) + 1];
+            strcpy(fileName, token);
+            token = strtok(NULL, &delimiter); // strtokç¬¬ä¸€ä¸ªå‚æ•°ä¼ å…¥nullptrï¼Œä»£è¡¨ä½¿ç”¨ä¹‹å‰strtokå†…éƒ¨ä¿å­˜çš„SAVE_PTRå®šä½åˆ°ä¸‹ä¸€ä¸ªå¾…å¤„ç†çš„å­—ç¬¦çš„ä½ç½®
+        }
 #else // Thread safe
-	char* ptr = nullptr;
-	char* token = strtok_s(filePath_c, delimiter, &ptr); //Ïà½ÏÓÚstrtok()º¯Êı£¬strtok_sº¯ÊıĞèÒªÓÃ»§´«ÈëÒ»¸öÖ¸Õë£¬ÓÃÓÚº¯ÊıÄÚ²¿ÅĞ¶Ï´ÓÄÄÀï¿ªÊ¼´¦Àí×Ö·û´®
-	while (token != nullptr)
-	{
-		if (fileName != nullptr) { delete[] fileName; fileName = nullptr; }
-		fileName = new char[strlen(token) + 1];
-		strcpy(fileName, token);
-		token = strtok_s(NULL, delimiter, &ptr);
-	}
+        char *ptr = nullptr;
+        char *token = strtok_s(filePath_c, &DELIMITER, &ptr); //ç›¸è¾ƒäºstrtok()å‡½æ•°ï¼Œstrtok_så‡½æ•°éœ€è¦ç”¨æˆ·ä¼ å…¥ä¸€ä¸ªæŒ‡é’ˆï¼Œç”¨äºå‡½æ•°å†…éƒ¨åˆ¤æ–­ä»å“ªé‡Œå¼€å§‹å¤„ç†å­—ç¬¦ä¸²
+        while (token != nullptr) {
+            if (fileName != nullptr) {
+                delete[] fileName;
+                fileName = nullptr;
+            }
+            fileName = new char[strlen(token) + 1];
+            strcpy(fileName, token);
+            token = strtok_s(nullptr, &DELIMITER, &ptr);
+        }
 #endif
-	delete[] filePath_c;
-	filePath_c = nullptr;
-	return fileName;
-}
+        delete[] filePath_c;
+        filePath_c = nullptr;
+        return fileName;
+    }
 
-inline string getFileNameWithExt(const char* delimiter, const string& filePath)
-{
-	string fileName = getFileNameWithExt(delimiter, filePath.c_str());
-	return fileName;
-}
+    FORCE_INLINE string getFileNameWithExt(const string &filePath) {
+        const string fileName = getFileNameWithExt(filePath.c_str());
+        return fileName;
+    }
 
-// such as ".obj"
-inline char* getFileExtension(char* filePath)
-{
-	char* extension = filePath;
-	for (int i = strlen(filePath); i >= 0; --i)
-	{
-		if (filePath[i] == '.')
-		{
-			extension = &filePath[i + 1];
-			return extension;
-		}
-	}
-	extension[0] = 0;
-	return extension;
-}
+    // such as ".obj"
+    FORCE_INLINE char const *getFileExtension(char *filePath) {
+        char *extension = filePath;
+        for (int i = strlen(filePath); i >= 0; --i) {
+            if (filePath[i] == '.') {
+                extension = &filePath[i];
+                return extension;
+            }
+        }
+        extension[0] = 0;
+        return extension;
+    }
 
-inline char* getFileExtension(const char* filePath)
-{
-	char* temp = new char[strlen(filePath) + 1];
-	strcpy(temp, filePath);
-	char* extension = getFileExtension(temp);
-	delete[] temp;
-	temp = nullptr;
-	return extension;
-}
+    // such as '.obj'
+    FORCE_INLINE char const *getFileExtension(const char *filePath) {
+        char *temp = new char[strlen(filePath) + 1];
+        strcpy(temp, filePath);
+        const char *extension = getFileExtension(temp);
+        delete[] temp;
+        temp = nullptr;
+        return extension;
+    }
 
-inline string getFileExtension(const string& filePath)
-{
-	const size_t idx = filePath.rfind('.');
-	if (idx != string::npos)
-		return filePath.substr(idx);
-	return "";
-}
+    FORCE_INLINE string getFileExtension(const string &filePath) {
+        const size_t idx = filePath.rfind('.');
+        if (idx + 1 != string::npos)
+            return filePath.substr(idx);
+        return "";
+    }
 
-inline char* getFileName(const char* delimiter, char* filePath)
-{
-	char* fileName = getFileNameWithExt(delimiter, filePath);
-	size_t len = strlen(fileName);
-	for (int i = len - 1; i >= 0; --i)
-	{
-		if (fileName[i] == '.')
-		{
-			fileName[i] = 0;
-			return fileName;
-		}
-	}
-	return fileName;
-}
+    FORCE_INLINE char const *getFileName(char *filePath) {
+        char const *fileNameWithExt = getFileNameWithExt(filePath);
+        size_t len = strlen(fileNameWithExt);
+        char *fileName = new char[len + 1];
+        strncpy(fileName, fileNameWithExt, len);
 
-inline char* getFileName(const char* delimiter, const char* filePath)
-{
-	char* fileName = getFileNameWithExt(delimiter, filePath);
-	size_t len = strlen(fileName);
-	for (int i = len - 1; i >= 0; --i)
-	{
-		if (fileName[i] == '.')
-		{
-			fileName[i] = 0;
-			return fileName;
-		}
-	}
-	return fileName;
-}
+        for (int i = len - 1; i >= 0; --i) {
+            if (fileName[i] == '.') {
+                fileName[i] = 0;
+                return fileName;
+            }
+        }
+        return fileName;
+    }
 
-inline string getFileName(const char* delimiter, const string& filePath)
-{
-	string fileName = getFileName(delimiter, filePath.c_str());
-	return fileName;
-}
+    FORCE_INLINE char const *getFileName(const char *filePath) {
+        char *fileName = const_cast<char *>(getFileNameWithExt(filePath));
+        size_t len = strlen(fileName);
+        for (int i = len - 1; i >= 0; --i) {
+            if (fileName[i] == '.') {
+                fileName[i] = 0;
+                return fileName;
+            }
+        }
+        return fileName;
+    }
 
-inline char* getDirName(const char* delimiter, const char* filePath)
-{
-	const size_t len = strlen(filePath);
-	char* dirName = new char[len + 1];
-	strcpy(dirName, filePath);
-	for (int i = len - 1; i >= 0; --i)
-	{
-		if (filePath[i] == delimiter[0])
-		{
-			dirName[i] = 0;
-			return dirName;
-		}
-	}
-	dirName[0] = 0;
-	return dirName;
-}
+    FORCE_INLINE string getFileName(const string &filePath) {
+        string fileName = getFileName(filePath.c_str());
+        return fileName;
+    }
 
-inline char* getDirName(const char* delimiter, char* filePath)
-{
-	const size_t len = strlen(filePath);
-	char* dirName = new char[len + 1];
-	strcpy(dirName, filePath);
-	for (int i = len - 1; i >= 0; --i)
-	{
-		if (filePath[i] == delimiter[0])
-		{
-			dirName[i] = 0;
-			return dirName;
-		}
-	}
-	dirName[0] = 0;
-	return dirName;
-}
+    FORCE_INLINE char const *getDirName(const char *filePath) {
+        const size_t len = strlen(filePath);
+        char *dirName = new char[len + 1];
+        strcpy(dirName, filePath);
+        for (int i = len - 1; i >= 0; --i) {
+            if (filePath[i] == DELIMITER) {
+                dirName[i] = 0;
+                return dirName;
+            }
+        }
+        dirName[0] = 0;
+        return dirName;
+    }
 
-inline void checkDir(const string& filename)
-{
-	size_t dir_idx = filename.find_last_of("\\");
-	if (dir_idx != string::npos)
-	{
-		//cout << "output dir = " << filename.substr(0, dir_idx) << endl;
-		string dir = filename.substr(0, dir_idx);
-		if (_access(dir.c_str(), 0) == -1)
-		{
-			string command = "mkdir " + dir;
-			system(command.c_str());
-		}
-	}
-}
+    FORCE_INLINE char const *getDirName(char *filePath) {
+        const size_t len = strlen(filePath);
+        char *dirName = new char[len + 1];
+        strcpy(dirName, filePath);
+        for (int i = len - 1; i >= 0; --i) {
+            if (filePath[i] == DELIMITER) {
+                dirName[i] = 0;
+                return dirName;
+            }
+        }
+        dirName[0] = 0;
+        return dirName;
+    }
+
+    FORCE_INLINE string getDirName(const string &filePath) {
+        string dirName = getDirName(filePath.c_str());
+        return dirName;
+    }
+
+    FORCE_INLINE void checkDir(const string &filename) {
+        size_t dir_idx = filename.find_last_of(DELIMITER);
+        if (dir_idx != string::npos) {
+            //cout << "output dir = " << filename.substr(0, dir_idx) << endl;
+            string dir = filename.substr(0, dir_idx);
+            if (_access(dir.c_str(), 0) == -1) {
+                string command = "mkdir " + dir;
+                int status = system(command.c_str());
+                if (status != 0) std::cerr << "Failed to create directory. Exit status: " << status << std::endl;
+            }
+        }
+    }
+
+}// namespace str_util
