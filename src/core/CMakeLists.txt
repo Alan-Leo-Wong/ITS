@@ -1,4 +1,4 @@
-###########################################
+﻿###########################################
 # common computation on GPU for other libs
 add_cuda_lib(ITS_GPU_COMPUTE STATIC)
 target_sources(ITS_GPU_COMPUTE
@@ -32,8 +32,8 @@ add_lib(ITS_MODEL STATIC)
 target_sources(ITS_MODEL
         PRIVATE
         BSpline.hpp
-        BaseModel.hpp
-        BaseModel.cpp
+        Mesh.hpp
+        Mesh.cpp
         ThinShells.hpp
         ThinShells.cpp
 )

@@ -1,4 +1,4 @@
-#include "LookTable.hpp"
+﻿#include "LookTable.hpp"
 #include "MarchingCubes.hpp"
 #include "utils/String.hpp"
 #include "core/BSpline.hpp"
@@ -106,7 +106,7 @@ NAMESPACE_BEGIN(ITS)
     //	{
     //		Vector3d width = d_nodeWidth[i];
     //		for (int j = 0; j < 8; ++j)
-    //			sum += d_lambda[i * 8 + j] * BaseFunction4Point(d_nodeCorners[i * 8 + j], width, Vector3d(pos.x, pos.y, pos.z));
+    //			sum += d_lambda[i * 8 + j] * bSplineForPoint(d_nodeCorners[i * 8 + j], width, Vector3d(pos.x, pos.y, pos.z));
     //	}
     //	return sum;
     //}
@@ -117,7 +117,7 @@ NAMESPACE_BEGIN(ITS)
         for (int i = 0; i < numNodeVerts; ++i) {
             double width = d_svoNodeArray[d_nodeVertexArray[i].second].width;
             sum += d_lambda[i] *
-                   core::BaseFunction4Point(d_nodeVertexArray[i].first, width, Vector3d(pos.x, pos.y, pos.z));
+                   core::bSplineForPoint(d_nodeVertexArray[i].first, width, Vector3d(pos.x, pos.y, pos.z));
         }
         return sum;
     }

@@ -473,11 +473,11 @@ NAMESPACE_BEGIN(ITS)
 
                     while (i < n) {
                         //printf("#2 sum = %lf\n", sum);
-                        sum += g_iB[i] * core::BaseFunction4Point(d_nodeVertexArray[i].first,
+                        sum += g_iB[i] * core::bSplineForPoint(d_nodeVertexArray[i].first,
                                                             d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
                         if (i + colBlockSize < n) {
                             sum += g_iB[i + colBlockSize] *
-                                   core::BaseFunction4Point(d_nodeVertexArray[i + colBlockSize].first,
+                                   core::bSplineForPoint(d_nodeVertexArray[i + colBlockSize].first,
                                                       d_nodeWidthArray[d_nodeVertexArray[i + colBlockSize].second],
                                                       g_iA[ty]); // (һ��)�߳̿鼶��Ŀ��
                             i += x_gridSize; // ���񼶱�Ŀ�ȣ�Ĭ�������С(block������)Ϊԭ������(xά�ȼ�����)��һ��(���nIsPow2��������x_gridSize����һ��)
@@ -487,7 +487,7 @@ NAMESPACE_BEGIN(ITS)
                     unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
                     while (i < n) {
                         //printf("#2 sum = %lf\n", sum);
-                        sum += g_iB[i] * core::BaseFunction4Point(d_nodeVertexArray[i].first,
+                        sum += g_iB[i] * core::bSplineForPoint(d_nodeVertexArray[i].first,
                                                             d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
                         i += x_gridSize;
                     }
@@ -557,11 +557,11 @@ NAMESPACE_BEGIN(ITS)
                     x_gridSize <<= 1;
 
                     while (i < n) {
-                        sum += g_iB[i] * core::BaseFunction4Point(d_nodeVertexArray[i].first,
+                        sum += g_iB[i] * core::bSplineForPoint(d_nodeVertexArray[i].first,
                                                             d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
                         if (i + colBlockSize < n) {
                             sum += g_iB[i + colBlockSize] *
-                                   core::BaseFunction4Point(d_nodeVertexArray[i + colBlockSize].first,
+                                   core::bSplineForPoint(d_nodeVertexArray[i + colBlockSize].first,
                                                       d_nodeWidthArray[d_nodeVertexArray[i + colBlockSize].second],
                                                       g_iA[ty]); // (һ��)�߳̿鼶��Ŀ��
                             i += x_gridSize; // ���񼶱�Ŀ�ȣ�Ĭ�������С(block������)Ϊԭ������(xά�ȼ�����)��һ��(���nIsPow2��������x_gridSize����һ��)
@@ -570,7 +570,7 @@ NAMESPACE_BEGIN(ITS)
                 } else {
                     unsigned int i = blockIdx.x * colBlockSize + threadIdx.x;
                     while (i < n) {
-                        sum += g_iB[i] * core::BaseFunction4Point(d_nodeVertexArray[i].first,
+                        sum += g_iB[i] * core::bSplineForPoint(d_nodeVertexArray[i].first,
                                                             d_nodeWidthArray[d_nodeVertexArray[i].second], g_iA[ty]);
                         i += x_gridSize;
                     }

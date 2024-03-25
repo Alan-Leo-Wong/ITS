@@ -4,8 +4,12 @@
 
 # General information
 cmake_minimum_required(VERSION 3.20)
-cmake_policy(SET CMP0104 NEW)
-cmake_policy(SET CMP0135 NEW)
+if (POLICY CMP0104)
+    cmake_policy(SET CMP0104 NEW)
+endif()
+if (POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
 
 ###########################################
 # Options

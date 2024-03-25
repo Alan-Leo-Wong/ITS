@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
 
     std::cout << "***************************************************\n";
     std::cout << "**                                               **\n";
-    std::cout << "**            Generate 3D Thin Shells            **\n";
+    std::cout << "**        Generate 3D Implicit Thin Shells       **\n";
     std::cout << "**                                               **\n";
     std::cout << "***************************************************\n";
 
@@ -170,8 +170,8 @@ int main(int argc, char **argv) {
     bool is2Cube = true, isAddNoise = false;
     double noisePercentage = 0.0025;
     //ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"Octocat.stl"), svo_res, svo_res, svo_res, is2Cube, 1.0, isAddNoise, noisePercentage); // to unit cube
-    ThinShells thinShell(concatFilePath(MODEL_DIR, "bunny.off"), svo_res, svo_res, svo_res, is2Cube,
-                         1.0); // to unit cube
+    ThinShells thinShell(concatFilePath(MODEL_DIR, "bunny.off"), svo_res); // to unit cube
+    thinShell.model2UnitCube();
     thinShell.creatShell();
     /*stopTimer(&timer);
     double time = getElapsedTime(&timer) * 1e-3;*/

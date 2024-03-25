@@ -1,12 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include "Config.hpp"
 #include "ModelDefine.h"
 #include "detail/BasicDataType.hpp"
 #include "detail/Geometry.hpp"
-#include <igl/AABB.h>
-
 #include <utility>
+#include <igl/AABB.h>
 
 NAMESPACE_BEGIN(ITS)
     namespace core {
@@ -15,19 +14,19 @@ NAMESPACE_BEGIN(ITS)
         /**
          * 3D Triangle Mesh
          */
-        class BaseModel {
+        class Mesh {
         public:
             std::string uniformDir = "non-uniform";
             std::string noiseDir = "non-noise";
 
         public:
-            BaseModel() noexcept = default;
+            Mesh() noexcept = default;
 
-            explicit BaseModel(const std::string &filename);
+            explicit Mesh(const std::string &filename);
 
-            BaseModel(MatrixXd verts, MatrixXi faces);
+            Mesh(MatrixXd verts, MatrixXi faces);
 
-            ~BaseModel() noexcept = default;
+            ~Mesh() noexcept = default;
 
         public:
             [[nodiscard]] std::vector<Vector3d> getModelVerts() const { return vertVec; }
@@ -106,14 +105,14 @@ NAMESPACE_BEGIN(ITS)
 
         public:
             /**
-             * [API]: Transform the model to the unit range: [0, 1]^3
+             * [API]: Transform the model to the unit range: scaleFactor * [0, 1]^3
              * it will call 'calcUnitCubeTransformMatrix'.
              * @param scaleFactor
              */
-            void model2UnitCube(double scaleFactor);
+            void model2UnitCube(double scaleFactor = 1.0);
 
             /**
-             * [API]: Recover the model position from the [0, 1]^3 range to its world coordinates.
+             * [API]: Recover the model position from the 'scaleFactor * [0, 1]^3' range to its world coordinates.
              */
             void unitCube2Model();
 

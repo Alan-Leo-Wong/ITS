@@ -1,4 +1,4 @@
-#include "BaseModel.hpp"
+﻿#include "BaseModel.hpp"
 #include "utils/IO.hpp"
 #include "utils/Common.hpp"
 #include "utils/String.hpp"
@@ -17,12 +17,12 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //   Constructors   //
         //////////////////////
-        BaseModel::BaseModel(const std::string &filename) {
+        Mesh::Mesh(const std::string &filename) {
             readMesh(filename);
             updateInternalData();
         }
 
-        BaseModel::BaseModel(MatrixXd verts, MatrixXi faces) : vertMat(std::move(verts)),
+        Mesh::Mesh(MatrixXd verts, MatrixXi faces) : vertMat(std::move(verts)),
                                                                faceMat(std::move(faces)) {
             updateInternalData();
         }
@@ -30,7 +30,7 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //   Internal data  //
         //////////////////////
-        void BaseModel::setModelBaseAttributes() {
+        void Mesh::setModelBaseAttributes() {
             nModelVerts = vertMat.rows();
             nModelTris = faceMat.rows();
 
@@ -59,18 +59,18 @@ NAMESPACE_BEGIN(ITS)
             aabbTree.init(vertMat, faceMat);
         }
 
-        void BaseModel::setTriAttributes() {
+        void Mesh::setTriAttributes() {
             cuAcc::launch_modelTriAttributeKernel(nModelTris, trisVec);
         }
 
-        void BaseModel::setBoundingBox() {
+        void Mesh::setBoundingBox() {
             Vector3d minV = vertMat.colwise().minCoeff();
             Vector3d maxV = vertMat.colwise().maxCoeff();
 
             modelBoundingBox = AABox<Vector3d>(minV, maxV);
         }
 
-        void BaseModel::setUniformBoundingBox() {
+        void Mesh::setUniformBoundingBox() {
             Vector3d minV = vertMat.colwise().minCoeff();
             Vector3d maxV = vertMat.colwise().maxCoeff();
 
@@ -100,7 +100,7 @@ NAMESPACE_BEGIN(ITS)
             modelBoundingBox.boxWidth = modelBoundingBox.boxEnd - modelBoundingBox.boxOrigin;
         }
 
-        void BaseModel::updateInternalData() {
+        void Mesh::updateInternalData() {
             setModelBaseAttributes();
             setTriAttributes();
             setUniformBoundingBox();
@@ -109,7 +109,7 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //     Utilities    //
         //////////////////////
-        void BaseModel::addNoise(double noisePercentage, double min_val, double max_val) {
+        void Mesh::addNoise(double noisePercentage, double min_val, double max_val) {
             noiseDir = (std::string) "noise_" + std::to_string(noisePercentage * 100.0);
 
             // set the number of vertices to be disturbed
@@ -129,7 +129,7 @@ NAMESPACE_BEGIN(ITS)
             updateInternalData();
         }
 
-        std::vector<Vector2i> BaseModel::extractEdges() {
+        std::vector<Vector2i> Mesh::extractEdges() {
             std::cout << "Extracting edges from " << std::quoted(modelName) << std::endl;
 
             std::vector<Vector2i> edges;
@@ -154,7 +154,7 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //   Transformers   //
         //////////////////////
-        Matrix3d BaseModel::calcScaleMatrix(double scaleFactor) {
+        Matrix3d Mesh::calcScaleMatrix(double scaleFactor) {
             RowVector3d boxMin = vertMat.colwise().minCoeff();
             RowVector3d boxMax = vertMat.colwise().maxCoeff();
 
@@ -167,7 +167,7 @@ NAMESPACE_BEGIN(ITS)
             return zoomMatrix;
         }
 
-        Matrix4d BaseModel::calcUnitCubeTransformMatrix(double scaleFactor) {
+        Matrix4d Mesh::calcUnitCubeTransformMatrix(double scaleFactor) {
             RowVector3d boxMin = vertMat.colwise().minCoeff();
             RowVector3d boxMax = vertMat.colwise().maxCoeff();
 
@@ -193,7 +193,7 @@ NAMESPACE_BEGIN(ITS)
             return zoomMatrix * transMatrix;
         }
 
-        Matrix4d BaseModel::calcTransformMatrix(double scaleFactor) {
+        Matrix4d Mesh::calcTransformMatrix(double scaleFactor) {
             RowVector3d boxMin = vertMat.colwise().minCoeff();
             RowVector3d boxMax = vertMat.colwise().maxCoeff();
 
@@ -215,7 +215,7 @@ NAMESPACE_BEGIN(ITS)
             return zoomMatrix * transMatrix;
         }
 
-        void BaseModel::model2UnitCube(double scaleFactor) {
+        void Mesh::model2UnitCube(double scaleFactor) {
             uniformDir = "uniform";
             unitScaleFactor = scaleFactor;
 
@@ -229,7 +229,7 @@ NAMESPACE_BEGIN(ITS)
             updateInternalData();
         }
 
-        void BaseModel::unitCube2Model() {
+        void Mesh::unitCube2Model() {
             uniformDir = "non-uniform";
 
             auto transMat = calcUnitCubeTransformMatrix(unitScaleFactor);
@@ -243,14 +243,14 @@ NAMESPACE_BEGIN(ITS)
             updateInternalData();
         }
 
-        void BaseModel::zoomModel(double scaleFactor) {
+        void Mesh::zoomModel(double scaleFactor) {
             Matrix3d zoomMat = calcScaleMatrix(scaleFactor);
             vertMat = vertMat * zoomMat;
 
             updateInternalData();
         }
 
-        void BaseModel::transformModel(double scaleFactor) {
+        void Mesh::transformModel(double scaleFactor) {
             Matrix4d transMat = calcTransformMatrix(scaleFactor);
 #pragma omp parallel for
             for (int i = 0; i < vertMat.rows(); ++i) {
@@ -261,7 +261,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         Eigen::MatrixXd
-        BaseModel::generateGaussianRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis) {
+        Mesh::generateGaussianRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis) {
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
             const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
@@ -270,7 +270,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         Eigen::MatrixXd
-        BaseModel::generateUniformRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis) {
+        Mesh::generateUniformRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis) {
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
             const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
@@ -278,7 +278,7 @@ NAMESPACE_BEGIN(ITS)
             return M;
         }
 
-        Eigen::MatrixXd BaseModel::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
+        Eigen::MatrixXd Mesh::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
                                                                 const float &_scaleFactor, const float &dis) {
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
@@ -302,7 +302,7 @@ NAMESPACE_BEGIN(ITS)
             return M;
         }
 
-        Eigen::MatrixXd BaseModel::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
+        Eigen::MatrixXd Mesh::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
                                                                const float &_scaleFactor, const float &dis) {
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
@@ -327,7 +327,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         std::vector<Vector3d>
-        BaseModel::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
+        Mesh::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
                                                const double &_scaleFactor, const Vector3d &dis) {
             std::vector<Vector3d> randomPoints;
             donut::getUniformRandomMatrix<Vector3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
@@ -350,7 +350,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         std::vector<Vector3d>
-        BaseModel::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
+        Mesh::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
                                                 const double &_scaleFactor, const Vector3d &dis) {
             std::vector<Vector3d> randomPoints;
             donut::getGaussianRandomMatrix<Vector3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
@@ -372,7 +372,7 @@ NAMESPACE_BEGIN(ITS)
             return randomPoints;
         }
 
-        MatrixXd BaseModel::getClosestPoint(const MatrixXd &queryPointMat) const {
+        MatrixXd Mesh::getClosestPoint(const MatrixXd &queryPointMat) const {
             Eigen::VectorXd sqrD;
             Eigen::VectorXi I;
             Eigen::MatrixXd C;
@@ -384,7 +384,7 @@ NAMESPACE_BEGIN(ITS)
             return C;
         }
 
-        MatrixXd BaseModel::getSurfacePointNormal(const MatrixXd &queryPointMat) {
+        MatrixXd Mesh::getSurfacePointNormal(const MatrixXd &queryPointMat) {
             const size_t numPoint = queryPointMat.rows();
 
             Eigen::VectorXd sqrD;
@@ -404,7 +404,7 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //       I / O      //
         //////////////////////
-        void BaseModel::readMesh(const std::string &filename) {
+        void Mesh::readMesh(const std::string &filename) {
             if (!igl::read_triangle_mesh(filename, vertMat, faceMat)) {
                 fprintf(stderr, "[I/O] Error: File %s could not open!", filename.c_str());
                 exit(EXIT_FAILURE);
@@ -412,7 +412,7 @@ NAMESPACE_BEGIN(ITS)
             modelName = str_util::getFileName(filename);
         }
 
-        void BaseModel::writeMesh(const std::string &filename) const {
+        void Mesh::writeMesh(const std::string &filename) const {
             if (str_util::getFileExtension(filename) != ".obj") {
                 std::cerr << "Unsupported file format!\n";
                 return;
@@ -420,7 +420,7 @@ NAMESPACE_BEGIN(ITS)
             igl::writeOBJ(filename, vertMat, faceMat);
         }
 
-        void BaseModel::writeTexturedObjFile(const std::string &filename, const std::vector<PDD> &uvs) const {
+        void Mesh::writeTexturedObjFile(const std::string &filename, const std::vector<PDD> &uvs) const {
             std::ofstream out(filename);
             out << "# Vertices: " << vertVec.size() << "\tFaces: " << faceVec.size() << std::endl;
             out << "mtllib defaultmaterial.mtl" << std::endl;
@@ -439,7 +439,7 @@ NAMESPACE_BEGIN(ITS)
             out.close();
         }
 
-        void BaseModel::writeTexturedObjFile(const std::string &filename, const VectorXd &uvs) const {
+        void Mesh::writeTexturedObjFile(const std::string &filename, const VectorXd &uvs) const {
             std::ofstream out(filename);
             out << "# Vertices: " << vertVec.size() << "\tFaces: " << faceVec.size() << std::endl;
             /*out << "mtllib defaultmaterial.mtl" << std::endl;

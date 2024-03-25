@@ -1,8 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include "SVO.hpp"
-#include "BaseModel.hpp"
-//#include "ParticleMesh.h"
+#include "Mesh.hpp"
 #include "utils/String.hpp"
 #include "test/TestConfig.h"
 
@@ -14,72 +13,24 @@ NAMESPACE_BEGIN(ITS)
         using std::string;
         using std::vector;
 
-        class ThinShells : public BaseModel {
+        class ThinShells : public Mesh {
             using test_type = Test::type;
-        private:
-            Vector3d modelOrigin;
-
-            Vector3i svo_gridSize;
-            SparseVoxelOctree svo;
-            double voxelWidth;
-            std::vector<Vector3d> nodeWidthArray;
-            //vector<Vector3d> nodeWidthArray;
-            std::map<uint32_t, uint32_t> morton2FineNodeIdx;
-
-            std::vector<Vector3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
-            std::vector<Vector3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
-            std::vector<Vector3d> allInterPoints;  // All intersection points of octree node and mesh
-
-        private:
-            VectorXd sdfVal;
-            VectorXd lambda;
-            VectorXd bSplineVal;
-
-        private:
-            double innerShellIsoVal = -DINF;
-            double outerShellIsoVal = -DINF;
-
         public:
-            int treeDepth;
-
-        public:
-            // constructor and destructor
             ThinShells() = default;
 
-            ThinShells(const string &filename, int _grid) : BaseModel(filename),
-                                                            svo_gridSize(_grid, _grid, _grid),
-                                                            modelOrigin(modelBoundingBox.boxOrigin),
-                                                            svo(_grid, _grid, _grid) {
-                svo.createOctree(nModelTris, trisVec, modelBoundingBox, concatFilePath(VIS_DIR, modelName));
-                treeDepth = svo.treeDepth;
-                voxelWidth = svo.svoNodeArray[0].width;
-#ifdef IO_SAVE
-                saveTree("");
-#endif // !IO_SAVE
-            }
+            ThinShells(const string& filename, int _grid);
 
-            ThinShells(const string &filename, const Vector3i &_grid) : BaseModel(filename),
-                                                                        svo_gridSize(_grid),
-                                                                        modelOrigin(modelBoundingBox.boxOrigin),
-                                                                        svo(_grid) {
-                svo.createOctree(nModelTris, trisVec, modelBoundingBox, concatFilePath(VIS_DIR, modelName));
-                treeDepth = svo.treeDepth;
-                voxelWidth = svo.svoNodeArray[0].width;
-#ifdef IO_SAVE
-                saveTree("");
-#endif // !IO_SAVE
-            }
+            ThinShells(const string& filename, const Vector3i& _grid);
 
             ~ThinShells() noexcept = default;
 
         private:
             [[nodiscard]] Vector3i
-            getPointDis(const Vector3d &modelVert, const Vector3d &origin, const Vector3d &width) const;
+            getPointOffset(const Vector3d &modelVert, const Vector3d &origin, const Vector3d &width) const;
 
             [[nodiscard]] Vector3i
-            getPointDis(const Vector3d &modelVert, const Vector3d &origin, const double &width) const;
+            getPointOffset(const Vector3d &modelVert, const Vector3d &origin, const double &width) const;
 
-            //void cpIntersectionPoints();
             void cpIntersectionPoints();
 
             void cpSDFOfTreeNodes();
@@ -87,8 +38,6 @@ NAMESPACE_BEGIN(ITS)
             void cpCoefficients();
 
             void cpLatentBSplineValue();
-
-            void initBSplineTree();
 
         public:
             void creatShell();
@@ -133,7 +82,6 @@ NAMESPACE_BEGIN(ITS)
             VectorXd getPointBSplineVal(const MatrixXd &queryPointMat);
 
         public:
-            // ���ڱ���Ĳ�ѯ
             void singlePointQuery(const string &out_file, const Vector3d &point);
 
             std::vector<int>
@@ -143,6 +91,32 @@ NAMESPACE_BEGIN(ITS)
             void multiPointQuery(const string &out_file, const std::vector<Vector3d> &points);
 
             void multiPointQuery(const string &out_file, const MatrixXd &points);
+
+        private:
+            Vector3d modelOrigin;
+
+            Vector3i svo_gridSize;
+            SparseVoxelOctree svo;
+            double voxelWidth;
+            std::vector<Vector3d> nodeWidthArray;
+            //vector<Vector3d> nodeWidthArray;
+            std::map<uint32_t, uint32_t> morton2FineNodeIdx;
+
+            std::vector<Vector3d> edgeInterPoints; // Intersection points of octree node and mesh's edges
+            std::vector<Vector3d> faceInterPoints; // Intersection points of octree node's edges and mesh's faces
+            std::vector<Vector3d> allInterPoints;  // All intersection points of octree node and mesh
+
+        private:
+            VectorXd sdfVal;
+            VectorXd lambda;
+            VectorXd bSplineVal;
+
+        private:
+            double innerShellIsoVal = -DINF;
+            double outerShellIsoVal = DINF;
+
+        public:
+            int treeDepth;
         };
 
     }
