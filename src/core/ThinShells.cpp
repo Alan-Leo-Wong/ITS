@@ -3,7 +3,7 @@
 #include "MortonLUT.hpp"
 #include "CUDACompute.hpp"
 #include "detail/cuda/CUDAMath.cuh"
-#include "utils/IO.hpp"
+#include "detail/Geometry.hpp"
 #include "utils/Timer.hpp"
 #include "utils/Common.hpp"
 #include "utils/String.hpp"

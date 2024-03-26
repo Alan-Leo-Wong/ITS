@@ -3,7 +3,6 @@
 #include "detail/Geometry.hpp"
 #include "detail/cuda/CUDAMath.cuh"
 #include "detail/cuda/CUDACheck.cuh"
-#include "utils/IO.hpp"
 #include "utils/Timer.hpp"
 #include "utils/cuda/CUDAUtil.cuh"
 #include "utils/String.hpp"

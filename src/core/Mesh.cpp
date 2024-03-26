@@ -1,5 +1,5 @@
 ﻿#include "Mesh.hpp"
-#include "utils/IO.hpp"
+#include "detail/Geometry.hpp"
 #include "utils/Common.hpp"
 #include "utils/String.hpp"
 #include "CUDACompute.hpp"
