@@ -356,6 +356,7 @@ NAMESPACE_BEGIN(ITS)
     }
 
     namespace svo {
+        using namespace utils;
         using namespace utils::cuda;
 
         namespace detail{
