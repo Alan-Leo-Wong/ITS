@@ -1,4 +1,4 @@
-﻿#include "BaseModel.hpp"
+﻿#include "Mesh.hpp"
 #include "utils/IO.hpp"
 #include "utils/Common.hpp"
 #include "utils/String.hpp"
@@ -17,13 +17,13 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //   Constructors   //
         //////////////////////
-        Mesh::Mesh(const std::string &filename) {
+        Mesh::Mesh(const std::string &filename, bool lazyTag) {
             readMesh(filename);
-            updateInternalData();
+            if (!lazyTag) updateInternalData();
         }
 
         Mesh::Mesh(MatrixXd verts, MatrixXi faces) : vertMat(std::move(verts)),
-                                                               faceMat(std::move(faces)) {
+                                                     faceMat(std::move(faces)) {
             updateInternalData();
         }
 
@@ -279,7 +279,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         Eigen::MatrixXd Mesh::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                                                const float &_scaleFactor, const float &dis) {
+                                                           const float &_scaleFactor, const float &dis) {
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
             const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
@@ -303,7 +303,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         Eigen::MatrixXd Mesh::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
-                                                               const float &_scaleFactor, const float &dis) {
+                                                          const float &_scaleFactor, const float &dis) {
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
             const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
@@ -328,7 +328,7 @@ NAMESPACE_BEGIN(ITS)
 
         std::vector<Vector3d>
         Mesh::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
-                                               const double &_scaleFactor, const Vector3d &dis) {
+                                          const double &_scaleFactor, const Vector3d &dis) {
             std::vector<Vector3d> randomPoints;
             donut::getUniformRandomMatrix<Vector3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
 
@@ -351,7 +351,7 @@ NAMESPACE_BEGIN(ITS)
 
         std::vector<Vector3d>
         Mesh::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                                const double &_scaleFactor, const Vector3d &dis) {
+                                           const double &_scaleFactor, const Vector3d &dis) {
             std::vector<Vector3d> randomPoints;
             donut::getGaussianRandomMatrix<Vector3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
 

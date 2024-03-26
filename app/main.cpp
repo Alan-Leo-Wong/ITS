@@ -11,7 +11,8 @@
 #include "utils/Timer.hpp"
 #include "utils/String.hpp"
 #include "utils/Common.hpp"
-#include "utils/CMDParser.hpp"
+#include <spdlog/spdlog.h>
+#include <CLI/CLI.hpp>
 #include <igl/signed_distance.h>
 
 using namespace ITS::core;
@@ -20,31 +21,6 @@ using namespace str_util;
 
 namespace test_time {
     double test_allTime = .0;
-}
-
-std::tuple<UINT, UINT, const char *, const char *> execArgParser(int argc, char **argv) {
-    CmdLineParameter<UINT> _dep_1("d1"); // max depth of the first model's octree
-    CmdLineParameter<UINT> _dep_2("d2"); // max depth of the second model's octree
-    CmdLineParameter<char *> _mp_1("mp1"); // path of the first model
-    CmdLineParameter<char *> _mp_2("mp2"); // path of the second model
-    ParserInterface *needParams[] = {
-            &_dep_1, &_dep_2, &_mp_1, &_mp_2};
-    if (argc > 1) cmdLineParse(argc - 1, &argv[1], needParams);
-
-    const unsigned int dep_1 = _dep_1.set ? _dep_1.value : 8;
-    const unsigned int dep_2 = _dep_2.set ? _dep_2.value : 8;
-    const char *mp_1 = _mp_1.set ? _mp_1.value : "";
-    const char *mp_2 = _mp_2.set ? _mp_2.value : "";
-
-    if (mp_1 == "" && mp_2 == "") {
-        fprintf(stderr, "Please input the path of model! Example: --mp1 \"path\"\n");
-        exit(EMPTY_ARG);
-    }
-
-    printf("--Octree's max depth built for the FIRST model: %u\n", dep_1);
-    printf("--Octree's max depth built for the SECOND model: %u\n", dep_2);
-
-    return std::make_tuple(dep_1, dep_2, mp_1, mp_2);
 }
 
 void testPointInOut(ThinShells &thinShell, const size_t &numPoints, const string &queryFile, const string &queryResFile,
@@ -136,71 +112,91 @@ void testPointInOut(ThinShells &thinShell, const size_t &numPoints, const string
 }
 
 int main(int argc, char **argv) {
-    //auto [dep_1, dep_2, mp_1, mp_2] = execArgParser(argc, argv);
-
-    /*int s1, s2;
-    cout << "resolution of the first model is: ";
-    std::cin >> s1;
-    cout << "resolution of the second model is: ";
-    std::cin >> s2;
-
-    string modelName1 = "bunny";
-    string modelName2 = "newbunny";
-
-    CollisionDetection d;
-    d.ExtractIntersectLines(s1, s2, modelName1, modelName2, ".off", ".obj");*/
-
     std::cout << "***************************************************\n";
     std::cout << "**                                               **\n";
     std::cout << "**        Generate 3D Implicit Thin Shells       **\n";
     std::cout << "**                                               **\n";
     std::cout << "***************************************************\n";
 
-    string modelName = getFileName("bunny.off");
-    //const double alpha = 1000;
-    std::cout << "-- Model: " << modelName << std::endl;
-    //cout << "-- alpha: " << alpha << endl;
+    ////////////////////////////////////////////////////////
+
+    struct {
+        std::string meshFile;
+        bool meshNorm = false;
+        bool addNoise = false;
+        double noisePercentage;
+
+        int svoRes;
+
+        bool mcVis = false;
+        int mcRes;
+        std::string mcOutDir;
+    } args;
+    CLI::App app{"3D Implicit Thin Shells"};
+
+    app.add_option("-f,--in_file", args.meshFile, "Input mesh file")->required();
+    app.add_flag("-U,--mesh_norm", args.meshNorm, "Normalize the input mesh");
+    app.add_flag("-N,--mesh_noise", args.addNoise, "Add noise on the mesh");
+    app.add_option("-P,--mesh_noise_per", args.addNoise, "Noise percentage for adding noise on the mesh");
+
+    app.add_option("-r,--svo_res", args.svoRes, "Resolution of sparse voxel octree")->required();
+
+    app.add_flag("-M,--mc", args.mcVis, "Perform marching-cubes visualization");
+    app.add_option("-R,--mc_res", args.mcRes, "Resolution of marching-cubes");
+    app.add_option("-O,--mc_dir", args.mcOutDir, "Output directory of the shells via marching cubes");
+
+    try {
+        app.parse(argc, argv);
+    }
+    catch (const CLI::ParseError &e) {
+        return app.exit(e);
+    }
+
+    ////////////////////////////////////////////////////////
+
+    spdlog::set_level(spdlog::level::info);
+
+    string modelName = getFileName(args.meshFile);
+    spdlog::info("-- Model: {}", modelName);;
 
     TimerInterface *timer = nullptr;
     createTimer(&timer);
 
-    int svo_res = 256;
-    //ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"dan-m-crowdproject.stl"), svo_res, svo_res, svo_res);
+    bool lazyTag = (args.meshNorm || args.addNoise);
+    ThinShells thinShell(args.meshFile, args.svoRes, lazyTag); // to unit cube
+    if (args.meshNorm) thinShell.model2UnitCube();
+    if (args.meshNorm) thinShell.addNoise(args.noisePercentage);
 
-    bool is2Cube = true, isAddNoise = false;
-    double noisePercentage = 0.0025;
-    //ThinShells thinShell(concatFilePath((string)MODEL_DIR, (string)"Octocat.stl"), svo_res, svo_res, svo_res, is2Cube, 1.0, isAddNoise, noisePercentage); // to unit cube
-    ThinShells thinShell(concatFilePath(MODEL_DIR, "bunny.off"), svo_res); // to unit cube
-    thinShell.model2UnitCube();
     thinShell.creatShell();
-    /*stopTimer(&timer);
-    double time = getElapsedTime(&timer) * 1e-3;*/
-    //printf("\nCreate shells spent %lf s.\n", time);
-    printf("\nCreate shells spent %.4lf s.\n", test_time::test_allTime);
+    spdlog::info("-- Create shells spent {} s.", test_time::test_allTime);
 
-    const int treeDepth = thinShell.treeDepth;
-    const std::string uniformDir = thinShell.uniformDir;
+    int treeDepth = thinShell.treeDepth;
+    std::string uniformDir = thinShell.uniformDir;
 
-    startTimer(&timer);
+    /*startTimer(&timer);
     thinShell.textureVisualization(
             concatFilePath(VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), "txt_shell.obj"));
     stopTimer(&timer);
     double time = getElapsedTime(&timer) * 1e-3;
-    printf("\nTexture Visualization spent %lf s.\n", time);
+    printf("\nTexture Visualization spent %lf s.\n", time);*/
 
-    const int res = 400;
-    const string innerShellFile = concatFilePath(VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), "mc_innerShell.obj");
-    const string outerShellFile = concatFilePath(VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), "mc_outerShell.obj");
-    const string isosurfaceFile = concatFilePath(VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), "mc_isosurface.obj");
-    startTimer(&timer);
-    thinShell.mcVisualization(
-        innerShellFile, Vector3i(res, res, res),
-        outerShellFile, Vector3i(res, res, res),
-        isosurfaceFile, Vector3i(res, res, res)
-    );
-    stopTimer(&timer);
-    time = getElapsedTime(&timer) * 1e-3;
-    printf("\nMarchingCubes spent %lf s.\n", time);
+    if (args.mcVis) {
+        string innerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir, std::to_string(treeDepth),
+                                               "mc_innerShell.obj");
+        string outerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir, std::to_string(treeDepth),
+                                               "mc_outerShell.obj");
+        string isosurfaceFile = concatFilePath(args.mcOutDir, modelName, uniformDir, std::to_string(treeDepth),
+                                               "mc_isosurface.obj");
+        startTimer(&timer);
+        thinShell.mcVisualization(
+                innerShellFile, Vector3i(args.mcRes, args.mcRes, args.mcRes),
+                outerShellFile, Vector3i(args.mcRes, args.mcRes, args.mcRes),
+                isosurfaceFile, Vector3i(args.mcRes, args.mcRes, args.mcRes)
+        );
+        stopTimer(&timer);
+        double time = getElapsedTime(&timer) * 1e-3;
+        spdlog::info("-- MarchingCubes spent {} s.", time);
+    }
 
     /*const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");
     const string queryResFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point_result.xyz");

@@ -25,10 +25,10 @@ NAMESPACE_BEGIN(ITS)
                                                                                boxWidth(_boxEnd - _boxOrigin) {}
 
         CUDA_GENERAL_CALL void scaleAndTranslate(const double &scale_factor, const V3d &translation) {
-            const Real center = (boxOrigin + boxEnd) / 2.0;
+            Real center = (boxOrigin + boxEnd) / 2.0;
 
-            const Real scaled_min_point = (boxOrigin - center) * scale_factor + center + translation;
-            const Real scaled_max_point = (boxEnd - center) * scale_factor + center + translation;
+            Real scaled_min_point = (boxOrigin - center) * scale_factor + center + translation;
+            Real scaled_max_point = (boxEnd - center) * scale_factor + center + translation;
 
             boxOrigin = scaled_min_point;
             boxEnd = scaled_max_point;
@@ -56,7 +56,7 @@ NAMESPACE_BEGIN(ITS)
         double area;
         double dir;
 
-        CUDA_GENERAL_CALL Triangle() {}
+        CUDA_GENERAL_CALL Triangle() = default;
 
         CUDA_GENERAL_CALL Triangle(const Real &_p1, const Real &_p2, const Real &_p3) : p1(_p1), p2(_p2), p3(_p3) {}
     };

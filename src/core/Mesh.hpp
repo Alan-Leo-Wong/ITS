@@ -22,7 +22,7 @@ NAMESPACE_BEGIN(ITS)
         public:
             Mesh() noexcept = default;
 
-            explicit Mesh(const std::string &filename);
+            explicit Mesh(const std::string &filename, bool lazyTag = false);
 
             Mesh(MatrixXd verts, MatrixXi faces);
 

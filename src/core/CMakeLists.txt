@@ -8,8 +8,10 @@ target_sources(ITS_GPU_COMPUTE
 )
 target_link_libraries(ITS_GPU_COMPUTE
         PUBLIC
-        CUDA::cublas
+#        ITS::CONFIG
+        spdlog::spdlog
         Eigen3::Eigen
+        CUDA::cublas
 )
 
 ###########################################

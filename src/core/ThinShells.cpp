@@ -22,22 +22,24 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //   Constructors   //
         //////////////////////
-        ThinShells::ThinShells(const string& filename, int _grid) : Mesh(filename),
-            svo_gridSize(_grid, _grid, _grid),
-            modelOrigin(modelBoundingBox.boxOrigin),
-            svo(_grid, _grid, _grid) {
+        ThinShells::ThinShells(const string &filename, int _grid, bool lazyTag) : Mesh(filename, lazyTag),
+                                                                                  svo_gridSize(_grid, _grid, _grid),
+                                                                                  modelOrigin(
+                                                                                          modelBoundingBox.boxOrigin),
+                                                                                  svo(_grid, _grid, _grid) {
             svo.createOctree(nModelTris, trisVec, modelBoundingBox, concatFilePath(VIS_DIR, modelName));
             treeDepth = svo.treeDepth;
             voxelWidth = svo.svoNodeArray[0].width;
-    #ifdef IO_SAVE
+#ifdef IO_SAVE
             saveTree("");
-    #endif // !IO_SAVE
+#endif // !IO_SAVE
         }
 
-        ThinShells::ThinShells(const string& filename, const Vector3i& _grid) : Mesh(filename),
-            svo_gridSize(_grid),
-            modelOrigin(modelBoundingBox.boxOrigin),
-            svo(_grid) {
+        ThinShells::ThinShells(const string &filename, const Vector3i &_grid, bool lazyTag) : Mesh(filename, lazyTag),
+                                                                                              svo_gridSize(_grid),
+                                                                                              modelOrigin(
+                                                                                                      modelBoundingBox.boxOrigin),
+                                                                                              svo(_grid) {
             svo.createOctree(nModelTris, trisVec, modelBoundingBox, concatFilePath(VIS_DIR, modelName));
             treeDepth = svo.treeDepth;
             voxelWidth = svo.svoNodeArray[0].width;
@@ -58,9 +60,10 @@ NAMESPACE_BEGIN(ITS)
         }
 
         void ThinShells::cpIntersectionPoints() {
-            auto parallelAxis = [&](const Vector3d& p1, const Vector3d& p2)->int {
+            auto parallelAxis = [&](const Vector3d &p1, const Vector3d &p2) -> int {
                 if (fabs(p1.y() - p2.y()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9) return 1; // parallel to the x-axis
-                else if (fabs(p1.x() - p2.x()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9) return 2; // parallel to the y-axis
+                else if (fabs(p1.x() - p2.x()) < 1e-9 && fabs(p1.z() - p2.z()) < 1e-9)
+                    return 2; // parallel to the y-axis
                 else return 3; // parallel to the z-axis
             };
 
@@ -173,7 +176,8 @@ NAMESPACE_BEGIN(ITS)
             double time = getElapsedTime(&timer) * 1e-3;
             test_time::test_allTime += time;
 
-            std::cout << "-- The number of intersections between mesh EDGES and nodes is " << edgeInterPoints.size() << std::endl;
+            std::cout << "-- The number of intersections between mesh EDGES and nodes is " << edgeInterPoints.size()
+                      << std::endl;
 
             std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << std::endl;
             resetTimer(&timer);
@@ -195,12 +199,16 @@ NAMESPACE_BEGIN(ITS)
             // x-y-z
             struct x_sortEdge {
                 bool operator()(node_edge_type &a, node_edge_type &b) {
-                    if (fabs(a.first.second.x() - b.first.second.x()) < 1e-9) // if the x-coordinates are equal(the order of the remaining two axes does not matter).
+                    if (fabs(a.first.second.x() - b.first.second.x()) <
+                        1e-9) // if the x-coordinates are equal(the order of the remaining two axes does not matter).
                     {
-                        if (fabs(a.first.second.y() - b.first.second.y()) < 1e-9)  // if both the x and y coordinates are equal
-                            return a.first.second.z() < b.first.second.z(); // return the one with the smaller z-coordinate.
+                        if (fabs(a.first.second.y() - b.first.second.y()) <
+                            1e-9)  // if both the x and y coordinates are equal
+                            return a.first.second.z() <
+                                   b.first.second.z(); // return the one with the smaller z-coordinate.
                         else
-                            return a.first.second.y() < b.first.second.y(); // return the one with the smaller y-coordinate.
+                            return a.first.second.y() <
+                                   b.first.second.y(); // return the one with the smaller y-coordinate.
                     } else return a.first.second.x() < b.first.second.x();
                 }
             };
@@ -208,8 +216,7 @@ NAMESPACE_BEGIN(ITS)
             // y-x-z
             struct y_sortEdge {
                 bool operator()(node_edge_type &a, node_edge_type &b) {
-                    if (fabs(a.first.second.y() - b.first.second.y()) < 1e-9)
-                    {
+                    if (fabs(a.first.second.y() - b.first.second.y()) < 1e-9) {
                         if (fabs(a.first.second.x() - b.first.second.x()) < 1e-9)
                             return a.first.second.z() < b.first.second.z();
                         else
@@ -221,8 +228,7 @@ NAMESPACE_BEGIN(ITS)
             // z-x-y
             struct z_sortEdge {
                 bool operator()(node_edge_type &a, node_edge_type &b) {
-                    if (fabs(a.first.second.z() - b.first.second.z()) < 1e-9)
-                    {
+                    if (fabs(a.first.second.z() - b.first.second.z()) < 1e-9) {
                         if (fabs(a.first.second.x() - b.first.second.x()) < 1e-9)
                             return a.first.second.y() < b.first.second.y();
                         else
@@ -403,7 +409,8 @@ NAMESPACE_BEGIN(ITS)
             time = getElapsedTime(&timer) * 1e-3;
             test_time::test_allTime += time;
 
-            std::cout << "-- The number of intersections between mesh FACES and node EDGES is " << faceInterPoints.size() << std::endl;
+            std::cout << "-- The number of intersections between mesh FACES and node EDGES is "
+                      << faceInterPoints.size() << std::endl;
             std::cout << "-- The number of all intersections is " << allInterPoints.size() << std::endl;
 
             deleteTimer(&timer);
@@ -418,12 +425,12 @@ NAMESPACE_BEGIN(ITS)
             createTimer(&timer);
             startTimer(&timer);
 
-            const auto &depthNodeVertexArray = svo.depthNodeVertexArray;
-            const auto &esumDepthNodeVerts = svo.esumDepthNodeVerts;
-            const size_t &numNodeVerts = svo.numNodeVerts;
+            auto depthNodeVertexArray = svo.depthNodeVertexArray;
+            auto esumDepthNodeVerts = svo.esumDepthNodeVerts;
+            size_t numNodeVerts = svo.numNodeVerts;
             MatrixXd pointsMat(numNodeVerts, 3);
             for (int d = 0; d < treeDepth; ++d) {
-                const size_t &d_numNodeVerts = depthNodeVertexArray[d].size();
+                size_t d_numNodeVerts = depthNodeVertexArray[d].size();
                 for (int i = 0; i < d_numNodeVerts; ++i)
                     pointsMat.row(esumDepthNodeVerts[d] + i) = depthNodeVertexArray[d][i].first;
             }
@@ -447,7 +454,7 @@ NAMESPACE_BEGIN(ITS)
             using SpMat = Eigen::SparseMatrix<double>;
             using Trip = Eigen::Triplet<double>;
 
-            const auto &nodeArray = svo.svoNodeArray;
+            auto nodeArray = svo.svoNodeArray;
             vector<vector<node_vertex_type>> depthNodeVertexArray = svo.depthNodeVertexArray;
             vector<size_t> esumDepthNodeVerts = svo.esumDepthNodeVerts;
             depthVert2Idx.resize(treeDepth);
@@ -463,7 +470,7 @@ NAMESPACE_BEGIN(ITS)
                 vector<size_t> d_nodeVertexIdx(d_numNodeVerts);
                 std::iota(d_nodeVertexIdx.begin(), d_nodeVertexIdx.end(), 0);
 
-                const size_t &d_esumNodeVerts = esumDepthNodeVerts[d]; // exclusive scan of vertex counts.
+                size_t d_esumNodeVerts = esumDepthNodeVerts[d]; // exclusive scan of vertex counts.
                 std::transform(depthNodeVertexArray[d].begin(), depthNodeVertexArray[d].end(),
                                d_nodeVertexIdx.begin(), std::inserter(depthVert2Idx[d], depthVert2Idx[d].end()),
                                [d_esumNodeVerts](const node_vertex_type &val, const size_t &idx) {
@@ -502,7 +509,7 @@ NAMESPACE_BEGIN(ITS)
                     for (int k = 0; k < nInDmPoints; ++k) {
                         auto inDmPointTrait = inDmPointTraits[k];
                         double val = bSplineForPoint(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait),
-                                                        i_nodeVertex);
+                                                     i_nodeVertex);
                         if (val != 0) private_matApVal.emplace_back(Trip(rowIdx, std::get<2>(inDmPointTrait), val));
                     }
 
@@ -570,7 +577,7 @@ NAMESPACE_BEGIN(ITS)
                 double sum = 0.0;
                 Vector3i dis = getPointOffset(point, modelOrigin, voxelWidth);
                 uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t) dis.x(), (uint16_t) dis.y(),
-                                                                      (uint16_t) dis.z());
+                                                                (uint16_t) dis.z());
                 uint32_t nodeIdx = morton2FineNodeIdx.at(pointMorton);
 
                 auto inDmPointsTraits = svo.setInDomainPoints(nodeIdx, 0, depthVert2Idx);
@@ -648,10 +655,7 @@ NAMESPACE_BEGIN(ITS)
             cpIntersectionPoints();
             stopTimer(&timer);
             double time = getElapsedTime(&timer) * 1e-3;
-            //qp::qp_ctrl(tColor::GREEN);
-            //qp::qprint("-- Elapsed time: ", time, "s.");
             printf("-- Elapsed time: %lf s.\n", time);
-            //qp::qp_ctrl();
             std::cout << "=====================\n";
 #ifdef IO_SAVE
             saveIntersections("", "");
@@ -686,9 +690,9 @@ NAMESPACE_BEGIN(ITS)
             time = getElapsedTime(&timer) * 1e-3;
             printf("-- Elapsed time: %lf s.\n", time);
             std::cout << "=====================\n";
-            //#ifdef IO_SAVE
+#ifdef IO_SAVE
             saveBSplineValue("");
-            //#endif // IO_SAVE
+#endif // IO_SAVE
 
             deleteTimer(&timer);
         }
@@ -698,10 +702,8 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         void ThinShells::saveTree(const string &filename) const {
             string t_filename = filename;
-            //if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"svo.obj");
-            //if (filename.empty()) t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth));
             if (filename.empty())
-                t_filename = concatFilePath((string) VIS_DIR, modelName, uniformDir, noiseDir,
+                t_filename = concatFilePath(VIS_DIR, modelName, uniformDir, noiseDir,
                                             std::to_string(treeDepth));
 
             svo.saveSVO(t_filename);
@@ -723,15 +725,15 @@ NAMESPACE_BEGIN(ITS)
         void ThinShells::saveIntersections(const string &filename_1, const string &filename_2) const {
             string t_filename = filename_1;
             if (filename_1.empty())
-                t_filename = concatFilePath((string) VIS_DIR, modelName, uniformDir, noiseDir,
-                                            std::to_string(treeDepth), (string) "edgeInter.xyz");
+                t_filename = concatFilePath(VIS_DIR, modelName, uniformDir, noiseDir,
+                                            std::to_string(treeDepth), "edgeInter.xyz");
             std::cout << "-- Save mesh EDGES and octree Nodes to " << std::quoted(t_filename) << std::endl;
             saveIntersections(t_filename, edgeInterPoints);
 
             t_filename = filename_2;
             if (filename_2.empty())
-                t_filename = concatFilePath((string) VIS_DIR, modelName, uniformDir, noiseDir,
-                                            std::to_string(treeDepth), (string) "faceInter.xyz");
+                t_filename = concatFilePath(VIS_DIR, modelName, uniformDir, noiseDir,
+                                            std::to_string(treeDepth), "faceInter.xyz");
             std::cout << "-- Save mesh FACES and octree node EDGES to " << std::quoted(t_filename) << std::endl;
             saveIntersections(t_filename, faceInterPoints);
         }
@@ -780,8 +782,6 @@ NAMESPACE_BEGIN(ITS)
                                             std::to_string(treeDepth), (string) "latent_point.xyz");
 
             checkDir(t_filename);
-            //std::ofstream out(t_filename);
-            //std::ofstream out(t_filename, std::ios_base::app);
             std::ofstream out(t_filename, std::ofstream::out | std::ofstream::trunc);
             if (!out) {
                 fprintf(stderr, "[I/O] Error: File %s could not open!\n", t_filename.c_str());
@@ -800,8 +800,8 @@ NAMESPACE_BEGIN(ITS)
         void ThinShells::saveBSplineValue(const string &filename) const {
             string t_filename = filename;
             if (filename.empty())
-                t_filename = concatFilePath((string) OUT_DIR, modelName, uniformDir, noiseDir,
-                                            std::to_string(treeDepth), (string) "BSplineValue.txt");
+                t_filename = concatFilePath(OUT_DIR, modelName, uniformDir, noiseDir,
+                                            std::to_string(treeDepth), "BSplineValue.txt");
 
             checkDir(t_filename);
             std::ofstream out(t_filename);
@@ -875,16 +875,6 @@ NAMESPACE_BEGIN(ITS)
                 }
             };
 
-            //if (nodeWidthArray.empty())
-            //{
-            //	//nodeWidthArray.reserve(svo.numTreeNodes);
-            //	auto& svoNodeArray = svo.svoNodeArray;
-            //	std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
-            //		[](SVONode node) {
-            //			return Eigen::Vector3d(node.width, node.width, node.width);
-            //		});
-            //}
-
             if (!outerFilename.empty() && outerShellIsoVal != -DINF && outerResolution.minCoeff() > 0) {
                 std::cout << "\n[MC] Extract outer shell by MarchingCubes..." << std::endl;
 #ifdef GPU_BSPLINEVAL
@@ -894,12 +884,6 @@ NAMESPACE_BEGIN(ITS)
 #else
                 serializedRes = outerResolution;
                 determineGridSDF(outerResolution);
-//                std::cout << outerShellIsoVal << std::endl;
-//                system("pause");
-//                for (int i = 0; i < gridSDF.size(); ++i)
-//                    if (gridSDF[i] < outerShellIsoVal)
-//                        std::cout << gridSDF[i] << std::endl;
-//                system("pause");
                 MC::marching_cubes(make_uint3(outerResolution),
                                    make_double3(gridOrigin),
                                    make_double3(gridWidth),
@@ -965,9 +949,9 @@ NAMESPACE_BEGIN(ITS)
             depthMorton2Nodes.resize(treeDepth);
             depthVert2Idx.resize(treeDepth);
 
-            // ÿһ��ڵ�Ī��������(ȫ��)�±��ӳ��
+            // Establish the mapping between the Morton code of each depth node and its (global) index.
             size_t _esumNodes = 0;
-            const auto &depthNumNodes = svo.depthNumNodes;
+            auto depthNumNodes = svo.depthNumNodes;
             for (int d = 0; d < treeDepth; ++d) {
                 vector<size_t> d_nodeIdx(depthNumNodes[d]);
                 std::iota(d_nodeIdx.begin(), d_nodeIdx.end(), 0);
@@ -980,14 +964,14 @@ NAMESPACE_BEGIN(ITS)
                 _esumNodes += depthNumNodes[d];
             }
 
-            // ÿ�㶥�㵽�����±�(ȫ��)��ӳ��
-            const auto &esumDepthNodeVerts = svo.esumDepthNodeVerts;
+            // Establish the mapping between each layer's vertex and its (global) vertex index.
+            auto esumDepthNodeVerts = svo.esumDepthNodeVerts;
             for (int d = 0; d < treeDepth; ++d) {
-                const size_t d_numVerts = svo.depthNodeVertexArray[d].size();
+                size_t d_numVerts = svo.depthNodeVertexArray[d].size();
                 vector<size_t> d_numVertIdx(d_numVerts);
                 std::iota(d_numVertIdx.begin(), d_numVertIdx.end(), 0);
 
-                const size_t &d_esumNodeVerts = esumDepthNodeVerts[d]; // ����������exclusive scan
+                size_t d_esumNodeVerts = esumDepthNodeVerts[d]; // ����������exclusive scan
                 std::transform(allNodeVertexArray.begin() + d_esumNodeVerts,
                                allNodeVertexArray.begin() + d_esumNodeVerts + d_numVerts,
                                d_numVertIdx.begin(), std::inserter(depthVert2Idx[d], depthVert2Idx[d].end()),
@@ -997,31 +981,31 @@ NAMESPACE_BEGIN(ITS)
             }
         }
 
-        void ThinShells::singlePointQuery(const std::string& out_file, const Vector3d& point) {
+        void ThinShells::singlePointQuery(const std::string &out_file, const Vector3d &point) {
             if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
                 printf("Error: You must create shells first!");
                 return;
             }
             if (nodeWidthArray.empty()) {
-                auto& svoNodeArray = svo.svoNodeArray;
+                auto &svoNodeArray = svo.svoNodeArray;
                 std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
-                    [](SVONode node) {
-                        return Eigen::Vector3d(node.width, node.width, node.width);
-                    });
+                               [](SVONode node) {
+                                   return Eigen::Vector3d(node.width, node.width, node.width);
+                               });
             }
 
             double q_bSplineVal;
             Vector3d rgb;
             cuAcc::cpBSplineVal(svo.numNodeVerts, svo.numTreeNodes, point, svo.nodeVertexArray, nodeWidthArray, lambda,
-                q_bSplineVal);
+                                q_bSplineVal);
             if (innerShellIsoVal < q_bSplineVal && q_bSplineVal < outerShellIsoVal)
                 rgb = Vector3d(0.56471, 0.93333, 0.56471);
             else rgb = Vector3d(1, 0.27059, 0);
 
             string _out_file = out_file;
             if (getFileExtension(_out_file) != ".obj")
-                _out_file = (string)getDirName(out_file.c_str()) +
-                (string)getFileName(out_file.c_str()) + (string)".obj";
+                _out_file = (string) getDirName(out_file.c_str()) +
+                            (string) getFileName(out_file.c_str()) + (string) ".obj";
 
             checkDir(_out_file);
             std::ofstream out(_out_file);
@@ -1030,41 +1014,41 @@ NAMESPACE_BEGIN(ITS)
                 return;
             }
             std::cout << "-- Save query result to " << std::quoted(_out_file) <<
-                "-- [RED] point not on the surface, [GREEN] point lie on the surface" << std::endl;
+                      "-- [RED] point not on the surface, [GREEN] point lie on the surface" << std::endl;
 
             gvis::writePointCloud(point, rgb, out);
         }
 
-        void ThinShells::multiPointQuery(const std::string& out_file, const vector<Vector3d>& points) {
+        void ThinShells::multiPointQuery(const std::string &out_file, const vector<Vector3d> &points) {
             if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
                 printf("Error: You must create shells first!");
                 return;
             }
             if (nodeWidthArray.empty()) {
-                auto& svoNodeArray = svo.svoNodeArray;
+                auto &svoNodeArray = svo.svoNodeArray;
                 std::transform(svoNodeArray.begin(), svoNodeArray.end(), std::back_inserter(nodeWidthArray),
-                    [](SVONode node) {
-                        return Eigen::Vector3d(node.width, node.width, node.width);
-                    });
+                               [](SVONode node) {
+                                   return Eigen::Vector3d(node.width, node.width, node.width);
+                               });
             }
 
             VectorXd q_bSplineVal;
             vector<Vector3d> rgbs;
             cuAcc::cpBSplineVal(points.size(), svo.numNodeVerts, svo.numTreeNodes,
-                points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal);
+                                points, svo.nodeVertexArray, nodeWidthArray, lambda, q_bSplineVal);
             std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), std::back_inserter(rgbs),
-                [=](double val) {
-                    Vector3d _t;
-                    if (innerShellIsoVal < val && val < outerShellIsoVal)
-                        _t = Vector3d(0.56471, 0.93333, 0.56471);
-                    else _t = Vector3d(1, 0.27059, 0);
-                    return _t;
-                });
+                           [=](double val) {
+                               Vector3d _t;
+                               if (innerShellIsoVal < val && val < outerShellIsoVal)
+                                   _t = Vector3d(0.56471, 0.93333, 0.56471);
+                               else _t = Vector3d(1, 0.27059, 0);
+                               return _t;
+                           });
 
             string _out_file = out_file;
             if (getFileExtension(_out_file) != ".obj")
-                _out_file = (string)getDirName(out_file.c_str()) +
-                (string)getFileName(out_file.c_str()) + (string)".obj";
+                _out_file = (string) getDirName(out_file.c_str()) +
+                            (string) getFileName(out_file.c_str()) + (string) ".obj";
 
             checkDir(_out_file);
             std::ofstream out(_out_file);
@@ -1073,30 +1057,36 @@ NAMESPACE_BEGIN(ITS)
                 return;
             }
             std::cout << "-- Save query result to " << std::quoted(_out_file) <<
-                "-- [RED] points not on the surface, [GREEN] points lie on the surface" << std::endl;
+                      "-- [RED] points not on the surface, [GREEN] points lie on the surface" << std::endl;
 
             gvis::writePointCloud(points, rgbs, out);
         }
 
-        void ThinShells::multiPointQuery(const std::string& out_file, const MatrixXd& pointsMat) {
+        void ThinShells::multiPointQuery(const std::string &out_file, const MatrixXd &pointsMat) {
             if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
                 printf("Error: You must create shells first!");
                 return;
             }
 
-            vector<Vector3d> points;
-            for (int i = 0; i < pointsMat.rows(); ++i) points.emplace_back(pointsMat.row(i));
+            vector<Vector3d> points(pointsMat.rows());
+#pragma omp parallel for
+            for (int i = 0; i < pointsMat.rows(); ++i)
+                points[i] = pointsMat.row(i);
 
             multiPointQuery(out_file, points);
         }
 
-        vector<int> ThinShells::multiPointQuery(const vector<Vector3d>& points, double& time, const int& session, const Test::type& choice) {
-            test_type test = (test_type)choice;
+        vector<int> ThinShells::multiPointQuery(const vector<Vector3d> &points, double &time, const int &session,
+                                                const Test::type &choice) {
+            test_type test = (test_type) choice;
 
             size_t numPoints = points.size();
             vector<int> result;
-            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) { printf("Error: You must create shells first!\n"); return result; }
-            const vector<SVONode>& svoNodeArray = svo.svoNodeArray;
+            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
+                printf("Error: You must create shells first!\n");
+                return result;
+            }
+            vector<SVONode> svoNodeArray = svo.svoNodeArray;
             VectorXd q_bSplineVal;
 
             vector<node_vertex_type> allNodeVertexArray = svo.nodeVertexArray;
@@ -1110,11 +1100,9 @@ NAMESPACE_BEGIN(ITS)
             // 通过找范围求b样条值
             auto mt_cpuTest = [&]() {
 #pragma omp parallel
-                for (size_t i = 0; i < numPoints; ++i)
-                {
-                    const Vector3d& point = points[i];
-                    if ((point.array() <= boxOrigin.array()).any() || (point.array() >= boxEnd.array()).any())
-                    {
+                for (size_t i = 0; i < numPoints; ++i) {
+                    const Vector3d &point = points[i];
+                    if ((point.array() <= boxOrigin.array()).any() || (point.array() >= boxEnd.array()).any()) {
                         q_bSplineVal[i] = outerShellIsoVal;
                         continue;
                     }
@@ -1125,237 +1113,8 @@ NAMESPACE_BEGIN(ITS)
                     int maxOffset = 0;
                     int searchDepth = 0;
                     double searchNodeWidth = voxelWidth;
-                    for (int i = 0; i < 3; ++i)
-                    {
-                        // 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
-                        if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
-                        else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
-                    }
-                    uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
-                    maxOffset = nextPow2(maxOffset);
-                    while (maxOffset >= 2)
-                    {
-                        pointMorton /= 8;
-                        ++searchDepth;
-                        searchNodeWidth *= 2;
-                        maxOffset >>= 1;
-                    }
-
-                    auto inDmPointsTraits = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth, depthMorton2Nodes, depthVert2Idx);
-                    const int nInDmPointsTraits = inDmPointsTraits.size();
-
-#pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
-                    for (int j = 0; j < nInDmPointsTraits; ++j)
-                    {
-                        const auto& inDmPointTrait = inDmPointsTraits[j];
-                        sum += lambda[std::get<2>(inDmPointTrait)] * bSplineForPoint(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
-                    }
-                    q_bSplineVal[i] = sum;
-                }
-                };
-
-            auto simd_cpuTest = [&]()
-                {
-#pragma omp parallel
-                    for (size_t i = 0; i < numPoints; ++i)
-                    {
-                        const Vector3d& point = points[i];
-                        if ((point.array() < minRange).any() || (point.array() > maxRange).any())
-                        {
-                            q_bSplineVal[i] = outerShellIsoVal;
-                            continue;
-                        }
-
-                        double sum = 0.0;
-                        Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                        // 在所有格子(包括边缘格子和大格子)的影响范围内
-                        int maxOffset = 0;
-                        int searchDepth = 0;
-                        double searchNodeWidth = voxelWidth;
-                        for (int i = 0; i < 3; ++i)
-                        {
-                            // 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
-                            if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
-                            else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
-                        }
-                        uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t)dis.x(), (uint16_t)dis.y(), (uint16_t)dis.z());
-                        maxOffset = nextPow2(maxOffset);
-                        while (maxOffset >= 2)
-                        {
-                            pointMorton /= 8;
-                            ++searchDepth;
-                            searchNodeWidth *= 2;
-                            maxOffset >>= 1;
-                        }
-                        auto inDmPoints = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth, depthMorton2Nodes, depthVert2Idx);
-                        const int nInDmPointsTraits = inDmPoints.size();
-
-#pragma omp simd simdlen(8)
-                        for (int j = 0; j < nInDmPointsTraits; ++j)
-                        {
-                            const auto& inDmPointTrait = inDmPoints[j];
-                            sum += lambda[std::get<2>(inDmPointTrait)] * bSplineForPoint(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
-                        }
-                        q_bSplineVal[i] = sum;
-                    }
-                };
-
-            q_bSplineVal.resize(numPoints);
-            TimerInterface* timer; createTimer(&timer);
-            switch (test)
-            {
-            case Test::CPU:
-                printf("-- [Ours]: Using CPU\n");
-                if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
-                for (int k = 0; k < session; ++k)
-                {
-                    printf("-- [Ours] [Session: %d/%d]", k + 1, session);
-                    if (k != session - 1) printf("\r");
-                    else printf("\n");
-
-                    startTimer(&timer);
-
-                    mt_cpuTest();
-
-                    stopTimer(&timer);
-                }
-                time = getAverageTimerValue(&timer) * 1e-3;
-                break;
-            case Test::CPU_SIMD:
-                printf("-- [Ours]: Using CPU-SIMD\n");
-                if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
-                simd_cpuTest();
-                for (int k = 0; k < session; ++k)
-                {
-                    printf("-- [Ours] [Session: %d/%d]", k + 1, session);
-                    if (k != session - 1) printf("\r");
-                    else printf("\n");
-
-                    startTimer(&timer);
-
-                    simd_cpuTest();
-
-                    stopTimer(&timer);
-                }
-                time = getAverageTimerValue(&timer) * 1e-3;
-                break;
-            default:
-            case Test::CUDA:
-                printf("-- [Ours]: Using CUDA\n");
-                cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
-                    points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal, q_bSplineVal);
-                for (int k = 0; k < session; ++k)
-                {
-                    printf("-- [Ours] [Session: %d/%d]", k + 1, session);
-                    if (k != session - 1) printf("\r");
-                    else printf("\n");
-
-                    startTimer(&timer);
-
-                    /// TODO: 还没改成点超过bbox就不算b样条值的版本
-                    cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
-                        points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal, q_bSplineVal);
-
-                    stopTimer(&timer);
-                }
-                time = getAverageTimerValue(&timer) * 1e-3;
-                break;
-            }
-            deleteTimer(&timer);
-
-            string t_filename = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"temp_queryValue.txt");
-            std::ofstream temp(t_filename);
-            temp << std::setiosflags(std::ios::fixed) << std::setprecision(9) << q_bSplineVal << std::endl;
-
-            std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), std::back_inserter(result),
-                [=](const double& val) {
-                    if (val >= outerShellIsoVal) return 1;
-                    else if (val <= innerShellIsoVal) return -1;
-                    else return 0;
-                });
-
-            return result;
-
-        }
-
-        vector<int> ThinShells::multiPointQuery(const vector<Vector3d> &points, double &time, const int &session,
-                                                const Test::type &choice) {
-            test_type test = (test_type) choice;
-
-            size_t numPoints = points.size();
-            vector<int> result;
-            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
-                printf("Error: You must create shells first!\n");
-                return result;
-            }
-            const vector<SVONode> &svoNodeArray = svo.svoNodeArray;
-            VectorXd q_bSplineVal;
-
-            const vector<node_vertex_type> &allNodeVertexArray = svo.nodeVertexArray;
-            const size_t &numNodeVerts = svo.numNodeVerts;
-            const Vector3d &boxOrigin = modelBoundingBox.boxOrigin;
-            const Vector3d &boxEnd = modelBoundingBox.boxEnd;
-            const Vector3d &boxWidth = modelBoundingBox.boxWidth;
-            const Eigen::Array3d minRange = boxOrigin - boxWidth;
-            const Eigen::Array3d maxRange = boxEnd + boxWidth;
-
-            auto mt_cpuTest = [&]() {
-#pragma omp parallel
-                for (size_t i = 0; i < numPoints; ++i) {
-                    const Vector3d &point = points[i];
-                    if ((point.array() < minRange).any() || (point.array() > maxRange).any()) {
-                        q_bSplineVal[i] = outerShellIsoVal;
-                        continue;
-                    }
-                    double sum = .0;
-#pragma omp parallel for reduction(+ : sum)
-                    for (int j = 0; j < numNodeVerts; ++j) {
-                        Vector3d nodeVert = allNodeVertexArray[j].first;
-                        uint32_t nodeIdx = allNodeVertexArray[j].second;
-                        double t = bSplineForPoint(nodeVert, svoNodeArray[nodeIdx].width, point);
-                        sum += lambda[j] * (bSplineForPoint(nodeVert, svoNodeArray[nodeIdx].width, point));
-                    }
-                    q_bSplineVal[i] = sum;
-                }
-            };
-
-            auto simd_cpuTest = [&]() {
-#pragma omp parallel
-                for (size_t i = 0; i < numPoints; ++i) {
-                    const Vector3d &point = points[i];
-                    if ((point.array() < minRange).any() || (point.array() > maxRange).any()) {
-                        q_bSplineVal[i] = outerShellIsoVal;
-                        continue;
-                    }
-                    double sum = .0;
-#pragma omp simd simdlen(8)
-                    for (int j = 0; j < numNodeVerts; ++j) {
-                        Vector3d nodeVert = allNodeVertexArray[j].first;
-                        uint32_t nodeIdx = allNodeVertexArray[j].second;
-                        sum += lambda[j] * (bSplineForPoint(nodeVert, svoNodeArray[nodeIdx].width, point));
-                    }
-                    q_bSplineVal[i] = sum;
-                }
-            };
-
-            // ͨ���ҷ�Χ��b����ֵ
-            auto mt_cpuTest_2 = [&]() {
-#pragma omp parallel
-                for (size_t i = 0; i < numPoints; ++i) {
-                    const Vector3d &point = points[i];
-                    if ((point.array() <= boxOrigin.array()).any() || (point.array() >= boxEnd.array()).any()) {
-                        q_bSplineVal[i] = outerShellIsoVal;
-                        continue;
-                    }
-
-                    double sum = 0.0;
-                    Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                    // �����и���(������Ե���Ӻʹ����)��Ӱ�췶Χ��
-                    int maxOffset = 0;
-                    int searchDepth = 0;
-                    double searchNodeWidth = voxelWidth;
                     for (int i = 0; i < 3; ++i) {
-                        // �ڱ�Ե����Ӱ�췶Χ��, ��Ϊ0����svo_gridSize[i] - 1��Ϊ�˺���Ī����ļ���
+                        // 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
                         if (dis[i] <= -1) {
                             maxOffset = std::max(maxOffset, std::abs(dis[i]));
                             dis[i] = 0;
@@ -1378,7 +1137,7 @@ NAMESPACE_BEGIN(ITS)
                                                                      searchDepth, depthMorton2Nodes, depthVert2Idx);
                     const int nInDmPointsTraits = inDmPointsTraits.size();
 
-#pragma omp parallel for reduction(+ : sum) // forѭ���еı�����������з�������
+#pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
                     for (int j = 0; j < nInDmPointsTraits; ++j) {
                         const auto &inDmPointTrait = inDmPointsTraits[j];
                         sum += lambda[std::get<2>(inDmPointTrait)] *
@@ -1388,7 +1147,7 @@ NAMESPACE_BEGIN(ITS)
                 }
             };
 
-            auto simd_cpuTest_2 = [&]() {
+            auto simd_cpuTest = [&]() {
 #pragma omp parallel
                 for (size_t i = 0; i < numPoints; ++i) {
                     const Vector3d &point = points[i];
@@ -1399,12 +1158,12 @@ NAMESPACE_BEGIN(ITS)
 
                     double sum = 0.0;
                     Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                    // �����и���(������Ե���Ӻʹ����)��Ӱ�췶Χ��
+                    // 在所有格子(包括边缘格子和大格子)的影响范围内
                     int maxOffset = 0;
                     int searchDepth = 0;
                     double searchNodeWidth = voxelWidth;
                     for (int i = 0; i < 3; ++i) {
-                        // �ڱ�Ե����Ӱ�췶Χ��, ��Ϊ0����svo_gridSize[i] - 1��Ϊ�˺���Ī����ļ���
+                        // 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
                         if (dis[i] <= -1) {
                             maxOffset = std::max(maxOffset, std::abs(dis[i]));
                             dis[i] = 0;
@@ -1443,7 +1202,6 @@ NAMESPACE_BEGIN(ITS)
                 case Test::CPU:
                     printf("-- [Ours]: Using CPU\n");
                     if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
-                    //mt_cpuTest();
                     for (int k = 0; k < session; ++k) {
                         printf("-- [Ours] [Session: %d/%d]", k + 1, session);
                         if (k != session - 1) printf("\r");
@@ -1451,8 +1209,7 @@ NAMESPACE_BEGIN(ITS)
 
                         startTimer(&timer);
 
-                        //mt_cpuTest();
-                        mt_cpuTest_2();
+                        mt_cpuTest();
 
                         stopTimer(&timer);
                     }
@@ -1461,7 +1218,7 @@ NAMESPACE_BEGIN(ITS)
                 case Test::CPU_SIMD:
                     printf("-- [Ours]: Using CPU-SIMD\n");
                     if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
-                    simd_cpuTest_2();
+                    simd_cpuTest();
                     for (int k = 0; k < session; ++k) {
                         printf("-- [Ours] [Session: %d/%d]", k + 1, session);
                         if (k != session - 1) printf("\r");
@@ -1469,8 +1226,7 @@ NAMESPACE_BEGIN(ITS)
 
                         startTimer(&timer);
 
-                        //simd_cpuTest();
-                        simd_cpuTest_2();
+                        simd_cpuTest();
 
                         stopTimer(&timer);
                     }
@@ -1489,7 +1245,7 @@ NAMESPACE_BEGIN(ITS)
 
                         startTimer(&timer);
 
-                        /// TODO: ��û�ĳɵ㳬��bbox�Ͳ���b����ֵ�İ汾
+                        /// TODO: 还没改成点超过bbox就不算b样条值的版本
                         cuAcc::cpPointQuery(points.size(), svo.numNodeVerts, svo.numTreeNodes, minRange, maxRange,
                                             points, svo.nodeVertexArray, nodeWidthArray, lambda, outerShellIsoVal,
                                             q_bSplineVal);
@@ -1501,13 +1257,13 @@ NAMESPACE_BEGIN(ITS)
             }
             deleteTimer(&timer);
 
-            string t_filename = concatFilePath((string) VIS_DIR, modelName, uniformDir, std::to_string(treeDepth),
-                                               (string) "temp_queryValue.txt");
+            /*string t_filename = concatFilePath(OUT_DIR, modelName, uniformDir, std::to_string(treeDepth),
+                                               "temp_queryValue.txt");
             std::ofstream temp(t_filename);
-            temp << std::setiosflags(std::ios::fixed) << std::setprecision(9) << q_bSplineVal << std::endl;
+            temp << std::setiosflags(std::ios::fixed) << std::setprecision(9) << q_bSplineVal << std::endl;*/
 
             std::transform(q_bSplineVal.begin(), q_bSplineVal.end(), std::back_inserter(result),
-                           [=](const double &val) {
+                           [=](double val) {
                                if (val >= outerShellIsoVal) return 1;
                                else if (val <= innerShellIsoVal) return -1;
                                else return 0;
@@ -1516,57 +1272,8 @@ NAMESPACE_BEGIN(ITS)
             return result;
         }
 
-        MatrixXd ThinShells::getPointNormal(const MatrixXd &queryPointMat) {
-            const int numPoints = queryPointMat.rows();
-            MatrixXd pointNormal(numPoints, 3);
-            pointNormal.setZero();
-            VectorXd q_bSplineVal(numPoints);
-            q_bSplineVal.setZero();
-
-            const Vector3d &boxOrigin = modelBoundingBox.boxOrigin;
-            const Vector3d &boxEnd = modelBoundingBox.boxEnd;
-            const Vector3d &boxWidth = modelBoundingBox.boxWidth;
-            /*const Eigen::Array3d minRange = boxOrigin - boxWidth;
-            const Eigen::Array3d maxRange = boxEnd + boxWidth;*/
-
-#pragma omp parallel
-            for (size_t i = 0; i < numPoints; ++i) {
-                const Vector3d &point = queryPointMat.row(i);
-                if ((point.array() < boxOrigin.array()).any() || (point.array() > boxEnd.array()).any()) {
-                    std::cout << "Point is outside boundingbox!\n";
-                    //std::cout << "point = " << point.transpose() << std::endl;
-                    continue; // Ҫ��֤��boundingbox����
-                }
-                //if ((point.array() <= minRange).any() || (point.array() >= maxRange).any()) continue;
-
-                Vector3d gradient;
-                gradient.setZero();
-                Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                // �����и���(������Ե���Ӻʹ����)��Ӱ�췶Χ��
-                //int maxOffset = 0;
-                int searchDepth = 0;
-                double searchNodeWidth = voxelWidth;
-                uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t) dis.x(), (uint16_t) dis.y(),
-                                                                (uint16_t) dis.z());
-
-                auto inDmPointsTraits = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth,
-                                                                 depthMorton2Nodes, depthVert2Idx);
-                const int nInDmPointsTraits = inDmPointsTraits.size();
-
-                //#pragma omp parallel for reduction(+ : gradient) // forѭ���еı�����������з������ͣ�reduction�Ӿ��еı��������Ǳ�����������
-                for (int j = 0; j < nInDmPointsTraits; ++j) {
-                    const auto &inDmPointTrait = inDmPointsTraits[j];
-                    gradient += lambda[std::get<2>(inDmPointTrait)] *
-                                bSplineGradientForPoint(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
-                }
-                pointNormal.row(i) = (gradient.normalized());
-            }
-
-            return pointNormal;
-        }
-
         VectorXd ThinShells::getPointBSplineVal(const MatrixXd &queryPointMat) {
-            const int numPoints = queryPointMat.rows();
+            int numPoints = queryPointMat.rows();
             VectorXd q_bSplineVal;
             q_bSplineVal.setZero();
 
@@ -1580,42 +1287,28 @@ NAMESPACE_BEGIN(ITS)
 
 #pragma omp parallel
             for (size_t i = 0; i < numPoints; ++i) {
-                const Vector3d &point = queryPointMat.row(i);
+                Vector3d point = queryPointMat.row(i);
                 if ((point.array() <= boxOrigin.array()).any() || (point.array() >= boxEnd.array()).any()) {
                     // std::cout << "[BSplineVal] Point is outside boundingbox!\n";
-                    continue; // Ҫ��֤��boundingbox����
+                    continue;
                 }
 
                 double sum = 0.0;
                 Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                // �����и���(������Ե���Ӻʹ����)��Ӱ�췶Χ��
+                // In the influence range of all cells (including edge cells and large cells).
                 int maxOffset = 0;
                 int searchDepth = 0;
                 double searchNodeWidth = voxelWidth;
-                //for (int i = 0; i < 3; ++i)
-                //{
-                //	// �ڱ�Ե����Ӱ�췶Χ��, ��Ϊ0����svo_gridSize[i] - 1��Ϊ�˺���Ī����ļ���
-                //	if (dis[i] <= -1) { maxOffset = std::max(maxOffset, std::abs(dis[i])); dis[i] = 0; }
-                //	else if (dis[i] >= svo_gridSize[i]) { maxOffset = std::max(maxOffset, dis[i] - svo_gridSize[i] + 1); dis[i] = svo_gridSize[i] - 1; }
-                //}
                 uint32_t pointMorton = morton::mortonEncode_LUT((uint16_t) dis.x(), (uint16_t) dis.y(),
                                                                 (uint16_t) dis.z());
-                /*maxOffset = nextPow2(maxOffset);
-                while (maxOffset >= 2)
-                {
-                    pointMorton /= 8;
-                    ++searchDepth;
-                    searchNodeWidth *= 2;
-                    maxOffset >>= 1;
-                }*/
 
                 auto inDmPointsTraits = svo.mq_setInDomainPoints(pointMorton, modelOrigin, searchNodeWidth, searchDepth,
                                                                  depthMorton2Nodes, depthVert2Idx);
-                const int nInDmPointsTraits = inDmPointsTraits.size();
+                int nInDmPointsTraits = inDmPointsTraits.size();
 
-#pragma omp parallel for reduction(+ : sum) // forѭ���еı�����������з�������
+#pragma omp parallel for reduction(+ : sum)
                 for (int j = 0; j < nInDmPointsTraits; ++j) {
-                    const auto &inDmPointTrait = inDmPointsTraits[j];
+                    auto inDmPointTrait = inDmPointsTraits[j];
                     sum += lambda[std::get<2>(inDmPointTrait)] *
                            bSplineForPoint(std::get<0>(inDmPointTrait), std::get<1>(inDmPointTrait), point);
                 }

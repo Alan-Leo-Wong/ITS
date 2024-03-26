@@ -6,3 +6,8 @@ target_sources(ITS_GPU_MC
         MarchingCubes.hpp
         MarchingCubes.cu
 )
+
+target_link_libraries(ITS_GPU_MC
+        PRIVATE
+        spdlog::spdlog
+)

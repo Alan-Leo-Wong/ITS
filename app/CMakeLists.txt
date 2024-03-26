@@ -3,6 +3,7 @@ add_executable(ITS_MAIN main.cpp)
 target_link_libraries(ITS_MAIN
         PRIVATE
         ITS::MODEL
+        CLI11::CLI11
 )
 
 if (FCPW_TEST)

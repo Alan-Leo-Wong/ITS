@@ -1254,7 +1254,8 @@ NAMESPACE_BEGIN(ITS)
             auto getVirtualNodeCorners = [&](uint32_t morton, int depth) {
                 uint16_t x, y, z;
                 morton::morton3D_32_decode(morton, x, y, z);
-                const Vector3d &virtualNodeOrigin = modelOrigin + Vector3d((int) x, (int) y, (int) z) * virtualNodeWidth;
+                const Vector3d &virtualNodeOrigin =
+                        modelOrigin + Vector3d((int) x, (int) y, (int) z) * virtualNodeWidth;
 
                 for (int k = 0; k < 8; ++k) {
                     const int xOffset = k & 1;
@@ -1310,45 +1311,11 @@ NAMESPACE_BEGIN(ITS)
         //  I/O: Save Data  //
         //////////////////////
         void SparseVoxelOctree::saveSVO(const std::string &filename) const {
-            /*checkDir(filename);
-            std::ofstream output(filename.c_str(), std::ios::out);
-            if (!output) { fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str()); return; }*/
-            //assert(output);
-
-#ifndef IO_SILENT
-            std::cout << "[I/O] Writing Sparse Voxel Octree data in obj format to file "
-                      << std::quoted(filename.c_str())
-                      << std::endl;
-            // Write stats
-            size_t voxels_seen = 0;
-            const size_t write_stats_25 = numTreeNodes / 4.0f;
-            fprintf(stdout, "[I/O] Writing to file: 0%%...");
-#endif // !IO_SILENT
-
-            /*size_t faceBegIdx = 0;
-            for (const auto& node : svoNodeArray)
-            {
-        #ifndef IO_SILENT
-                voxels_seen++;
-                if (voxels_seen == write_stats_25) { fprintf(stdout, "25%%..."); }
-                else if (voxels_seen == write_stats_25 * size_t(2)) { fprintf(stdout, "50%%..."); }
-                else if (voxels_seen == write_stats_25 * size_t(3)) { fprintf(stdout, "75%%..."); }
-        #endif // !IO_SILENT
-                gvis::writeCube(node.origin, Eigen::Vector3d(node.width, node.width, node.width), output, faceBegIdx);
-            }
-        #ifndef IO_SILENT
-            fprintf(stdout, "100%% \n");
-        #endif // !IO_SILENT*/
-
-//output.close();
-
-// 分层输出
             for (int i = 0; i < treeDepth; ++i) {
                 size_t faceBegIdx = 0;
 
-                const std::string &d_filename = str_util::concatFilePath(filename,
-                                                               (std::string) "svo_" + std::to_string(i + 1) +
-                                                               (std::string) ".obj");
+                std::string d_filename = str_util::concatFilePath(filename, "svo_" + std::to_string(i + 1) +
+                                                                            ".obj");
                 str_util::checkDir(d_filename);
                 std::ofstream output(d_filename.c_str(), std::ios::out);
                 if (!output) {
@@ -1356,14 +1323,12 @@ NAMESPACE_BEGIN(ITS)
                     return;
                 }
 
-                for (int j = 0; j < depthSVONodeArray[i].size(); ++j) {
-                    const auto &node = depthSVONodeArray[i][j];
+                for (const auto &node: depthSVONodeArray[i]) {
                     gvis::writeCube(node.origin, Eigen::Vector3d(node.width, node.width, node.width), output,
                                     faceBegIdx);
                 }
                 output.close();
             }
-
         }
 
         void
@@ -1376,38 +1341,34 @@ NAMESPACE_BEGIN(ITS)
                 fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename_output.c_str());
                 return;
             }
-            //assert(output);
 
-#ifndef SILENT
+#ifndef SVO_IO_SILENT
             std::cout << "[I/O] Writing data in obj voxels format to file " << std::quoted(filename_output.c_str())
                       << std::endl;
             // Write stats
             size_t voxels_seen = 0;
-            const size_t write_stats_25 = voxelArray.size() / 4.0f;
+            size_t write_stats_25 = voxelArray.size() / 4.0f;
             fprintf(stdout, "[I/O] Writing to file: 0%%...");
 #endif
 
             size_t faceBegIdx = 0;
-            for (size_t i = 0; i < voxelArray.size(); ++i) {
-#ifndef SILENT
+            for (unsigned int morton : voxelArray) {
+#ifndef SVO_IO_SILENT
                 voxels_seen++;
                 if (voxels_seen == write_stats_25) { fprintf(stdout, "25%%..."); }
                 else if (voxels_seen == write_stats_25 * size_t(2)) { fprintf(stdout, "50%%..."); }
                 else if (voxels_seen == write_stats_25 * size_t(3)) { fprintf(stdout, "75%%..."); }
 #endif
 
-                const auto &morton = voxelArray[i];
-
                 uint16_t x, y, z;
                 morton::morton3D_32_decode((morton & D_MORTON_32_FLAG), x, y, z);
-                const Eigen::Vector3d nodeOrigin =
+                Eigen::Vector3d nodeOrigin =
                         modelBBox.boxOrigin + width * Eigen::Vector3d((double) x, (double) y, (double) z);
                 gvis::writeCube(nodeOrigin, Eigen::Vector3d(width, width, width), output, faceBegIdx);
             }
-#ifndef SILENT
+#ifndef SVO_IO_SILENT
             fprintf(stdout, "100%% \n");
 #endif
-
             output.close();
         }
 
