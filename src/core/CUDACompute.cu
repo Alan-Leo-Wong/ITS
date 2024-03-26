@@ -2,8 +2,8 @@
 #include "MortonLUT.hpp"
 #include "BSpline.hpp"
 #include "utils/Common.hpp"
-#include "detail/cuda/CUDAUtil.cuh"
-#include "detail/cuda/DeviceQuery.cuh"
+#include "utils/cuda/CUDAUtil.cuh"
+#include "utils/cuda/DeviceQuery.cuh"
 #include <vector>
 #include <cuda_runtime.h>
 #include <thrust/reduce.h>
@@ -15,6 +15,7 @@
 NAMESPACE_BEGIN(ITS)
     namespace cuAcc {
         namespace cg = cooperative_groups;
+        using namespace utils::cuda;
 
         namespace detail {
             /**
@@ -585,7 +586,7 @@ NAMESPACE_BEGIN(ITS)
                 int x_blockSize = 0, y_blockSize = 16; // x����B��y����A (ע�⣺x_blockSize �����>=32)
                 int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
-                // ����ʱ��ҪpaddingCols
+                // Padding columns is needed during allocation.
                 getBlocksAndThreadsNum(prop, paddingCols, 65535, 1024 / y_blockSize, x_gridSize, x_blockSize);
                 dim3 blockSize(x_blockSize, y_blockSize, 1);
                 dim3 gridSize(x_gridSize, y_gridSize, 1);
@@ -651,7 +652,7 @@ NAMESPACE_BEGIN(ITS)
                 int x_blockSize = 0, y_blockSize = 32; // x����B��y����A (ע�⣺x_blockSize �����>=32)
                 int x_gridSize = 0, y_gridSize = (rowElems + y_blockSize - 1) / y_blockSize;
 
-                // ����ʱ��ҪpaddingCols
+                // Padding columns is needed during allocation.
                 getBlocksAndThreadsNum(prop, paddingCols, 65535, 1024 / y_blockSize, x_gridSize, x_blockSize);
                 dim3 blockSize(x_blockSize, y_blockSize, 1);
                 dim3 gridSize(x_gridSize, y_gridSize, 1);
@@ -665,8 +666,8 @@ NAMESPACE_BEGIN(ITS)
                         sizeof(Scalar) * y_blockSize * ((x_blockSize / 32) + 1); // +1 for avoiding bank conflicts
                 bool flag = isPow2(cols);
 
-                // d_tRowSumMatrix Ϊ row reduce sum �Ľ������ʵ�ʲ��� 0 ������ά��Ϊ: elems * x_gridSize��
-                // ������ elems * x_paddingGridSize
+                // 'd_tRowSumMatrix' is the result of row reduction sum,
+                // its actual non-zero data dimension is: 'elems * x_gridSize', not 'elems * x_paddingGridSize'.
                 mq_switchKernel<T, Scalar>(flag, x_blockSize, gridSize, blockSize, sh_memSize, stream, rowElems,
                                            cols, d_nodeVertexArray, d_nodeWidthArray, d_A, d_B, d_outerVal, d_minRange,
                                            d_maxRange,

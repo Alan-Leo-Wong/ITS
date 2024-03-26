@@ -2,9 +2,10 @@
 
 #include <cstdio>
 #include <iostream>
-// v2һ��Ҫ����apiǰ��
 #include <cublas_v2.h>
 //#include <cublas_api.h>
+
+NAMESPACE_BEGIN(ITS)
 
 #define CUBLAS_CHECK(call)                                                      \
     do                                                                        \
@@ -19,3 +20,5 @@
             exit(EXIT_FAILURE);                                                          \
         }                                                                     \
     } while (0);
+
+NAMESPACE_END(ITS)

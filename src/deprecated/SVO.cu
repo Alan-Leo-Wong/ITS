@@ -1,13 +1,13 @@
 ﻿#include "SVO.hpp"
 #include "MortonLUT.hpp"
 #include "detail/Geometry.hpp"
-#include "detail/cuda/CUDAMath.cuh"
+#include "detail/cuda/CUDAMath.hpp"
+#include "detail/cuda/CUDAUtil.cuh"
 #include "detail/cuda/CUDACheck.cuh"
 #include "utils/IO.hpp"
 #include "utils/Timer.hpp"
-#include "utils/cuda/CUDAUtil.cuh"
 #include "utils/String.hpp"
-#include <spdlog/spdlog.h>
+#include "utils/String.hpp"
 #include <thrust/scan.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
@@ -356,20 +356,18 @@ NAMESPACE_BEGIN(ITS)
         int gridSize;    // The actual grid size needed, based on input size
     }
 
+
+    template<typename T>
+    struct scanMortonFlag : public thrust::unary_function<T, T> {
+        __host__ __device__ T operator()(const T &x) {
+            // printf("%lu %d\n", b, (b >> 31) & 1);
+            return (x >> 31) & 1;
+        }
+    };
+
     namespace svo {
-        using namespace utils::cuda;
-
         namespace detail{
-
-            template<typename T>
-            struct scanMortonFlag : public thrust::unary_function<T, T> {
-                __host__ __device__ T operator()(const T &x) {
-                    // printf("%lu %d\n", b, (b >> 31) & 1);
-                    return (x >> 31) & 1;
-                }
-            };
-
-            __global__ void surfaceVoxelize(int nTris,
+            __global__ void surfaceVoxelize(const int nTris,
                                             const Eigen::Vector3i *d_surfaceVoxelGridSize,
                                             const Eigen::Vector3d *d_gridOrigin,
                                             const Eigen::Vector3d *d_unitVoxelSize,
@@ -536,15 +534,15 @@ NAMESPACE_BEGIN(ITS)
                 }
             }
 
-            CUDA_GENERAL_CALL uint32_t getParentMorton(uint32_t morton) {
+            CUDA_GENERAL_CALL uint32_t getParentMorton(const uint32_t morton) {
                 return (((morton >> 3) & 0xfffffff));
             }
 
-            CUDA_GENERAL_CALL bool isSameParent(uint32_t morton_1, uint32_t morton_2) {
+            CUDA_GENERAL_CALL bool isSameParent(const uint32_t morton_1, const uint32_t morton_2) {
                 return getParentMorton(morton_1) == getParentMorton(morton_2);
             }
 
-            __global__ void compactArray(int n,
+            __global__ void compactArray(const int n,
                                          const bool *d_isValidArray,
                                          const uint32_t *d_dataArray,
                                          const size_t *d_esumDataArray,
@@ -557,7 +555,7 @@ NAMESPACE_BEGIN(ITS)
 
 
             // 计算表面voxel共对应多少个八叉树节点同时设置父节点的莫顿码数组
-            __global__ void cpNumNodes(size_t n,
+            __global__ void cpNumNodes(const size_t n,
                                        const uint32_t *d_pactDataArray,
                                        size_t *d_nNodesArray,
                                        uint32_t *d_parentMortonArray) {
@@ -573,7 +571,7 @@ NAMESPACE_BEGIN(ITS)
                 }
             }
 
-            __global__ void createNode_1(size_t pactSize,
+            __global__ void createNode_1(const size_t pactSize,
                                          const size_t *d_sumNodesArray,
                                          const uint32_t *d_pactDataArray,
                                          const Eigen::Vector3d *d_gridOrigin,
@@ -607,9 +605,9 @@ NAMESPACE_BEGIN(ITS)
                 }
             }
 
-            __global__ void createNode_2(size_t pactSize,
-                                         size_t d_preChildDepthTreeNodes, // 子节点层的前面所有层的节点数量(exclusive scan)，用于确定在总节点数组中的位置
-                                         size_t d_preDepthTreeNodes, // 当前层的前面所有层的节点数量(exclusive scan)，用于确定在总节点数组中的位置
+            __global__ void createNode_2(const size_t pactSize,
+                                         const size_t d_preChildDepthTreeNodes, // 子节点层的前面所有层的节点数量(exclusive scan)，用于确定在总节点数组中的位置
+                                         const size_t d_preDepthTreeNodes, // 当前层的前面所有层的节点数量(exclusive scan)，用于确定在总节点数组中的位置
                                          const size_t *d_sumNodesArray, // 这一层的节点数量inclusive scan数组
                                          const uint32_t *d_pactDataArray,
                                          const Eigen::Vector3d *d_gridOrigin,
@@ -648,7 +646,7 @@ NAMESPACE_BEGIN(ITS)
                 }
             }
 
-            __global__ void createRemainNode(size_t nNodes,
+            __global__ void createRemainNode(const size_t nNodes,
                                              const Eigen::Vector3d *d_gridOrigin,
                                              const double *d_width,
                                              const uint32_t *d_begMortonArray,
@@ -680,8 +678,8 @@ NAMESPACE_BEGIN(ITS)
             }
 
             template<bool topFlag>
-            __global__ void findNeighbors(size_t nNodes,
-                                          size_t preESumTreeNodes,
+            __global__ void findNeighbors(const size_t nNodes,
+                                          const size_t preESumTreeNodes,
                                           SVONode *d_nodeArray) {
                 if (topFlag) {
                     d_nodeArray[0].neighbors[13] = d_topNodeIdx;
@@ -703,8 +701,8 @@ NAMESPACE_BEGIN(ITS)
 
             }
 
-            __global__ void determineNodeVertex(size_t nNodes,
-                                                size_t nodeOffset,
+            __global__ void determineNodeVertex(const size_t nNodes,
+                                                const size_t nodeOffset,
                                                 const SVONode *d_nodeArray,
                                                 node_vertex_type *d_nodeVertArray) {
                 size_t tid_x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -753,7 +751,7 @@ NAMESPACE_BEGIN(ITS)
                 }
             }
 
-            __global__ void determineNodeEdge(size_t nNodes,
+            __global__ void determineNodeEdge(const size_t nNodes,
                                               const SVONode *d_nodeArray,
                                               node_edge_type *d_nodeEdgeArray) {
                 size_t tid_x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -1177,6 +1175,43 @@ NAMESPACE_BEGIN(ITS)
             constructNodeVertexAndEdge(d_esumTreeNodesArray, d_SVONodeArray);
         }
 
+        //std::tuple<vector<std::pair<Vector3d, double>>, vector<size_t>> SparseVoxelOctree::setInDomainPoints(const uint32_t& nodeIdx,
+        //	const int& nodeDepth, vector<std::map<Vector3d, size_t>>& nodeVertex2Idx) const
+        //{
+        //	int parentDepth = nodeDepth;
+        //	auto parentIdx = svoNodeArray[nodeIdx].parent;
+        //	vector<std::pair<Vector3d, double>> dm_points;
+        //	vector<size_t> dm_pointsIdx;
+        //
+        //	auto getCorners = [&](const SVONode& node, const int& depth)
+        //	{
+        //		const Vector3d& nodeOrigin = node.origin;
+        //		const double& nodeWidth = node.width;
+        //
+        //		for (int k = 0; k < 8; ++k)
+        //		{
+        //			const int xOffset = k & 1;
+        //			const int yOffset = (k >> 1) & 1;
+        //			const int zOffset = (k >> 2) & 1;
+        //
+        //			Vector3d corner = nodeOrigin + nodeWidth * Vector3d(xOffset, yOffset, zOffset);
+        //
+        //			dm_points.emplace_back(std::make_pair(corner, nodeWidth));
+        //			dm_pointsIdx.emplace_back(nodeVertex2Idx[depth][corner]);
+        //		}
+        //	};
+        //
+        //	while (parentIdx != UINT_MAX)
+        //	{
+        //		const auto& svoNode = svoNodeArray[parentIdx];
+        //		getCorners(svoNode, parentDepth);
+        //		parentIdx = svoNode.parent;
+        //		++parentDepth;
+        //	}
+        //
+        //	return std::make_tuple(dm_points, dm_pointsIdx);
+        //}
+
         std::vector<std::tuple<Vector3d, double, size_t>>
         SparseVoxelOctree::setInDomainPoints(uint32_t _nodeIdx, int nodeDepth,
                                              const std::vector<std::map<Vector3d, size_t>> &depthVert2Idx) {
@@ -1185,13 +1220,13 @@ NAMESPACE_BEGIN(ITS)
             uint32_t nodeIdx = _nodeIdx;
 
             auto getNodeCorners = [&](const SVONode &node, const int &depth) {
-                Vector3d nodeOrigin = node.origin;
-                double nodeWidth = node.width;
+                const Vector3d &nodeOrigin = node.origin;
+                const double &nodeWidth = node.width;
 
                 for (int k = 0; k < 8; ++k) {
-                    int xOffset = k & 1;
-                    int yOffset = (k >> 1) & 1;
-                    int zOffset = (k >> 2) & 1;
+                    const int xOffset = k & 1;
+                    const int yOffset = (k >> 1) & 1;
+                    const int zOffset = (k >> 2) & 1;
 
                     Vector3d corner = nodeOrigin + nodeWidth * Vector3d(xOffset, yOffset, zOffset);
 
@@ -1200,7 +1235,7 @@ NAMESPACE_BEGIN(ITS)
             };
 
             while (searchDepth < treeDepth && nodeIdx != UINT_MAX) {
-                auto svoNode = svoNodeArray[nodeIdx];
+                const auto &svoNode = svoNodeArray[nodeIdx];
                 getNodeCorners(svoNode, searchDepth);
                 nodeIdx = svoNode.parent;
                 ++searchDepth;
@@ -1222,13 +1257,13 @@ NAMESPACE_BEGIN(ITS)
             auto getVirtualNodeCorners = [&](uint32_t morton, int depth) {
                 uint16_t x, y, z;
                 morton::morton3D_32_decode(morton, x, y, z);
-                Vector3d virtualNodeOrigin =
+                const Vector3d &virtualNodeOrigin =
                         modelOrigin + Vector3d((int) x, (int) y, (int) z) * virtualNodeWidth;
 
                 for (int k = 0; k < 8; ++k) {
-                    int xOffset = k & 1;
-                    int yOffset = (k >> 1) & 1;
-                    int zOffset = (k >> 2) & 1;
+                    const int xOffset = k & 1;
+                    const int yOffset = (k >> 1) & 1;
+                    const int zOffset = (k >> 2) & 1;
 
                     Vector3d corner = virtualNodeOrigin + virtualNodeWidth * Vector3d(xOffset, yOffset, zOffset);
 
@@ -1250,13 +1285,13 @@ NAMESPACE_BEGIN(ITS)
             if (searchDepth == treeDepth) return dm_points;
 
             auto getExistNodeCorners = [&](const SVONode &node, const int &depth) {
-                Vector3d nodeOrigin = node.origin;
-                double nodeWidth = node.width;
+                const Vector3d &nodeOrigin = node.origin;
+                const double &nodeWidth = node.width;
 
                 for (int k = 0; k < 8; ++k) {
-                    int xOffset = k & 1;
-                    int yOffset = (k >> 1) & 1;
-                    int zOffset = (k >> 2) & 1;
+                    const int xOffset = k & 1;
+                    const int yOffset = (k >> 1) & 1;
+                    const int zOffset = (k >> 2) & 1;
 
                     Vector3d corner = nodeOrigin + nodeWidth * Vector3d(xOffset, yOffset, zOffset);
 
@@ -1266,7 +1301,7 @@ NAMESPACE_BEGIN(ITS)
 
             uint32_t nodeIdx = depthMorton2Nodes[searchDepth].at(pointMorton);
             while (nodeIdx != UINT_MAX) {
-                auto svoNode = svoNodeArray[nodeIdx];
+                const auto &svoNode = svoNodeArray[nodeIdx];
                 getExistNodeCorners(svoNode, searchDepth);
                 nodeIdx = svoNode.parent;
                 ++searchDepth;
@@ -1287,7 +1322,7 @@ NAMESPACE_BEGIN(ITS)
                 str_util::checkDir(d_filename);
                 std::ofstream output(d_filename.c_str(), std::ios::out);
                 if (!output) {
-                    spdlog::error("File \"{}\" could not be opened!", d_filename);
+                    fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str());
                     return;
                 }
 
@@ -1306,7 +1341,7 @@ NAMESPACE_BEGIN(ITS)
             str_util::checkDir(filename_output);
             std::ofstream output(filename_output.c_str(), std::ios::out);
             if (!output) {
-                spdlog::error("File \"{}\" could not be opened!", filename_output);
+                fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename_output.c_str());
                 return;
             }
 

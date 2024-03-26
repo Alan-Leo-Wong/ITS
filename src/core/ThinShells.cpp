@@ -2,11 +2,11 @@
 #include "BSpline.hpp"
 #include "MortonLUT.hpp"
 #include "CUDACompute.hpp"
+#include "detail/cuda/CUDAMath.cuh"
 #include "utils/IO.hpp"
 #include "utils/Timer.hpp"
 #include "utils/Common.hpp"
 #include "utils/String.hpp"
-#include "detail/cuda/CUDAMath.hpp"
 #include "mc/MarchingCubes.hpp"
 #include <omp.h>
 #include <queue>
@@ -131,28 +131,28 @@ NAMESPACE_BEGIN(ITS)
                             double bottom_t = DINF;
                             if (modelEdgeDir.z() != 0) bottom_t = (lbbCorner.z() - p1.z()) / modelEdgeDir.z();
 
-                            if (donut::isInRange(.0, 1.0, back_t) &&
-                                donut::isInRange(lbbCorner.y(), lbbCorner.y() + width,
+                            if (utils::isInRange(.0, 1.0, back_t) &&
+                                utils::isInRange(lbbCorner.y(), lbbCorner.y() + width,
                                                  (p1 + back_t * modelEdgeDir).y()) &&
-                                donut::isInRange(lbbCorner.z(), lbbCorner.z() + width,
+                                utils::isInRange(lbbCorner.z(), lbbCorner.z() + width,
                                                  (p1 + back_t * modelEdgeDir).z())) {
                                 //edgeInterPoints.emplace_back(p1 + back_t * modelEdgeDir);
                                 edge_vec_private.emplace_back(p1 + back_t * modelEdgeDir);
                                 //edge_morton_vec_private.emplace_back(std::make_pair(p1 + back_t * modelEdgeDir, nodeMorton));
                             }
-                            if (donut::isInRange(.0, 1.0, left_t) &&
-                                donut::isInRange(lbbCorner.x(), lbbCorner.x() + width,
+                            if (utils::isInRange(.0, 1.0, left_t) &&
+                                utils::isInRange(lbbCorner.x(), lbbCorner.x() + width,
                                                  (p1 + left_t * modelEdgeDir).x()) &&
-                                donut::isInRange(lbbCorner.z(), lbbCorner.z() + width,
+                                utils::isInRange(lbbCorner.z(), lbbCorner.z() + width,
                                                  (p1 + left_t * modelEdgeDir).z())) {
                                 //edgeInterPoints.emplace_back(p1 + left_t * modelEdgeDir);
                                 edge_vec_private.emplace_back(p1 + left_t * modelEdgeDir);
                                 //edge_morton_vec_private.emplace_back(std::make_pair(p1 + back_t * modelEdgeDir, nodeMorton));
                             }
-                            if (donut::isInRange(.0, 1.0, bottom_t) &&
-                                donut::isInRange(lbbCorner.x(), lbbCorner.x() + width,
+                            if (utils::isInRange(.0, 1.0, bottom_t) &&
+                                utils::isInRange(lbbCorner.x(), lbbCorner.x() + width,
                                                  (p1 + bottom_t * modelEdgeDir).x()) &&
-                                donut::isInRange(lbbCorner.y(), lbbCorner.y() + width,
+                                utils::isInRange(lbbCorner.y(), lbbCorner.y() + width,
                                                  (p1 + bottom_t * modelEdgeDir).y())) {
                                 //edgeInterPoints.emplace_back(p1 + bottom_t * modelEdgeDir);
                                 edge_vec_private.emplace_back(p1 + bottom_t * modelEdgeDir);
@@ -264,19 +264,19 @@ NAMESPACE_BEGIN(ITS)
             struct lessXVal {
                 bool operator()(const node_edge_type &a,
                                 const node_edge_type &b) { // search the first element 'a' in list such that b \leq a
-                    return donut::isLargeDouble(b.first.second.x(), a.first.second.x(), 1e-9);
+                    return utils::isLargeDouble(b.first.second.x(), a.first.second.x(), 1e-9);
                 }
             };
             struct lessYVal {
                 bool operator()(const node_edge_type &a,
                                 const node_edge_type &b) { // search the first element 'a' in list such that b \leq a
-                    return donut::isLargeDouble(b.first.second.y(), a.first.second.y(), 1e-9);
+                    return utils::isLargeDouble(b.first.second.y(), a.first.second.y(), 1e-9);
                 }
             };
             struct lessZVal {
                 bool operator()(const node_edge_type &a,
                                 const node_edge_type &b) { // search the first element 'a' in list such that b \leq a
-                    return donut::isLargeDouble(b.first.second.z(), a.first.second.z(), 1e-9);
+                    return utils::isLargeDouble(b.first.second.z(), a.first.second.z(), 1e-9);
                 }
             };
 
@@ -305,7 +305,7 @@ NAMESPACE_BEGIN(ITS)
                     for (int i = x_lower - x_fineNodeEdges.begin(); i < x_numEdges; ++i) {
                         auto e_p1 = x_fineNodeEdges[i].first.first, e_p2 = x_fineNodeEdges[i].first.second;
 
-                        if (donut::isLargeDouble(e_p1.x(), tri_bbox_end.x(), 1e-9)) break; // ��ʼ�˵����bbox_end
+                        if (utils::isLargeDouble(e_p1.x(), tri_bbox_end.x(), 1e-9)) break; // ��ʼ�˵����bbox_end
 
                         Vector3d edgeDir = e_p2 - e_p1;
 
@@ -341,7 +341,7 @@ NAMESPACE_BEGIN(ITS)
                     for (int i = y_lower - y_fineNodeEdges.begin(); i < y_numEdges; ++i) {
                         auto e_p1 = y_fineNodeEdges[i].first.first, e_p2 = y_fineNodeEdges[i].first.second;
 
-                        if (donut::isLargeDouble(e_p1.y(), tri_bbox_end.y(), 1e-9)) break; // ��ʼ�˵����bbox_end
+                        if (utils::isLargeDouble(e_p1.y(), tri_bbox_end.y(), 1e-9)) break; // ��ʼ�˵����bbox_end
 
                         Vector3d edgeDir = e_p2 - e_p1;
 
@@ -377,7 +377,7 @@ NAMESPACE_BEGIN(ITS)
                     for (int i = z_lower - z_fineNodeEdges.begin(); i < z_numEdges; ++i) {
                         auto e_p1 = z_fineNodeEdges[i].first.first, e_p2 = z_fineNodeEdges[i].first.second;
 
-                        if (donut::isLargeDouble(e_p1.z(), tri_bbox_end.z(), 1e-9)) break; // ��ʼ�˵����bbox_end
+                        if (utils::isLargeDouble(e_p1.z(), tri_bbox_end.z(), 1e-9)) break; // ��ʼ�˵����bbox_end
 
                         Vector3d edgeDir = e_p2 - e_p1;
 

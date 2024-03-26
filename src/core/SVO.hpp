@@ -28,8 +28,8 @@ NAMESPACE_BEGIN(ITS)
             unsigned int neighbors[27]{UINT_MAX};
 
             CUDA_GENERAL_CALL SVONode() {
-                donut::Loop<unsigned int, 8>([&](auto i) { childs[i] = UINT_MAX; });
-                donut::Loop<unsigned int, 27>([&](auto i) { neighbors[i] = UINT_MAX; });
+                utils::Loop<unsigned int, 8>([&](auto i) { childs[i] = UINT_MAX; });
+                utils::Loop<unsigned int, 27>([&](auto i) { neighbors[i] = UINT_MAX; });
             }
         };
 

@@ -1,10 +1,10 @@
 ﻿#include "LookTable.hpp"
 #include "MarchingCubes.hpp"
 #include "utils/String.hpp"
+#include "utils/cuda/CUDAUtil.cuh"
+#include "utils/cuda/DeviceQuery.cuh"
 #include "core/BSpline.hpp"
 #include "core/CUDACompute.hpp"
-#include "detail/cuda/CUDAUtil.cuh"
-#include "detail/cuda/DeviceQuery.cuh"
 #include <chrono>
 #include <cuda_device_runtime_api.h>
 #include <cuda_runtime_api.h>
@@ -482,7 +482,7 @@ NAMESPACE_BEGIN(ITS)
 
         // device
         cudaDeviceProp prop;
-        int device = getMaxComputeDevice();
+        int device = utils::cuda::getMaxComputeDevice();
         CUDA_CHECK(cudaGetDevice(&device));
         CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
 
@@ -512,7 +512,7 @@ NAMESPACE_BEGIN(ITS)
             thrust::device_vector<Vector3d> d_voxelCornerData(numVoxelElemCorners);
 
             int minGridSize, blockSize, gridSize;
-            getOccupancyMaxPotentialBlockSize(nVoxels, minGridSize, blockSize, gridSize,
+            utils::cuda::getOccupancyMaxPotentialBlockSize(nVoxels, minGridSize, blockSize, gridSize,
                                               MCKernel::prepareVoxelCornerKernel);
             MCKernel::prepareVoxelCornerKernel << < gridSize, blockSize >> >
             (voxelElems, d_voxelOffset, d_gridOrigin, d_voxelSize, d_res, d_voxelCornerData.data().get());
@@ -524,8 +524,8 @@ NAMESPACE_BEGIN(ITS)
             CUDA_CHECK(cudaMemcpyAsync((d_voxelSDF.data() + voxelOffset * 8).get(), d_voxelElemSDF.data().get(),
                                        sizeof(double) * numVoxelElemCorners, cudaMemcpyDeviceToDevice, streams[i]));
 
-            cleanupThrust(d_voxelElemSDF);
-            cleanupThrust(d_voxelCornerData);
+            utils::cuda::cleanupThrust(d_voxelElemSDF);
+            utils::cuda::cleanupThrust(d_voxelCornerData);
             CUDA_CHECK(cudaFree(d_voxelOffset));
 
             printf("[%d/%d] batch_size = %u", i + 1, MAX_NUM_STREAMS, voxelElems);
@@ -636,7 +636,7 @@ NAMESPACE_BEGIN(ITS)
                               cudaMemcpyDeviceToHost));
 
         // free resources
-        cleanupThrust(d_voxelSDF);
+        utils::cuda::cleanupThrust(d_voxelSDF);
         CUDA_CHECK(cudaFree(d_compactedVoxelArray));
         CUDA_CHECK(cudaFree(d_voxelCubeIndex));
         CUDA_CHECK(cudaFree(d_nVoxelVertsScan));

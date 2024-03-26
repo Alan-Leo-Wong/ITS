@@ -154,10 +154,8 @@ int main(int argc, char **argv) {
 
     ////////////////////////////////////////////////////////
 
-    spdlog::set_level(spdlog::level::info);
-
     string modelName = getFileName(args.meshFile);
-    spdlog::info("-- Model: {}", modelName);;
+    spdlog::info("-- Model: {}", modelName);
 
     TimerInterface *timer = nullptr;
     createTimer(&timer);

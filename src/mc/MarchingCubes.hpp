@@ -2,7 +2,7 @@
 
 #include "core/SVO.hpp"
 #include "detail/cuda/CUDACheck.cuh"
-#include "detail/cuda/CUDAMath.hpp"
+#include "detail/cuda/CUDAMath.cuh"
 #include <thrust/host_vector.h>
 #include <Eigen/Dense>
 

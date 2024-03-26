@@ -1,12 +1,20 @@
 #pragma once
 
 #include "Config.hpp"
-#include "cuda_runtime.h"
 #include <cmath>
 #include <array>
 #include <Eigen/Core>
+#include <cuda_runtime.h>
 
 NAMESPACE_BEGIN(ITS)
+
+#ifndef cuMIN
+#  define cuMIN(x, y) ((x < y) ? x : y)
+#endif
+
+#ifndef cuMAX
+#  define cuMAX(x, y) ((x > y) ? x : y)
+#endif
 
     using uint = unsigned int;
 

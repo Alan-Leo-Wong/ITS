@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cuda_runtime.h>
 
+NAMESPACE_BEGIN(ITS)
+
 #define CUDA_CHECK(call)                                                      \
     do                                                                        \
     {                                                                         \
@@ -32,3 +34,5 @@ inline void __getLastCudaError(const char* errorMessage, const char* file, const
         exit(EXIT_FAILURE);
 	}
 }
+
+NAMESPACE_END(ITS)
