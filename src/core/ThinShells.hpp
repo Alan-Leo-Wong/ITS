@@ -2,14 +2,14 @@
 
 #include "SVO.hpp"
 #include "Mesh.hpp"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "test/TestConfig.h"
 
 NAMESPACE_BEGIN(ITS)
     namespace core {
         using namespace Eigen;
         using namespace svo;
-        using namespace str_util;
+        using namespace utils;
         using std::string;
         using std::vector;
 

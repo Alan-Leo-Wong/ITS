@@ -32,7 +32,7 @@ NAMESPACE_BEGIN(ITS)
                 {0x87, 128},
                 {-1,   -1}};
 
-        inline int convertSMVer2Cores(int major, int minor) {
+        FORCE_INLINE int convertSMVer2Cores(int major, int minor) {
             int index = 0;
             while (nGpuArchCoresPerSM[index].SM != -1) {
                 if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor))
@@ -41,7 +41,7 @@ NAMESPACE_BEGIN(ITS)
             }
         }
 
-        inline int getDeviceCount() {
+        FORCE_INLINE int getDeviceCount() {
             int deviceCount = 0;
             CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
             if (deviceCount == 0) {
@@ -53,7 +53,7 @@ NAMESPACE_BEGIN(ITS)
             return deviceCount;
         }
 
-        inline int getMaxComputeDevice() {
+        FORCE_INLINE int getMaxComputeDevice() {
             int deviceCount = getDeviceCount();
             int maxNumSMs = 0, maxDevice = 0;
             if (deviceCount > 1) {
@@ -69,7 +69,7 @@ NAMESPACE_BEGIN(ITS)
             return maxDevice;
         }
 
-        inline void getDeviceDefaultProp(int device) {
+        FORCE_INLINE void getDeviceDefaultProp(int device) {
             cudaDeviceProp deviceProp;
             CUDA_CHECK(cudaGetDeviceProperties(&deviceProp, device));
 
@@ -101,7 +101,7 @@ NAMESPACE_BEGIN(ITS)
                    deviceProp.regsPerBlock);
         }
 
-        inline void getDeviceDetailedProp(int device) {
+        FORCE_INLINE void getDeviceDetailedProp(int device) {
             cudaDeviceProp deviceProp;
             CUDA_CHECK(cudaGetDeviceProperties(&deviceProp, device));
 
@@ -242,7 +242,7 @@ NAMESPACE_BEGIN(ITS)
             printf("     < %s >\n", sComputeMode[deviceProp.computeMode]);
         }
 
-        inline void getDeviceProp(int device, int mode) {
+        FORCE_INLINE void getDeviceProp(int device, int mode) {
             if (mode == 0)
                 getDeviceDefaultProp(device);
             else

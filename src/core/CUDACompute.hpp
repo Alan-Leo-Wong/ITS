@@ -121,5 +121,5 @@ NAMESPACE_BEGIN(ITS)
                           const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>> &nodeVertexArray,
                           const std::vector<Vector3d> &nodeWidthArray, const VectorXd &lambda, const double &outerVal,
                           VectorXd &bSplinVal, bool useThrust = true);
-    }
+    } // namespace cuAcc
 NAMESPACE_END(ITS)

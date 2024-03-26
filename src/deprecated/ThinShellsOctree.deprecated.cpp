@@ -1,7 +1,7 @@
 #include "ThinShells.h"
 #include "BSpline.hpp"
 #include "utils\Common.hpp"
-#include "utils\String.hpp"
+#include "utils\File.hpp"
 #include "utils\cuda\CUDAMath.hpp"
 #include "cuAcc\MarchingCubes\MarchingCubes.h"
 #include <queue>
@@ -23,9 +23,9 @@ inline void ThinShells::cpIntersectionPoints()
 	const vector<SVONode>& nodeArray = svo.svoNodeArray;
 	const vector<node_edge_type>& fineNodeEdges = svo.fineNodeEdgeArray;
 
-	// Ö»ÐèÒªÇóÈý½ÇÐÎÓë×îµ×²ã½ÚµãµÄ½»µã
+	// Ö»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×²ï¿½Úµï¿½Ä½ï¿½ï¿½ï¿½
 	
-	// Èý½ÇÐÎµÄ±ßÓënodeÃæ½»£¬ ÒòÎªÒþÊ½BÑùÌõ»ù¶¨ÒåÔÚÁËleft/bottom/back cornerÉÏ£¬ ËùÒÔÓë½ÚµãÖ»ÐèÒªÇóÓëÕâÈý¸öÃæµÄ½»¼´¿É
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ÎµÄ±ï¿½ï¿½ï¿½nodeï¿½æ½»ï¿½ï¿½ ï¿½ï¿½Îªï¿½ï¿½Ê½Bï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½left/bottom/back cornerï¿½Ï£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½Ö»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 	for (int i = 0; i < nModelEdges; i++)
 	{
@@ -72,10 +72,10 @@ inline void ThinShells::cpIntersectionPoints()
 		}
 	}
 
-	cout << "-- Èý½ÇÐÎ±ßÓënodeµÄ½»µãÊýÁ¿£º" << edgeInterPoints.size() << endl;
+	cout << "-- ï¿½ï¿½ï¿½ï¿½ï¿½Î±ï¿½ï¿½ï¿½nodeï¿½Ä½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" << edgeInterPoints.size() << endl;
 	allInterPoints.insert(allInterPoints.end(), edgeInterPoints.begin(), edgeInterPoints.end());
 
-	// Èý½ÇÐÎÃæÓënode±ßÏß½»£¨ÓÐÖØºÏµã£©
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½nodeï¿½ï¿½ï¿½ß½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ØºÏµã£©
 	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
 	for (const auto& tri : modelTris)
 	{
@@ -101,12 +101,12 @@ inline void ThinShells::cpIntersectionPoints()
 	}
 
 	//faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
-	cout << "-- Èý½ÇÐÎÃæÓënode±ßµÄ½»µãÊýÁ¿£º" << faceInterPoints.size() << endl;
+	cout << "-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½nodeï¿½ßµÄ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" << faceInterPoints.size() << endl;
 
 	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
 
 	allInterPoints.erase(std::unique(allInterPoints.begin(), allInterPoints.end()), allInterPoints.end());
-	cout << "-- ×Ü½»µãÊýÁ¿£º" << allInterPoints.size() << endl;
+	cout << "-- ï¿½Ü½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" << allInterPoints.size() << endl;
 }
 
 inline void ThinShells::cpSDFOfTreeNodes()
@@ -154,7 +154,7 @@ inline void ThinShells::cpCoefficients()
 
 			for (const auto& id_ck : corner2IDs[i_corner])
 			{
-				// i_cornerËùÔÚµÄÆäËû½ÚµãµÄidºÍÎ»ÖÃ
+				// i_cornerï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½idï¿½ï¿½Î»ï¿½ï¿½
 				const uint o_id = id_ck.first;
 				const uint o_k = id_ck.second;
 				const uint o_realID = o_id * 8 + o_k;
@@ -393,7 +393,7 @@ void ThinShells::textureVisualization(const string& filename) const
 //
 //	auto leafNodes = bSplineTree.leafNodes;
 //
-//	// Èý½ÇÐÎµÄ±ßÓënodeÃæ½»£¬ ÒòÎªÒþÊ½BÑùÌõ»ù¶¨ÒåÔÚÁËleft/bottom/back cornerÉÏ£¬ ËùÒÔÓë½ÚµãÖ»ÐèÒªÇóÓëÕâÈý¸öÃæµÄ½»¼´¿É
+//	// ï¿½ï¿½ï¿½ï¿½ï¿½ÎµÄ±ï¿½ï¿½ï¿½nodeï¿½æ½»ï¿½ï¿½ ï¿½ï¿½Îªï¿½ï¿½Ê½Bï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½left/bottom/back cornerï¿½Ï£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½Ö»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä½ï¿½ï¿½ï¿½ï¿½ï¿½
 //	std::cout << "1. Computing the intersections between mesh EDGES and nodes...\n";
 //	for (int i = 0; i < nModelEdges; i++)
 //	{
@@ -444,11 +444,11 @@ void ThinShells::textureVisualization(const string& filename) const
 //		}
 //	}
 //
-//	cout << "-- Èý½ÇÐÎ±ßÓënodeµÄ½»µãÊýÁ¿£º" << edgeInterPoints.size() << endl;
+//	cout << "-- ï¿½ï¿½ï¿½ï¿½ï¿½Î±ï¿½ï¿½ï¿½nodeï¿½Ä½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" << edgeInterPoints.size() << endl;
 //
 //	allInterPoints.insert(allInterPoints.end(), edgeInterPoints.begin(), edgeInterPoints.end());
 //
-//	// Èý½ÇÐÎÃæÓënode±ßÏß½»£¨ÓÐÖØºÏµã£©
+//	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½nodeï¿½ï¿½ï¿½ß½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ØºÏµã£©
 //	std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << endl;
 //	for (const auto& leafNode : leafNodes)
 //	{
@@ -527,16 +527,16 @@ void ThinShells::textureVisualization(const string& filename) const
 //			}
 //		}
 //
-//		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // É¸Ñ¡ÓÐ½»µãµÄÒ¶×Ó½Úµã
+//		if (leafNode->isInterMesh) interLeafNodes.emplace_back(leafNode); // É¸Ñ¡ï¿½Ð½ï¿½ï¿½ï¿½ï¿½Ò¶ï¿½Ó½Úµï¿½
 //	}
 //
 //	faceInterPoints.erase(std::unique(faceInterPoints.begin(), faceInterPoints.end()), faceInterPoints.end());
-//	cout << "-- Èý½ÇÐÎÃæÓënode±ßµÄ½»µãÊýÁ¿£º" << faceInterPoints.size() << endl;
+//	cout << "-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½nodeï¿½ßµÄ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" << faceInterPoints.size() << endl;
 //
 //	allInterPoints.insert(allInterPoints.end(), faceInterPoints.begin(), faceInterPoints.end());
 //
 //	allInterPoints.erase(std::unique(allInterPoints.begin(), allInterPoints.end()), allInterPoints.end());
-//	cout << "-- ×Ü½»µãÊýÁ¿£º" << allInterPoints.size() << endl;
+//	cout << "-- ï¿½Ü½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" << allInterPoints.size() << endl;
 //}
 
 ///Deprecated: refineSurface
@@ -558,13 +558,13 @@ void ThinShells::textureVisualization(const string& filename) const
 //	auto& id2Node = bSplineTree.id2Node;
 //	auto& visNodeId = bSplineTree.visNodeId;
 //
-//	// ÅÐ¶ÏÊÇ·ñ´©¹ý±íÃæ
+//	// ï¿½Ð¶ï¿½ï¿½Ç·ñ´©¹ï¿½ï¿½ï¿½ï¿½ï¿½
 //	/*
-//	* @param width: d_leafNodes¿í¶È
+//	* @param width: d_leafNodesï¿½ï¿½ï¿½
 //	*/
 //	auto isNodeCrossSurface = [=](OctreeNode* node)->bool
 //	{
-//		//// µÃµ½nodeId¶ÔÓ¦µÄÔ­µãÎ»ÖÃ
+//		//// ï¿½Ãµï¿½nodeIdï¿½ï¿½Ó¦ï¿½ï¿½Ô­ï¿½ï¿½Î»ï¿½ï¿½
 //		//MXd corners(8, 3);
 //		//for (int i = 0; i < 8; ++i)
 //		//	corners.row(i) = node->corners[i];
@@ -593,12 +593,12 @@ void ThinShells::textureVisualization(const string& filename) const
 //			node->sdf[i] = getSignedDistance(node->corners[i], scene);
 //			if (!flag && ((node->sdf[i] < 0) == ref)) flag = true;
 //		}
-//		return (!flag && node->idxOfPoints.empty()); // Èç¹ûnode²»°üº¬µãÇÒÃ»ÓÐ´©¹ý±íÃæ£¬ÔòÉ¾³ý
+//		return (!flag && node->idxOfPoints.empty()); // ï¿½ï¿½ï¿½nodeï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ£¬ï¿½ï¿½É¾ï¿½ï¿½
 //	};
 //	auto isCrossSurface = [=](const size_t& nodeId, double sdf[8])->bool
 //	{
 //		//MXd corners(8, 3);
-//		//// µÃµ½nodeId¶ÔÓ¦µÄÔ­µãÎ»ÖÃ
+//		//// ï¿½Ãµï¿½nodeIdï¿½ï¿½Ó¦ï¿½ï¿½Ô­ï¿½ï¿½Î»ï¿½ï¿½
 //		//V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
 //		//corners.row(0) = originCorner;
 //		//for (int i = 1; i < 8; i++)
@@ -624,7 +624,7 @@ void ThinShells::textureVisualization(const string& filename) const
 //		//	if (!flag && ((sdf[i] < 0) == ref)) flag = true;
 //		//}
 //
-//		// µÃµ½nodeId¶ÔÓ¦µÄÔ­µãÎ»ÖÃ
+//		// ï¿½Ãµï¿½nodeIdï¿½ï¿½Ó¦ï¿½ï¿½Ô­ï¿½ï¿½Î»ï¿½ï¿½
 //		V3d originCorner = treeOrigin + bSplineTree.getNodeCoord(nodeId, d_leafNodeWidth);
 //		sdf[0] = getSignedDistance(originCorner, scene);
 //		bool ref = sdf[0] > 0;
@@ -690,7 +690,7 @@ void ThinShells::textureVisualization(const string& filename) const
 //		int t_offset = offset;
 //
 //		int fatherId = GET_PARENT_ID(queryNodeId);
-//		//if (!fatherId) return; // ±£Ö¤queryNodeÖÁÉÙÎ»ÓÚµÚ2²ã¼°ÒÔÏÂ
+//		//if (!fatherId) return; // ï¿½ï¿½Ö¤queryNodeï¿½ï¿½ï¿½ï¿½Î»ï¿½Úµï¿½2ï¿½ã¼°ï¿½ï¿½ï¿½ï¿½
 //		int fatherOffset = GET_OFFSET(fatherId);
 //		for (int i = 0; i < 3; ++i, t_offset >>= 1)
 //		{
@@ -698,8 +698,8 @@ void ThinShells::textureVisualization(const string& filename) const
 //			int t_fatherId = fatherId, t_fatherOffset = fatherOffset;
 //			int subDepth = 1;
 //
-//			// µ±queryNodeµÄÄ³¸ö¸¸½ÚµãfatherNodeÔÚÆä¸¸½ÚµãÖÐµÄÆ«ÒÆÁ¿fatherOffsetµÄµÚiÎ»ÓëqueryBit(±íÊ¾ÁËqueryNode´ýÑ°ÕÒµÄÖÜÎ§½ÚµãµÄ·´·½Ïò)Ò»ÖÂÊ±
-//			// ÎÒÃÇ¾Í¿ÉÒÔ¼ÆËã´ýÑ°ÕÒµÄqueryNodeÖÜÎ§½ÚµãidÁË
+//			// ï¿½ï¿½queryNodeï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½fatherNodeï¿½ï¿½ï¿½ä¸¸ï¿½Úµï¿½ï¿½Ðµï¿½Æ«ï¿½ï¿½ï¿½ï¿½fatherOffsetï¿½Äµï¿½iÎ»ï¿½ï¿½queryBit(ï¿½ï¿½Ê¾ï¿½ï¿½queryNodeï¿½ï¿½Ñ°ï¿½Òµï¿½ï¿½ï¿½Î§ï¿½Úµï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½)Ò»ï¿½ï¿½Ê±
+//			// ï¿½ï¿½ï¿½Ç¾Í¿ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½Ñ°ï¿½Òµï¿½queryNodeï¿½ï¿½Î§ï¿½Úµï¿½idï¿½ï¿½
 //			while ((t_fatherOffset >> i & 1) != queryBit)
 //			{
 //				t_fatherId = GET_PARENT_ID(t_fatherId);
@@ -715,7 +715,7 @@ void ThinShells::textureVisualization(const string& filename) const
 //		}
 //	};
 //
-//	// ÂþÑÓ
+//	// ï¿½ï¿½ï¿½ï¿½
 //	while (!q.empty())
 //	{
 //		auto queryNodeId = q.front();
@@ -724,19 +724,19 @@ void ThinShells::textureVisualization(const string& filename) const
 //		if (visNodeId[queryNodeId] >= 2) continue;
 //		visNodeId[queryNodeId]++;
 //
-//		// µÃµ½ÆäÔÚ¸¸Ç×ÄÚÊÇÄÄÒ»¸öÆ«ÒÆ½Úµã
+//		// ï¿½Ãµï¿½ï¿½ï¿½ï¿½Ú¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Æ«ï¿½Æ½Úµï¿½
 //		int offset = GET_OFFSET(queryNodeId);
-//		// µÃµ½ÐèÒª½¨Á¢µÄÁù¸önodeId(Í¨¹ýÕÒ¸¸Ç×ÒÔ¼°¶¨Öµ)
+//		// ï¿½Ãµï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½nodeId(Í¨ï¿½ï¿½ï¿½Ò¸ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½Öµ)
 //		size_t neighbors[6] = { 0 };
 //		getNeightborNodeId(offset, queryNodeId, neighbors);
 //
-//		// ÅÐ¶ÏneedNodeÊÇ·ñ½¨Á¢¹ýÇÒÊÇ·ñ´©¹ý±íÃæ£¬ÈôÃ»½¨Á¢ÇÒ´©¹ý±íÃæÔò½¨Á¢
+//		// ï¿½Ð¶ï¿½needNodeï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ñ´©¹ï¿½ï¿½ï¿½ï¿½æ£¬ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ò´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //		for (const auto& nodeId : neighbors)
 //		{
 //			/*if (queryNodeId == 124)
 //				cout << "neighbor: " << nodeId << endl;*/
-//				// nodeId == 0 ´ú±í nodeId Õâ¸öÁÚ¾Ó½Úµã²¢²»´æÔÚ
-//				// visNodeId[nodeId] >= 1´ú±íÒÑ¾­ÔÚ¶ÓÁÐÖÐ»òÕßÒÑ¾­³ö¹ý¶ÓÁË
+//				// nodeId == 0 ï¿½ï¿½ï¿½ï¿½ nodeId ï¿½ï¿½ï¿½ï¿½Ú¾Ó½Úµã²¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//				// visNodeId[nodeId] >= 1ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½Ú¶ï¿½ï¿½ï¿½ï¿½Ð»ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //			if (!nodeId || visNodeId[nodeId] >= 1) continue;
 //			visNodeId[nodeId]++;
 //			q.push(nodeId);
@@ -749,14 +749,14 @@ void ThinShells::textureVisualization(const string& filename) const
 //			//// create node
 //			//vector<size_t> parents;
 //			//int parentNodeId = GET_PARENT_ID(queryNodeId);
-//			//// Öð½¥ÏòÉÏ±éÀúÊ÷£¬ÕÒµ½ËùÓÐÃ»½¨Á¢µÄ¸¸½ÚµãÒÔ¼°µÚÒ»¸ö½¨Á¢³öÀ´µÄ¸¸½Úµã
+//			//// ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òµï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½Úµï¿½ï¿½Ô¼ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½Úµï¿½
 //			//while (id2Node[parentNodeId] == nullptr && parentNodeId != 0)
 //			//{
 //			//	parents.emplace_back(parentNodeId);
 //			//	parentNodeId = GET_PARENT_ID(parentNodeId);
 //			//}
 //			//parents.emplace_back(parentNodeId);
-//			//// ×ÔÉÏÏòÏÂ½¨Á¢½Úµã
+//			//// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â½ï¿½ï¿½ï¿½ï¿½Úµï¿½
 //			//for (auto it = parents.rbegin(); it != parents.rend(); ++it)
 //			//{
 //			//	const size_t parentId = *it;
@@ -811,7 +811,7 @@ void ThinShells::textureVisualization(const string& filename) const
 //		//	// create node
 //		//	vector<size_t> parents;
 //		//	int parentNodeId = GET_PARENT_ID(queryNodeId);
-//		//	// Öð½¥ÏòÉÏ±éÀúÊ÷£¬ÕÒµ½ËùÓÐÃ»½¨Á¢µÄ¸¸½ÚµãÒÔ¼°µÚÒ»¸ö½¨Á¢³öÀ´µÄ¸¸½Úµã
+//		//	// ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òµï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½Úµï¿½ï¿½Ô¼ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½Úµï¿½
 //		//	while (parentNodeId != 0)
 //		//	{
 //		//		parents.emplace_back(parentNodeId);

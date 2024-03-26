@@ -7,17 +7,18 @@
 #endif
 
 #include "core/ThinShells.hpp"
-#include "utils/IO.hpp"
+#include "detail/Geometry.hpp"
 #include "utils/Timer.hpp"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "utils/Common.hpp"
 #include <spdlog/spdlog.h>
 #include <CLI/CLI.hpp>
 #include <igl/signed_distance.h>
 
 using namespace ITS::core;
+using namespace ITS::utils::timer;
+using namespace ITS::utils::file;
 using namespace Eigen;
-using namespace str_util;
 
 namespace test_time {
     double test_allTime = .0;
@@ -179,11 +180,14 @@ int main(int argc, char **argv) {
     printf("\nTexture Visualization spent %lf s.\n", time);*/
 
     if (args.mcVis) {
-        string innerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir, std::to_string(treeDepth),
+        string innerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir,
+                                               std::to_string(treeDepth),
                                                "mc_innerShell.obj");
-        string outerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir, std::to_string(treeDepth),
+        string outerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir,
+                                               std::to_string(treeDepth),
                                                "mc_outerShell.obj");
-        string isosurfaceFile = concatFilePath(args.mcOutDir, modelName, uniformDir, std::to_string(treeDepth),
+        string isosurfaceFile = concatFilePath(args.mcOutDir, modelName, uniformDir,
+                                               std::to_string(treeDepth),
                                                "mc_isosurface.obj");
         startTimer(&timer);
         thinShell.mcVisualization(

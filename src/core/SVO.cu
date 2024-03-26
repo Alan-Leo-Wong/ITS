@@ -5,7 +5,7 @@
 #include "detail/cuda/CUDACheck.cuh"
 #include "utils/Timer.hpp"
 #include "utils/cuda/CUDAUtil.cuh"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include <spdlog/spdlog.h>
 #include <thrust/scan.h>
 #include <thrust/sort.h>
@@ -356,10 +356,9 @@ NAMESPACE_BEGIN(ITS)
     }
 
     namespace svo {
-        using namespace utils;
         using namespace utils::cuda;
 
-        namespace detail{
+        namespace detail {
 
             template<typename T>
             struct scanMortonFlag : public thrust::unary_function<T, T> {
@@ -808,6 +807,9 @@ NAMESPACE_BEGIN(ITS)
 
         using namespace detail;
 
+        ////////////////////////
+        //     Create SVO     //
+        ////////////////////////
         void SparseVoxelOctree::meshVoxelize(const size_t &nModelTris,
                                              const std::vector<Triangle<Vector3d>> &modelTris,
                                              const Eigen::Vector3i *d_surfaceVoxelGridSize,
@@ -829,9 +831,9 @@ NAMESPACE_BEGIN(ITS)
             //cudaDeviceSynchronize();
         }
 
-        void SparseVoxelOctree::createOctree(const size_t &nModelTris, const std::vector<Triangle<Vector3d>> &modelTris,
-                                             const AABox<Eigen::Vector3d> &modelBBox,
-                                             const std::string &base_filename) {
+        void SparseVoxelOctree::createOctree(size_t nModelTris, const std::vector<Triangle<Vector3d>> &modelTris) {
+            using namespace utils::timer;
+
             TimerInterface *timer = nullptr;
             createTimer(&timer);
             startTimer(&timer);
@@ -841,9 +843,9 @@ NAMESPACE_BEGIN(ITS)
                                                                      (uint16_t) (surfaceVoxelGridSize.y() - 1),
                                                                      (uint16_t) (surfaceVoxelGridSize.z() - 1)) + 1;
             size_t gridTreeNodeSize = gridCNodeSize % 8 ? gridCNodeSize + 8 - (gridCNodeSize % 8) : gridCNodeSize;
-            Eigen::Vector3d unitVoxelSize = Eigen::Vector3d(modelBBox.boxWidth.x() / surfaceVoxelGridSize.x(),
-                                                            modelBBox.boxWidth.y() / surfaceVoxelGridSize.y(),
-                                                            modelBBox.boxWidth.z() / surfaceVoxelGridSize.z());
+            Eigen::Vector3d unitVoxelSize = Eigen::Vector3d(modelBoundingBox.boxWidth.x() / surfaceVoxelGridSize.x(),
+                                                            modelBoundingBox.boxWidth.y() / surfaceVoxelGridSize.y(),
+                                                            modelBoundingBox.boxWidth.z() / surfaceVoxelGridSize.z());
             double unitNodeWidth = unitVoxelSize.x();
 
             Eigen::Vector3i *d_surfaceVoxelGridSize;
@@ -853,7 +855,7 @@ NAMESPACE_BEGIN(ITS)
                                cudaMemcpyHostToDevice));
             Eigen::Vector3d *d_gridOrigin;
             CUDA_CHECK(cudaMalloc((void **) &d_gridOrigin, sizeof(Eigen::Vector3d)));
-            CUDA_CHECK(cudaMemcpy(d_gridOrigin, &modelBBox.boxOrigin, sizeof(Eigen::Vector3d), cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(d_gridOrigin, &modelBoundingBox.boxOrigin, sizeof(Eigen::Vector3d), cudaMemcpyHostToDevice));
             Eigen::Vector3d *d_unitVoxelSize;
             CUDA_CHECK(cudaMalloc((void **) &d_unitVoxelSize, sizeof(Eigen::Vector3d)));
             CUDA_CHECK(cudaMemcpy(d_unitVoxelSize, &unitVoxelSize, sizeof(Eigen::Vector3d), cudaMemcpyHostToDevice));
@@ -907,13 +909,6 @@ NAMESPACE_BEGIN(ITS)
 
                 if (treeDepth == 1) {
                     numVoxels = numCNodes;
-#ifndef NDEBUG
-                    // 验证体素
-                    vector<uint32_t> voxelArray;
-                    voxelArray.resize(numCNodes);
-                    CUDA_CHECK(cudaMemcpy(voxelArray.data(), d_pactCNodeArray.data().get(), sizeof(uint32_t) * numCNodes, cudaMemcpyDeviceToHost));
-                    saveVoxel(modelBBox, voxelArray, base_filename, unitNodeWidth);
-#endif // !NDEBUG
                 }
 
                 // compute the number of (real)octree nodes by coarse node array and set parent's morton code to 'd_CNodeMortonArray'
@@ -1035,9 +1030,13 @@ NAMESPACE_BEGIN(ITS)
             }
         }
 
+        //////////////////////////
+        // Construct attributes //
+        //////////////////////////
         namespace {
             __device__ size_t d_topNodeIdx;
         }
+
         void SparseVoxelOctree::constructNodeNeighbors(const thrust::device_vector<size_t> &d_esumTreeNodesArray,
                                                        thrust::device_vector<SVONode> &d_SVONodeArray) {
             dim3 gridSize, blockSize;
@@ -1108,10 +1107,10 @@ NAMESPACE_BEGIN(ITS)
             };
         }
 
-#define MAX_STREAM 16
 
         void SparseVoxelOctree::constructNodeVertexAndEdge(const thrust::device_vector<size_t> &d_esumTreeNodesArray,
                                                            thrust::device_vector<SVONode> &d_SVONodeArray) {
+            constexpr int MAX_STREAM = 16;
             // assert(treeDepth + 1 <= MAX_STREAM, "the number of stream is too small!\n");
             cudaStream_t streams[MAX_STREAM];
             for (int i = 0; i < MAX_STREAM; ++i) CUDA_CHECK(cudaStreamCreate(&streams[i]));
@@ -1177,6 +1176,9 @@ NAMESPACE_BEGIN(ITS)
             constructNodeVertexAndEdge(d_esumTreeNodesArray, d_SVONodeArray);
         }
 
+        //////////////////////////
+        //       Utilities      //
+        //////////////////////////
         std::vector<std::tuple<Vector3d, double, size_t>>
         SparseVoxelOctree::setInDomainPoints(uint32_t _nodeIdx, int nodeDepth,
                                              const std::vector<std::map<Vector3d, size_t>> &depthVert2Idx) {
@@ -1275,35 +1277,14 @@ NAMESPACE_BEGIN(ITS)
             return dm_points;
         }
 
-        //////////////////////
-        //  I/O: Save Data  //
-        //////////////////////
-        void SparseVoxelOctree::saveSVO(const std::string &filename) const {
-            for (int i = 0; i < treeDepth; ++i) {
-                size_t faceBegIdx = 0;
-
-                std::string d_filename = str_util::concatFilePath(filename, "svo_" + std::to_string(i + 1) +
-                                                                            ".obj");
-                str_util::checkDir(d_filename);
-                std::ofstream output(d_filename.c_str(), std::ios::out);
-                if (!output) {
-                    spdlog::error("File \"{}\" could not be opened!", d_filename);
-                    return;
-                }
-
-                for (const auto &node: depthSVONodeArray[i]) {
-                    gvis::writeCube(node.origin, Eigen::Vector3d(node.width, node.width, node.width), output,
-                                    faceBegIdx);
-                }
-                output.close();
-            }
-        }
-
+        ////////////////////////
+        //   I/O: Save Data   //
+        ////////////////////////
         void
         SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d> &modelBBox, const std::vector<uint32_t> &voxelArray,
-                                     const std::string &base_filename, const double &width) const {
+                                     const std::string &base_filename, double width) const {
             std::string filename_output = base_filename + std::string("_voxel.obj");
-            str_util::checkDir(filename_output);
+            utils::file::checkDir(filename_output);
             std::ofstream output(filename_output.c_str(), std::ios::out);
             if (!output) {
                 spdlog::error("File \"{}\" could not be opened!", filename_output);
@@ -1320,7 +1301,7 @@ NAMESPACE_BEGIN(ITS)
 #endif
 
             size_t faceBegIdx = 0;
-            for (unsigned int morton : voxelArray) {
+            for (unsigned int morton: voxelArray) {
 #ifndef SVO_IO_SILENT
                 voxels_seen++;
                 if (voxels_seen == write_stats_25) { fprintf(stdout, "25%%..."); }
@@ -1338,6 +1319,28 @@ NAMESPACE_BEGIN(ITS)
             fprintf(stdout, "100%% \n");
 #endif
             output.close();
+        }
+
+
+        void SparseVoxelOctree::saveSVO(const std::string &filename) const {
+            for (int i = 0; i < treeDepth; ++i) {
+                size_t faceBegIdx = 0;
+
+                std::string d_filename = utils::file::concatFilePath(filename, "svo_" + std::to_string(i + 1) +
+                                                                               ".obj");
+                utils::file::checkDir(d_filename);
+                std::ofstream output(d_filename.c_str(), std::ios::out);
+                if (!output) {
+                    spdlog::error("File \"{}\" could not be opened!", d_filename);
+                    return;
+                }
+
+                for (const auto &node: depthSVONodeArray[i]) {
+                    gvis::writeCube(node.origin, Eigen::Vector3d(node.width, node.width, node.width), output,
+                                    faceBegIdx);
+                }
+                output.close();
+            }
         }
 
     } // namespace svo

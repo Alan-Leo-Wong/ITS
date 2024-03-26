@@ -1,7 +1,7 @@
 ﻿#include "Mesh.hpp"
 #include "detail/Geometry.hpp"
 #include "utils/Common.hpp"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "CUDACompute.hpp"
 #include <sstream>
 #include <iomanip>
@@ -14,6 +14,7 @@
 
 NAMESPACE_BEGIN(ITS)
     namespace core {
+        using namespace utils::file;
 
         //////////////////////
         //   Constructors   //
@@ -266,109 +267,8 @@ NAMESPACE_BEGIN(ITS)
             Eigen::MatrixXd M;
             const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
             const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-            utils::getGaussianRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
+            getGaussianRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
             return M;
-        }
-
-        Eigen::MatrixXd
-        Mesh::generateUniformRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis) {
-            Eigen::MatrixXd M;
-            const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
-            const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-            utils::getUniformRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
-            return M;
-        }
-
-        Eigen::MatrixXd Mesh::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                                           const float &_scaleFactor, const float &dis) {
-            Eigen::MatrixXd M;
-            const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
-            const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-            utils::getGaussianRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
-
-            str_util::checkDir(filename);
-            std::ofstream out(filename, std::ofstream::out);
-            if (!out) {
-                spdlog::error("File \"{}\" could not be opened!", filename);
-                return M;
-            }
-            spdlog::info("Save random points to \"{}\".", filename);
-
-            if (str_util::getFileExtension(filename) == ".obj")
-                gvis::writePointCloud(M, out);
-            else if (str_util::getFileExtension(filename) == ".xyz")
-                gvis::writePointCloud_xyz(M, out);
-
-            return M;
-        }
-
-        Eigen::MatrixXd Mesh::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
-                                                          const float &_scaleFactor, const float &dis) {
-            Eigen::MatrixXd M;
-            const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
-            const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-            utils::getUniformRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
-
-            str_util::checkDir(filename);
-            std::ofstream out(filename, std::ofstream::out);
-            if (!out) {
-                spdlog::error("File \"{}\" could not be opened!", filename);
-                return M;
-            }
-            spdlog::info("Save random points to \"{}\".", filename);
-
-            if (str_util::getFileExtension(filename) == ".obj")
-                gvis::writePointCloud(M, out);
-            else if (str_util::getFileExtension(filename) == ".xyz")
-                gvis::writePointCloud_xyz(M, out);
-
-            return M;
-        }
-
-        std::vector<Vector3d>
-        Mesh::generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
-                                          const double &_scaleFactor, const Vector3d &dis) {
-            std::vector<Vector3d> randomPoints;
-            utils::getUniformRandomMatrix<Vector3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
-
-            str_util::checkDir(filename);
-            std::ofstream out(filename, std::ofstream::out);
-            if (!out) {
-                spdlog::error("File \"{}\" could not be opened!", filename);
-                return randomPoints;
-            }
-            spdlog::info("Save random points to \"{}\".", filename);
-
-            //std::cout << getFileExtension(filename) << std::endl;
-            if (str_util::getFileExtension(filename) == ".obj")
-                gvis::writePointCloud(randomPoints, out);
-            else if (str_util::getFileExtension(filename) == ".xyz")
-                gvis::writePointCloud_xyz(randomPoints, out);
-
-            return randomPoints;
-        }
-
-        std::vector<Vector3d>
-        Mesh::generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                           const double &_scaleFactor, const Vector3d &dis) {
-            std::vector<Vector3d> randomPoints;
-            utils::getGaussianRandomMatrix<Vector3d>(modelBoundingBox, numPoints, _scaleFactor, dis, randomPoints);
-
-            str_util::checkDir(filename);
-            std::ofstream out(filename, std::ofstream::out);
-            if (!out) {
-                spdlog::error("File \"{}\" could not be opened!", filename);
-                return randomPoints;
-            }
-            spdlog::info("Save random points to \"{}\".", filename);
-
-            //std::cout << getFileExtension(filename) << std::endl;
-            if (str_util::getFileExtension(filename) == ".obj")
-                gvis::writePointCloud(randomPoints, out);
-            else if (str_util::getFileExtension(filename) == ".xyz")
-                gvis::writePointCloud_xyz(randomPoints, out);
-
-            return randomPoints;
         }
 
         MatrixXd Mesh::getClosestPoint(const MatrixXd &queryPointMat) const {
@@ -408,13 +308,13 @@ NAMESPACE_BEGIN(ITS)
                 spdlog::error("File \"{}\" could not be opened!", filename);
                 exit(EXIT_FAILURE);
             }
-            modelName = str_util::getFileName(filename);
+            modelName = getFileName(filename);
         }
 
         void Mesh::writeMesh(const std::string &filename) const {
-            if (str_util::getFileExtension(filename) != ".obj") {
+            if (getFileExtension(filename) != ".obj") {
                 spdlog::error("Unsupported file format \"{}\"!",
-                              str_util::getFileExtension(filename));
+                              getFileExtension(filename));
                 return;
             }
             igl::writeOBJ(filename, vertMat, faceMat);

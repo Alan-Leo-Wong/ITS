@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "Config.hpp"
-#include "ModelDefine.h"
 #include "detail/BasicDataType.hpp"
 #include "detail/Geometry.hpp"
 #include <utility>
@@ -66,6 +65,9 @@ NAMESPACE_BEGIN(ITS)
             void setUniformBoundingBox();
 
         public:
+            AABox<Vector3d> getBoundingBox() const { return modelBoundingBox; }
+
+        public:
             /**
              * Extract edges from the model.
              * @return All edge pairs, represented by two vertex index
@@ -125,32 +127,6 @@ NAMESPACE_BEGIN(ITS)
              * [API]: Transform the model by calling 'calcTransformMatrix'.
              */
             void transformModel(double scaleFactor);
-
-        public:
-            Eigen::MatrixXd
-            generateGaussianRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis);
-
-            Eigen::MatrixXd
-            generateUniformRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis);
-
-            Eigen::MatrixXd
-            generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                         const float &_scaleFactor,
-                                         const float &dis);
-
-            Eigen::MatrixXd
-            generateUniformRandomPoints(const std::string &filename, const size_t &numPoints, const float &_scaleFactor,
-                                        const float &dis);
-
-            std::vector<Vector3d>
-            generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
-                                        const double &_scaleFactor,
-                                        const Vector3d &dis);
-
-            std::vector<Vector3d>
-            generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                         const double &_scaleFactor,
-                                         const Vector3d &dis);
 
         protected:
             [[nodiscard]] MatrixXd getClosestPoint(const MatrixXd &queryPointMat) const;

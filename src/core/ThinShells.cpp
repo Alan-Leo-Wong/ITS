@@ -6,7 +6,7 @@
 #include "detail/cuda/CUDAMath.cuh"
 #include "utils/Timer.hpp"
 #include "utils/Common.hpp"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "mc/MarchingCubes.hpp"
 #include <omp.h>
 #include <queue>
@@ -18,7 +18,8 @@
 
 NAMESPACE_BEGIN(ITS)
     namespace core {
-        using namespace utils;
+        using namespace utils::file;
+        using namespace utils::timer;
 
         //////////////////////
         //   Constructors   //
@@ -27,8 +28,8 @@ NAMESPACE_BEGIN(ITS)
                                                                                   svo_gridSize(_grid, _grid, _grid),
                                                                                   modelOrigin(
                                                                                           modelBoundingBox.boxOrigin),
-                                                                                  svo(_grid, _grid, _grid) {
-            svo.createOctree(nModelTris, trisVec, modelBoundingBox, concatFilePath(VIS_DIR, modelName));
+                                                                                  svo(_grid, modelBoundingBox) {
+            svo.createOctree(nModelTris, trisVec);
             treeDepth = svo.treeDepth;
             voxelWidth = svo.svoNodeArray[0].width;
 #ifdef IO_SAVE
@@ -40,8 +41,8 @@ NAMESPACE_BEGIN(ITS)
                                                                                               svo_gridSize(_grid),
                                                                                               modelOrigin(
                                                                                                       modelBoundingBox.boxOrigin),
-                                                                                              svo(_grid) {
-            svo.createOctree(nModelTris, trisVec, modelBoundingBox, concatFilePath(VIS_DIR, modelName));
+                                                                                              svo(_grid, modelBoundingBox) {
+            svo.createOctree(nModelTris, trisVec);
             treeDepth = svo.treeDepth;
             voxelWidth = svo.svoNodeArray[0].width;
 #ifdef IO_SAVE
@@ -885,7 +886,7 @@ NAMESPACE_BEGIN(ITS)
 #else
                 serializedRes = outerResolution;
                 determineGridSDF(outerResolution);
-                MC::marching_cubes(make_uint3(outerResolution),
+                mc::marching_cubes(make_uint3(outerResolution),
                                    make_double3(gridOrigin),
                                    make_double3(gridWidth),
                                    outerShellIsoVal,
@@ -905,7 +906,7 @@ NAMESPACE_BEGIN(ITS)
                     determineGridSDF(innerResolution);
                     serializedRes = outerResolution;
                 }
-                MC::marching_cubes(make_uint3(innerResolution),
+                mc::marching_cubes(make_uint3(innerResolution),
                                    make_double3(gridOrigin),
                                    make_double3(gridWidth),
                                    innerShellIsoVal,
@@ -923,7 +924,7 @@ NAMESPACE_BEGIN(ITS)
 #else
                 if (isoResolution != serializedRes)
                     determineGridSDF(isoResolution);
-                MC::marching_cubes(make_uint3(isoResolution),
+                mc::marching_cubes(make_uint3(isoResolution),
                                    make_double3(gridOrigin),
                                    make_double3(gridWidth),
                                    .0,

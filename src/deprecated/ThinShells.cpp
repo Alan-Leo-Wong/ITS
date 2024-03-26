@@ -4,7 +4,7 @@
 #include "utils/IO.hpp"
 #include "utils/Timer.hpp"
 #include "utils/Common.hpp"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "cuAcc/CUDACompute.h"
 #include "utils/cuda/CUDAMath.hpp"
 #include "cuAcc/MarchingCubes/MarchingCubes.h"
