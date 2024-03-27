@@ -1,5 +1,5 @@
 #include "Octree.h"
-#include "utils\String.hpp"
+#include "utils\File.hpp"
 #include <numeric>
 #include <iomanip>
 #include <queue>
@@ -59,7 +59,7 @@ inline void OctreeNode::setEdges()
 	edges.emplace_back(std::make_pair(corners[3], corners[7]));
 }
 
-// 判断q_boundary是否在node的影响域内
+// 锟叫讹拷q_boundary锟角凤拷锟斤拷node锟斤拷影锟斤拷锟斤拷锟斤拷
 //inline bool OctreeNode::isInDomain(const PV3d& q_boundary)
 //{
 //	V3d st_b = q_boundary.first;
@@ -148,7 +148,7 @@ inline void Octree::createNode(OctreeNode*& node, const int& depth,
 	}
 }
 
-// 用于自下向上得到nodeId对应的原点坐标
+// 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟较得碉拷nodeId锟斤拷应锟斤拷原锟斤拷锟斤拷锟斤拷
 V3d Octree::getNodeCoord(const size_t& nodeId, const V3d& width)
 {
 	if (nodeId <= 0) return V3d(0, 0, 0);

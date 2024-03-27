@@ -3,7 +3,7 @@
 #include "SVO.hpp"
 #include "BaseModel.hpp"
 //#include "ParticleMesh.h"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "test/TestConfig.h"
 
 NAMESPACE_BEGIN(ITS)

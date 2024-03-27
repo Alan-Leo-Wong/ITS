@@ -2,7 +2,7 @@
 #include "SVO.h"
 #include "BaseModel.h"
 #include "ParticleMesh.h"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "test/TestConfig.h"
 
 class ThinShells : public BaseModel, public ParticleMesh
@@ -174,7 +174,7 @@ private:
 	void lbfgs_optimization(const int& maxIterations, const std::string& out_file) override;
 
 public:
-	// µãÔÚ±íÃæµÄ²éÑ¯
+	// ï¿½ï¿½ï¿½Ú±ï¿½ï¿½ï¿½Ä²ï¿½Ñ¯
 	void singlePointQuery(const std::string& out_file, const V3d& point);
 
 	vector<int> multiPointQuery(const vector<V3d>& points, double& time, const int& session, const test_type& choice = Test::CPU);

@@ -20,7 +20,7 @@
 #endif // WIN32
 
 NAMESPACE_BEGIN(ITS)
-    namespace utils {
+    namespace utils::timer {
 
         class TimerInterface {
         public:
@@ -329,5 +329,5 @@ NAMESPACE_BEGIN(ITS)
             }
         }
 
-    } // namespace utils
+    } // namespace utils::timer
 NAMESPACE_END(ITS)

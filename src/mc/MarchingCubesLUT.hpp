@@ -3,7 +3,7 @@
 #include "Config.hpp"
 
 NAMESPACE_BEGIN(ITS)
-namespace MC {
+namespace mc {
 // triTable is used which this time uses the same cube index but allows the
 // vertex sequence to be looked up for as many triangular facets are necessary
 // to represent the isosurface within the grid cell

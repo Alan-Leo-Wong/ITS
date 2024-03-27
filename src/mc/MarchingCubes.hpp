@@ -1,14 +1,15 @@
 #pragma once
 
 #include "core/SVO.hpp"
+#include "core/Mesh.hpp"
 #include "detail/cuda/CUDACheck.cuh"
 #include "detail/cuda/CUDAMath.cuh"
+#include <memory>
 #include <thrust/host_vector.h>
 #include <Eigen/Dense>
 
 NAMESPACE_BEGIN(ITS)
-
-    namespace MCKernel {
+    namespace mc::detail {
         using namespace svo;
         using namespace Eigen;
 
@@ -110,28 +111,21 @@ NAMESPACE_BEGIN(ITS)
                 *d_nVertsScanned,
                 double3 *d_triPoints
         );
-    } // namespace MCKernel
+    } // namespace detail
 
-    namespace MC {
-        // ����kernel: prepareMatrix
-#ifndef P_NTHREADS_X // node corner
-#  define P_NTHREADS_X 64
-#endif // !P_NTHREADS_X
-#ifndef P_NTHREADS_Y // voxel corner
-#  define P_NTHREADS_Y 16
-#endif // !P_NTHREADS_Y
+    namespace mc::detail {
 
-        // ����kernel: determine��tomesh
-#ifndef V_NTHREADS
-#  define V_NTHREADS 256
-#endif // !NTHREADS
+// for kernel: prepareMatrix
+#define P_NTHREADS_X 64 // node corner
+#define P_NTHREADS_Y 16 // voxel corner
 
-#ifndef MAX_NUM_STREAMS
-#  define MAX_NUM_STREAMS 128 // ���ڴ����з���--voxel�����ֿ���
-#endif // !MAX_NUM_STREAMS
-    }
+#define V_NTHREADS 256 // for kernel: determine and tomesh
 
-    namespace MC {
+#define MAX_NUM_STREAMS 128 // maximum number of blocks used for processing voxel in the row direction
+
+    } // namespace detail
+
+    namespace mc {
         // host
         //namespace {
         extern uint numNodeVerts;
@@ -177,7 +171,7 @@ NAMESPACE_BEGIN(ITS)
         //} // namespace
     } // namespace MC
 
-    namespace MC {
+    namespace mc {
         using namespace svo;
         using namespace Eigen;
 
@@ -197,8 +191,8 @@ NAMESPACE_BEGIN(ITS)
 
         void launch_computSDFKernel(const uint &nVoxels,
                                     const uint &numNodes, const size_t &_numNodeVerts,
-                                    const VectorXd &lambda, const std::vector <V3d> &nodeWidthArray,
-                                    const std::vector <thrust::pair<Eigen::Vector3d, uint32_t>> &nodeVertexArray);
+                                    const VectorXd &lambda, const std::vector<V3d> &nodeWidthArray,
+                                    const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>> &nodeVertexArray);
 
         void launch_determineVoxelKernel(const uint &nVoxels, const double &isoVal, const uint &maxVerts);
 
@@ -206,20 +200,22 @@ NAMESPACE_BEGIN(ITS)
 
         void launch_voxelToMeshKernel(const uint &maxVerts, const uint &nVoxels);
 
+        std::shared_ptr<core::Mesh> writeToMesh();
+
         void writeToOBJFile(const std::string &filename);
 
-        void marching_cubes(const std::vector <thrust::pair<Eigen::Vector3d, uint32_t>> &nodeVertexArray,
-                            size_t numNodes, const std::vector <V3d> &nodeWidthArray,
+        void marching_cubes(const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>> &nodeVertexArray,
+                            size_t numNodes, const std::vector<V3d> &nodeWidthArray,
                             size_t numSVONodeVerts, const VectorXd &lambda, double3 gridOrigin,
                             double3 gridWidth,
                             uint3 resolution, double isoVal, const std::string &filename);
 
-        void marching_cubes(uint3 resolution,
+        std::shared_ptr<core::Mesh> marching_cubes(uint3 resolution,
                             double3 gridOrigin,
                             double3 gridWidth,
                             double isoVal,
-                            const thrust::host_vector<double>& gridSDF,
-                            const std::string &filename);
+                            const thrust::host_vector<double> &gridSDF);
 
     } // namespace MC
+
 NAMESPACE_END(ITS)

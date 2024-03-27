@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "Config.hpp"
-#include "ModelDefine.h"
 #include "detail/BasicDataType.hpp"
 #include "detail/Geometry.hpp"
 #include <utility>
@@ -66,6 +65,13 @@ NAMESPACE_BEGIN(ITS)
             void setUniformBoundingBox();
 
         public:
+            [[nodiscard]] MatrixXd getVertMat() const noexcept { return vertMat; }
+
+            [[nodiscard]] MatrixXi getFaceMat() const noexcept { return faceMat; }
+
+            [[nodiscard]] AABBox<double, 3> getBoundingBox() const noexcept { return modelBoundingBox; }
+
+        public:
             /**
              * Extract edges from the model.
              * @return All edge pairs, represented by two vertex index
@@ -126,32 +132,6 @@ NAMESPACE_BEGIN(ITS)
              */
             void transformModel(double scaleFactor);
 
-        public:
-            Eigen::MatrixXd
-            generateGaussianRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis);
-
-            Eigen::MatrixXd
-            generateUniformRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis);
-
-            Eigen::MatrixXd
-            generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                         const float &_scaleFactor,
-                                         const float &dis);
-
-            Eigen::MatrixXd
-            generateUniformRandomPoints(const std::string &filename, const size_t &numPoints, const float &_scaleFactor,
-                                        const float &dis);
-
-            std::vector<Vector3d>
-            generateUniformRandomPoints(const std::string &filename, const size_t &numPoints,
-                                        const double &_scaleFactor,
-                                        const Vector3d &dis);
-
-            std::vector<Vector3d>
-            generateGaussianRandomPoints(const std::string &filename, const size_t &numPoints,
-                                         const double &_scaleFactor,
-                                         const Vector3d &dis);
-
         protected:
             [[nodiscard]] MatrixXd getClosestPoint(const MatrixXd &queryPointMat) const;
 
@@ -184,7 +164,7 @@ NAMESPACE_BEGIN(ITS)
             std::string modelName;
             double unitScaleFactor; // record scale factor when calling 'model2UnitCube'
 
-            AABox<Eigen::Vector3d> modelBoundingBox;
+            AABBox<double, 3> modelBoundingBox;
             igl::AABB<MatrixXd, 3> aabbTree;
         };
 

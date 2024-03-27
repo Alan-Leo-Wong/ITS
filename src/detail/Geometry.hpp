@@ -1,10 +1,88 @@
 #pragma once
 
 #include "Config.hpp"
+#include <random>
 #include <fstream>
 #include <Eigen/Dense>
 
 NAMESPACE_BEGIN(ITS)
+
+    /**
+     * Axis Aligned Bounding-Box (AABB)
+     * @tparam Scalar
+     * @tparam DIM
+     * @tparam T
+     */
+    template<typename Scalar, int DIM, typename T=Eigen::Matrix<Scalar, DIM, 1>>
+    struct AABBox {
+        using type = T;
+
+        T boxOrigin;
+        T boxEnd;
+        T boxWidth;
+
+        CUDA_GENERAL_CALL AABBox() : boxOrigin(T()), boxEnd(T()), boxWidth(T()) {}
+
+        CUDA_GENERAL_CALL AABBox(const T &_boxOrigin, const T &_boxEnd) : boxOrigin(_boxOrigin), boxEnd(_boxEnd),
+                                                                          boxWidth(_boxEnd - _boxOrigin) {}
+
+        CUDA_GENERAL_CALL void scaleAndTranslate(double scale_factor, const T &translation) {
+            T center = (boxOrigin + boxEnd) / 2.0;
+
+            T scaled_min_point = (boxOrigin - center) * scale_factor + center + translation;
+            T scaled_max_point = (boxEnd - center) * scale_factor + center + translation;
+
+            boxOrigin = scaled_min_point;
+            boxEnd = scaled_max_point;
+        }
+
+        CUDA_GENERAL_CALL AABBox<Scalar, DIM, T>(const AABBox<Scalar, DIM, T> &_box) {
+            boxOrigin = _box.boxOrigin;
+            boxEnd = _box.boxEnd;
+            boxWidth = _box.boxWidth;
+        }
+
+        CUDA_GENERAL_CALL AABBox<Scalar, DIM, T> &operator=(const AABBox<Scalar, DIM, T> &_box) {
+            boxOrigin = _box.boxOrigin;
+            boxEnd = _box.boxEnd;
+            boxWidth = _box.boxWidth;
+
+            return *this;
+        }
+    };
+
+    /**
+     * 3D Triangle
+     * @tparam Scalar
+     * @tparam T
+     */
+    /*template<typename Scalar, typename T=Eigen::Matrix<Scalar, 3, 1>>
+    struct Triangle {
+        using type = Eigen::Matrix<Scalar, 3, 1>;
+
+        T p1, p2, p3;
+        T normal;
+        Scalar area;
+        Scalar dir;
+
+        CUDA_GENERAL_CALL Triangle() = default;
+
+        CUDA_GENERAL_CALL Triangle(const T &_p1, const T &_p2, const T &_p3) : p1(_p1), p2(_p2), p3(_p3) {}
+    };*/
+    template<typename T=Eigen::Vector3d>
+    struct Triangle {
+        using type = T;
+
+        T p1, p2, p3;
+        T normal;
+        double area;
+        double dir;
+
+        CUDA_GENERAL_CALL Triangle() = default;
+
+        CUDA_GENERAL_CALL Triangle(const T &_p1, const T &_p2, const T &_p3) : p1(_p1), p2(_p2), p3(_p3) {}
+    };
+
     namespace gvis {
 
         // Helper function to write single vertex to OBJ file
@@ -71,36 +149,36 @@ NAMESPACE_BEGIN(ITS)
             // create faces
 #if defined(MESH_WRITE)
             // back
-        write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 3, faceBegIdx + 4));
-        write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 4, faceBegIdx + 2));
-        // bottom
-        write_face(output, Eigen::Vector3i(faceBegIdx + 4, faceBegIdx + 3, faceBegIdx + 6));
-        write_face(output, Eigen::Vector3i(faceBegIdx + 4, faceBegIdx + 6, faceBegIdx + 5));
-        // right
-        write_face(output, Eigen::Vector3i(faceBegIdx + 3, faceBegIdx + 1, faceBegIdx + 8));
-        write_face(output, Eigen::Vector3i(faceBegIdx + 3, faceBegIdx + 8, faceBegIdx + 6));
-        // top
-        write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 2, faceBegIdx + 7));
-        write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 7, faceBegIdx + 8));
-        // left
-        write_face(output, Eigen::Vector3i(faceBegIdx + 2, faceBegIdx + 4, faceBegIdx + 5));
-        write_face(output, Eigen::Vector3i(faceBegIdx + 2, faceBegIdx + 5, faceBegIdx + 7));
-        // front
-        write_face(output, Eigen::Vector3i(faceBegIdx + 5, faceBegIdx + 6, faceBegIdx + 8));
-        write_face(output, Eigen::Vector3i(faceBegIdx + 5, faceBegIdx + 8, faceBegIdx + 7));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 3, faceBegIdx + 4));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 4, faceBegIdx + 2));
+            // bottom
+            write_face(output, Eigen::Vector3i(faceBegIdx + 4, faceBegIdx + 3, faceBegIdx + 6));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 4, faceBegIdx + 6, faceBegIdx + 5));
+            // right
+            write_face(output, Eigen::Vector3i(faceBegIdx + 3, faceBegIdx + 1, faceBegIdx + 8));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 3, faceBegIdx + 8, faceBegIdx + 6));
+            // top
+            write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 2, faceBegIdx + 7));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 1, faceBegIdx + 7, faceBegIdx + 8));
+            // left
+            write_face(output, Eigen::Vector3i(faceBegIdx + 2, faceBegIdx + 4, faceBegIdx + 5));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 2, faceBegIdx + 5, faceBegIdx + 7));
+            // front
+            write_face(output, Eigen::Vector3i(faceBegIdx + 5, faceBegIdx + 6, faceBegIdx + 8));
+            write_face(output, Eigen::Vector3i(faceBegIdx + 5, faceBegIdx + 8, faceBegIdx + 7));
 #  elif defined(CUBE_WRITE)
             // back
-        write_face(output, Eigen::Vector4i(faceBegIdx + 3, faceBegIdx + 4, faceBegIdx + 2, faceBegIdx + 1));
-        // bottom
-        write_face(output, Eigen::Vector4i(faceBegIdx + 6, faceBegIdx + 5, faceBegIdx + 4, faceBegIdx + 3));
-        // right
-        write_face(output, Eigen::Vector4i(faceBegIdx + 1, faceBegIdx + 8, faceBegIdx + 6, faceBegIdx + 3));
-        // top
-        write_face(output, Eigen::Vector4i(faceBegIdx + 1, faceBegIdx + 2, faceBegIdx + 7, faceBegIdx + 8));
-        // left
-        write_face(output, Eigen::Vector4i(faceBegIdx + 4, faceBegIdx + 5, faceBegIdx + 7, faceBegIdx + 2));
-        // front
-        write_face(output, Eigen::Vector4i(faceBegIdx + 8, faceBegIdx + 7, faceBegIdx + 5, faceBegIdx + 6));
+            write_face(output, Eigen::Vector4i(faceBegIdx + 3, faceBegIdx + 4, faceBegIdx + 2, faceBegIdx + 1));
+            // bottom
+            write_face(output, Eigen::Vector4i(faceBegIdx + 6, faceBegIdx + 5, faceBegIdx + 4, faceBegIdx + 3));
+            // right
+            write_face(output, Eigen::Vector4i(faceBegIdx + 1, faceBegIdx + 8, faceBegIdx + 6, faceBegIdx + 3));
+            // top
+            write_face(output, Eigen::Vector4i(faceBegIdx + 1, faceBegIdx + 2, faceBegIdx + 7, faceBegIdx + 8));
+            // left
+            write_face(output, Eigen::Vector4i(faceBegIdx + 4, faceBegIdx + 5, faceBegIdx + 7, faceBegIdx + 2));
+            // front
+            write_face(output, Eigen::Vector4i(faceBegIdx + 8, faceBegIdx + 7, faceBegIdx + 5, faceBegIdx + 6));
 #  else
             write_line(output, Eigen::Vector2i(faceBegIdx + 1, faceBegIdx + 2));
             write_line(output, Eigen::Vector2i(faceBegIdx + 2, faceBegIdx + 7));
@@ -157,61 +235,184 @@ NAMESPACE_BEGIN(ITS)
         inline void writePointCloud(const Eigen::Vector3d &point, const Eigen::Vector3d &rgb, std::ofstream &output) {
             write_vertex(output, point, rgb);
         }
-    }
 
-    /**
-     * An Axis Aligned Box (AAB) of a certain Real -
-     * to be initialized with a boxOrigin and boxEnd
-     * @tparam Real
-     */
-    template<typename Real>
-    struct AABox {
-        //using Real = typename Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
+    } // namespace gvis
 
-        Real boxOrigin;
-        Real boxEnd;
-        Real boxWidth;
+    namespace pointgen {
+        template<typename Scalar, int DIM, typename T=Eigen::Matrix<Scalar, DIM, 1>>
+        inline bool getUniformRandomMatrix(const T &min_area,
+                                           const T &max_area,
+                                           size_t num, Eigen::Matrix<Scalar, Eigen::Dynamic, DIM> &M,
+                                           double scaleFactor = 1.0, const T &dis = T::Zero()) {
+            M.resize(num, DIM);
+            std::default_random_engine e(time(0)); // current time as seed
+            std::uniform_real_distribution<Scalar> n(-1, 1);
+            M = Eigen::Matrix<Scalar, Eigen::Dynamic, DIM>::Zero(num, DIM)
+                    .unaryExpr([&](Scalar val) { return static_cast<Scalar>(round((n(e) + 1e-6) * 1e6) / 1e6); });
 
-        CUDA_GENERAL_CALL AABox() : boxOrigin(Real()), boxEnd(Real()), boxWidth(Real()) {}
+            M.conservativeResize(num + 1, DIM + 1); // strange value because reallocate memory
+            Eigen::Matrix<Scalar, 1, DIM + 1> r_zeroVec(num);
+            Eigen::Matrix<Scalar, Eigen::Dynamic, 1> c_onesVec(num + 1);
+            r_zeroVec.setZero();
+            c_onesVec.setOnes();
+            M.row(num) = r_zeroVec;
+            M.col(DIM) = c_onesVec;
 
-        CUDA_GENERAL_CALL AABox(const Real &_boxOrigin, const Real &_boxEnd) : boxOrigin(_boxOrigin), boxEnd(_boxEnd),
-                                                                               boxWidth(_boxEnd - _boxOrigin) {}
+            const T min_m = M.colwise().minCoeff();
+            const T max_m = M.colwise().maxCoeff();
 
-        CUDA_GENERAL_CALL void scaleAndTranslate(const double &scale_factor, const V3d &translation) {
-            Real center = (boxOrigin + boxEnd) / 2.0;
+            T diag_area = max_area - min_area; // bounding box
+            T diag_m = max_m - min_m; // random points
 
-            Real scaled_min_point = (boxOrigin - center) * scale_factor + center + translation;
-            Real scaled_max_point = (boxEnd - center) * scale_factor + center + translation;
+            T center_area = 0.5 * (max_area + min_area);
+            T center_m = 0.5 * (max_m + min_m);
 
-            boxOrigin = scaled_min_point;
-            boxEnd = scaled_max_point;
+            Eigen::Matrix<Scalar, DIM + 1, DIM + 1> zoomMatrix = Eigen::Matrix<Scalar, DIM + 1, DIM + 1>::Identity();
+            Eigen::Matrix<Scalar, DIM + 1, DIM + 1> transMatrix = Eigen::Matrix<Scalar, DIM + 1, DIM + 1>::Identity();
+
+            for (int d = 0; d < DIM; d++) {
+                if (diag_m[d] == 0) return false;
+                zoomMatrix(d, d) = (diag_area[d] / diag_m[d]) * scaleFactor;
+                transMatrix(DIM, d) = (center_area[d] - center_m[d] * zoomMatrix(d, d)) + dis(d);
+            }
+
+            M = M * zoomMatrix * transMatrix;
+            M = (M.array().abs() < 1e-9).select(0, M);
+
+            return true;
         }
 
-        CUDA_GENERAL_CALL AABox<Real>(const AABox<Real> &_box) {
-            boxOrigin = _box.boxOrigin;
-            boxEnd = _box.boxEnd;
-            boxWidth = _box.boxWidth;
+        template<typename Scalar, int DIM, typename T=Eigen::Matrix<Scalar, DIM, 1>>
+        inline bool getGaussianRandomMatrix(const T &min_area,
+                                            const T &max_area,
+                                            size_t num, Eigen::Matrix<Scalar, Eigen::Dynamic, DIM> &M,
+                                            double scaleFactor = 1.0, const T &dis = T::Zero()) {
+            M.resize(num, DIM);
+            std::default_random_engine e(1314); // current time as seed
+            std::normal_distribution<Scalar> n(-1, 1);
+            M = Eigen::Matrix<Scalar, Eigen::Dynamic, DIM>::Zero(num, DIM)
+                    .unaryExpr([&](Scalar val) { return static_cast<Scalar>(round((n(e) + 1e-6) * 1e6) / 1e6); });
+
+            M.conservativeResize(num + 1, DIM + 1); // strange value because reallocate memory
+            Eigen::Matrix<Scalar, 1, DIM + 1> r_zeroVec(num);
+            Eigen::Matrix<Scalar, Eigen::Dynamic, 1> c_onesVec(num + 1);
+            r_zeroVec.setZero();
+            c_onesVec.setOnes();
+            M.row(num) = r_zeroVec;
+            M.col(DIM) = c_onesVec;
+
+            const T min_m = M.colwise().minCoeff();
+            const T max_m = M.colwise().maxCoeff();
+
+            T diag_area = max_area - min_area; // bounding box
+            T diag_m = max_m - min_m; // random points
+
+            T center_area = 0.5 * (max_area + min_area);
+            T center_m = 0.5 * (max_m + min_m);
+
+            Eigen::Matrix<Scalar, DIM + 1, DIM + 1> zoomMatrix = Eigen::Matrix<Scalar, DIM + 1, DIM + 1>::Identity();
+            Eigen::Matrix<Scalar, DIM + 1, DIM + 1> transMatrix = Eigen::Matrix<Scalar, DIM + 1, DIM + 1>::Identity();
+
+            for (int d = 0; d < DIM; d++) {
+                if (diag_m[d] == 0) return false;
+                zoomMatrix(d, d) = (diag_area[d] / diag_m[d]) * scaleFactor;
+                transMatrix(DIM, d) = (center_area[d] - center_m[d] * zoomMatrix(d, d)) + dis(d);
+            }
+
+            M = M * zoomMatrix * transMatrix;
+            M = (M.array().abs() < 1e-9).select(0, M);
+
+            return true;
         }
 
-        CUDA_GENERAL_CALL AABox<Real> &operator=(const AABox<Real> &_box) {
-            boxOrigin = _box.boxOrigin;
-            boxEnd = _box.boxEnd;
-            boxWidth = _box.boxWidth;
+        template<typename Scalar, int DIM, typename T=Eigen::Matrix<Scalar, DIM, 1>>
+        inline bool genUniformRandomPoints(const AABBox<Scalar, DIM, T> &_area,
+                                           size_t num, Eigen::Matrix<Scalar, Eigen::Dynamic, DIM> &M,
+                                           double scaleFactor = 1.0, const T &dis = T::Zero()) {
+            static_assert(DIM >= 2, "DIM must at least 2");
+            if (scaleFactor <= .0) return false;
 
-            return *this;
+            AABBox<Scalar, DIM, T> area = _area;
+            area.scaleAndTranslate(scaleFactor, dis);
+
+            auto haltonSequence = [](int index, int base) {
+                double result = 0.0;
+                double f = 1.0 / base;
+                int i = index;
+
+                while (i > 0) {
+                    result += f * (i % base);
+                    i = std::floor(i / base);
+                    f /= base;
+                }
+
+                return result;
+            };
+
+            auto mapToRange = [](double value, double min, double max) {
+                return min + value * (max - min);
+            };
+
+            T minArea = area.boxOrigin;
+            T maxArea = area.boxEnd;
+
+            int baseX = 2;
+            int baseY = 3;
+            int baseZ;
+            if constexpr (DIM == 3) baseZ = 5;
+
+            M.resize(num, DIM);
+            for (int i = 0; i < num; ++i) {
+                Scalar x = mapToRange(haltonSequence(i, baseX), minArea.x(), maxArea.x());
+                Scalar y = mapToRange(haltonSequence(i, baseY), minArea.y(), maxArea.y());
+                if constexpr (DIM == 3) {
+                    Scalar z = mapToRange(haltonSequence(i, baseZ), minArea.z(), maxArea.z());
+                    M.row(i) = Eigen::Matrix<Scalar, 1, DIM>(x, y, z);
+                } else {
+                    M.row(i) = Eigen::Matrix<Scalar, 1, DIM>(x, y);
+                }
+            }
+
+            return true;
         }
-    };
 
-    template<typename Real>
-    struct Triangle {
-        Real p1, p2, p3;
-        Real normal;
-        double area;
-        double dir;
+        template<typename Scalar, int DIM, typename T=Eigen::Matrix<Scalar, DIM, 1>>
+        inline bool genGaussianRandomPoints(const AABBox<Scalar, DIM, T> &_area,
+                                            size_t num, Eigen::Matrix<Scalar, Eigen::Dynamic, DIM> &M,
+                                            double scaleFactor = 1.0, const T &dis = T::Zero()) {
+            static_assert(DIM >= 2, "DIM must at least 2");
+            if (scaleFactor <= .0) return false;
 
-        CUDA_GENERAL_CALL Triangle() = default;
+            AABBox<Scalar, DIM, T> area = _area;
+            area.scaleAndTranslate(scaleFactor, dis);
 
-        CUDA_GENERAL_CALL Triangle(const Real &_p1, const Real &_p2, const Real &_p3) : p1(_p1), p2(_p2), p3(_p3) {}
-    };
+            static std::random_device rd; //
+            static std::mt19937 gen(rd());
+            auto gaussianSample = [](Scalar mean, Scalar stddev) {
+                std::normal_distribution<double> dist(0.0, 1.0);
+
+                T sample;
+                for (int i = 0; i < DIM; ++i)
+                    sample(i) = mean(i) + stddev(i) * dist(gen);
+
+                return sample;
+            };
+
+            T minArea = area.boxOrigin;
+            T maxArea = area.boxEnd;
+
+            T mean = (maxArea + minArea) / 2.0;
+            T stddev = (maxArea - minArea) / 6.0;
+
+            M.resize(num, DIM);
+            for (int i = 0; i < num; ++i) {
+                Eigen::Matrix<Scalar, 1, DIM> sample = gaussianSample(mean, stddev);
+                M.row(i) = sample;
+            }
+
+            return true;
+        }
+
+    } // namespace pointgen
 
 NAMESPACE_END(ITS)

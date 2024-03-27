@@ -1,7 +1,7 @@
 #include "BaseModel.hpp"
 #include "utils/IO.hpp"
 #include "utils/Common.hpp"
-#include "utils/String.hpp"
+#include "utils/File.hpp"
 #include "CUDACompute.hpp"
 #include <sstream>
 #include <iomanip>

@@ -35,17 +35,18 @@ NAMESPACE_BEGIN(ITS)
                 }
             };
 
-            template<typename Real>
+            template<typename T>
             __global__ void modelTriAttributeKernel(size_t nTriangles,
-                                                    Triangle <Real> *d_modelTriangleArray) {
+                                                    Triangle<T> *d_modelTriangleArray) {
+                using type = typename Triangle<T>::type;
                 const size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
 
                 if (tid < nTriangles) {
-                    const Real p1 = d_modelTriangleArray[tid].p1;
-                    const Real p2 = d_modelTriangleArray[tid].p2;
-                    const Real p3 = d_modelTriangleArray[tid].p3;
+                    const type p1 = d_modelTriangleArray[tid].p1;
+                    const type p2 = d_modelTriangleArray[tid].p2;
+                    const type p3 = d_modelTriangleArray[tid].p3;
 
-                    const Real normal = (p2 - p1).cross(p3 - p1);
+                    const type normal = (p2 - p1).cross(p3 - p1);
 
                     d_modelTriangleArray[tid].normal = normal;
                     d_modelTriangleArray[tid].area = 0.5 * (normal.norm());
@@ -692,8 +693,8 @@ NAMESPACE_BEGIN(ITS)
         } // namespace detail
 
         void launch_modelTriAttributeKernel(size_t nTriangles,
-                                            std::vector<Triangle<Eigen::Vector3d>> &modelTriangleArray) {
-            thrust::device_vector<Triangle<Eigen::Vector3d>> d_modelTriangleArray = modelTriangleArray;
+                                            std::vector<Triangle<Vector3d>> &modelTriangleArray) {
+            thrust::device_vector<Triangle<Vector3d>> d_modelTriangleArray = modelTriangleArray;
             int blockSize, gridSize, minGridSize;
             getOccupancyMaxPotentialBlockSize(nTriangles, minGridSize, blockSize, gridSize,
                                               detail::modelTriAttributeKernel<Eigen::Vector3d>, 0, 0);
@@ -702,7 +703,7 @@ NAMESPACE_BEGIN(ITS)
             getLastCudaError("Kernel 'modelTriAttributeKernel' launch failed!\n");
 
             CUDA_CHECK(cudaMemcpy(modelTriangleArray.data(), d_modelTriangleArray.data().get(),
-                                  sizeof(Triangle<Eigen::Vector3d>) * nTriangles, cudaMemcpyDeviceToHost));
+                                  sizeof(Triangle<Vector3d>) * nTriangles, cudaMemcpyDeviceToHost));
         }
 
         void launch_BLASRowSumReduce(int rows,
