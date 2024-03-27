@@ -3,6 +3,7 @@
 #include "core/SVO.hpp"
 #include "detail/cuda/CUDACheck.cuh"
 #include "detail/cuda/CUDAMath.cuh"
+#include <core/Mesh.hpp>
 #include <thrust/host_vector.h>
 #include <Eigen/Dense>
 
@@ -198,6 +199,8 @@ NAMESPACE_BEGIN(ITS)
 
         void launch_voxelToMeshKernel(const uint &maxVerts, const uint &nVoxels);
 
+        const core::Mesh& writeToMesh();
+
         void writeToOBJFile(const std::string &filename);
 
         void marching_cubes(const std::vector<thrust::pair<Eigen::Vector3d, uint32_t>> &nodeVertexArray,
@@ -206,12 +209,11 @@ NAMESPACE_BEGIN(ITS)
                             double3 gridWidth,
                             uint3 resolution, double isoVal, const std::string &filename);
 
-        void marching_cubes(uint3 resolution,
+        const core::Mesh& marching_cubes(uint3 resolution,
                             double3 gridOrigin,
                             double3 gridWidth,
                             double isoVal,
-                            const thrust::host_vector<double> &gridSDF,
-                            const std::string &filename);
+                            const thrust::host_vector<double> &gridSDF);
 
     } // namespace MC
 

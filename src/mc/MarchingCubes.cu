@@ -638,6 +638,27 @@ NAMESPACE_BEGIN(ITS)
             CUDA_CHECK(cudaFree(d_triPoints));
         }
 
+        const core::Mesh &writeToMesh() {
+            logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
+            logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+
+            Eigen::MatrixXd meshVertMat(allTriVertices, 3);
+            Eigen::MatrixXi meshfaceMat(allTriVertices / 3, 3);
+            for (int i = 0; i < allTriVertices; i += 3) {
+                meshVertMat.row(i) = Eigen::RowVector3d(h_triPoints[i].x,
+                                                        h_triPoints[i].y,
+                                                        h_triPoints[i].z);
+                meshVertMat.row(i + 1) = Eigen::RowVector3d(h_triPoints[i + 1].x,
+                                                            h_triPoints[i + 1].y,
+                                                            h_triPoints[i + 1].z);
+                meshVertMat.row(i + 2) = Eigen::RowVector3d(h_triPoints[i + 2].x,
+                                                            h_triPoints[i + 2].y,
+                                                            h_triPoints[i + 2].z);
+                meshfaceMat.row(i) = Eigen::RowVector3i(i + 1, i + 2, i + 3);
+            }
+            return core::Mesh(meshVertMat, meshfaceMat);
+        }
+
         void writeToOBJFile(const std::string &filename) {
             utils::file::checkDir(filename);
             std::ofstream out(filename);
@@ -648,8 +669,9 @@ NAMESPACE_BEGIN(ITS)
 
             logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
             logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+
             for (int i = 0; i < allTriVertices; i += 3) {
-                const int faceIdx = i;
+                int faceIdx = i;
 
                 out << "v " << h_triPoints[i].x << ' ' << h_triPoints[i].y << ' '
                     << h_triPoints[i].z << '\n';
@@ -666,12 +688,12 @@ NAMESPACE_BEGIN(ITS)
         }
 
         /**
-         * @brief 主方法
+         * [API]: Main method for user calling
          *
          * @param gridOrigin origin coordinate of grid
          * @param gridWidth  width of grid
-         * @param resolution voxel 的分辨率
-         * @param isoVal     isosurface value
+         * @param resolution resolution of voxel
+         * @param isoVal     iso-surface value
          * @param filename   output obj file
          */
         void marching_cubes(const std::vector<thrust::pair<Vector3d, uint32_t>> &nodeVertexArray,
@@ -722,12 +744,21 @@ NAMESPACE_BEGIN(ITS)
             freeCommonResources();
         }
 
-        void marching_cubes(uint3 resolution,
-                            double3 gridOrigin,
-                            double3 gridWidth,
-                            double isoVal,
-                            const thrust::host_vector<double> &gridSDF,
-                            const std::string &filename) {
+        /**
+         * [API]: Main method for user calling
+         *
+         * @param resolution resolution of voxel
+         * @param gridOrigin origin coordinate of grid
+         * @param gridWidth width of grid
+         * @param isoVal iso-surface value
+         * @param gridSDF sdf of grid points
+         * @return
+         */
+        const core::Mesh &marching_cubes(uint3 resolution,
+                                         double3 gridOrigin,
+                                         double3 gridWidth,
+                                         double isoVal,
+                                         const thrust::host_vector<double> &gridSDF) {
             uint nVoxels = resolution.x * resolution.y * resolution.z;
 
             uint maxVerts = nVoxels * 18;
@@ -747,7 +778,7 @@ NAMESPACE_BEGIN(ITS)
             launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
             if (allTriVertices == 0) {
                 spdlog::warn("-- [MC] There is no valid vertices...");
-                return;
+                return core::Mesh();
             }
 
             launch_compactVoxelsKernel(nVoxels);
@@ -757,11 +788,11 @@ NAMESPACE_BEGIN(ITS)
             end = system_clock::now();
             duration<double> elapsed_seconds = end - start;
             logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
-            logger().info("-- [MC] Writing to {}...", filename);
 
-            writeToOBJFile(filename);
-
+            const core::Mesh &M = writeToMesh();
             freeCommonResources();
+
+            return M;
         }
 
     } // namespace mc

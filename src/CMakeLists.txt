@@ -18,7 +18,7 @@
 #)
 
 ###########################################
-# Detail folder
+# detail folder
 add_subdirectory(detail)
 #link_libraries(ITS::DETAIL)
 
@@ -27,15 +27,21 @@ add_subdirectory(detail)
 add_subdirectory(mc)
 
 ###########################################
-# Core folder
+# core folder
 add_subdirectory(core)
+
+###########################################
+# viewer folder
+if (ENABLE_IMGUI_VIEWER)
+    add_subdirectory(viewer)
+endif ()
 
 ###########################################
 # Organize linkings
 target_link_libraries(ITS_GPU_MC
         PRIVATE
         ITS::SVO
-        # ITS::MODEL
+        igl::core
 )
 
 target_link_libraries(ITS_MODEL

@@ -65,7 +65,11 @@ NAMESPACE_BEGIN(ITS)
             void setUniformBoundingBox();
 
         public:
-            [[nodiscard]] AABBox<double, 3> getBoundingBox() const { return modelBoundingBox; }
+            [[nodiscard]] MatrixXd getVertMat() const noexcept { return vertMat; }
+
+            [[nodiscard]] MatrixXi getFaceMat() const noexcept { return faceMat; }
+
+            [[nodiscard]] AABBox<double, 3> getBoundingBox() const noexcept { return modelBoundingBox; }
 
         public:
             /**

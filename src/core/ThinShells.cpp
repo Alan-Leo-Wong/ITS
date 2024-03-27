@@ -829,13 +829,14 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         //   Visualiztion   //
         //////////////////////
-        void ThinShells::mcVisualization(const string &innerFilename, const Vector3i &innerResolution,
-                                         const string &outerFilename, const Vector3i &outerResolution,
-                                         const string &isoFilename, const Vector3i &isoResolution) {
+        const std::vector<std::pair<Mesh, string >> &
+        ThinShells::mcVisualization(const string &innerFilename, const Vector3i &innerResolution,
+                                    const string &outerFilename, const Vector3i &outerResolution,
+                                    const string &isoFilename, const Vector3i &isoResolution) {
             if (svo.numNodeVerts == 0) {
                 logger().warn("[ITS] There is no valid Sparse Voxel Octree's node vertex, "
-                             "MarchingCubes is exited...");
-                return;
+                              "MarchingCubes is exited...");
+                return std::vector<std::pair<Mesh, string>>();
             }
             if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
 
@@ -882,8 +883,9 @@ NAMESPACE_BEGIN(ITS)
                 }
             };
 
-            TimerInterface* timer;
+            TimerInterface *timer;
             createTimer(&timer);
+            std::vector<std::pair<Mesh, string >> meshes;
             if (!outerFilename.empty() && outerShellIsoVal != -DINF && outerResolution.minCoeff() > 0) {
                 logger().info("[ITS] Extract outer shell by using MarchingCubes...");
 #ifdef GPU_BSPLINEVAL
@@ -898,11 +900,11 @@ NAMESPACE_BEGIN(ITS)
                 stopTimer(&timer);
                 logger().info("[ITS] Compute B-Spline value of grid points spent {} s.", getElapsedTime(&timer) * 1e-3);
 
-                mc::marching_cubes(make_uint3(outerResolution),
-                                   make_double3(gridOrigin),
-                                   make_double3(gridWidth),
-                                   outerShellIsoVal,
-                                   gridSDF, outerFilename);
+                meshes.emplace_back(mc::marching_cubes(make_uint3(outerResolution),
+                                                       make_double3(gridOrigin),
+                                                       make_double3(gridWidth),
+                                                       outerShellIsoVal,
+                                                       gridSDF), "outer shell");
 #endif
                 utils::split();
             }
@@ -918,15 +920,16 @@ NAMESPACE_BEGIN(ITS)
                     startTimer(&timer);
                     determineGridSDF(innerResolution);
                     stopTimer(&timer);
-                    logger().info("[ITS] Compute B-Spline value of grid points spent {} s.", getElapsedTime(&timer) * 1e-3);
+                    logger().info("[ITS] Compute B-Spline value of grid points spent {} s.",
+                                  getElapsedTime(&timer) * 1e-3);
 
                     serializedRes = outerResolution;
                 }
-                mc::marching_cubes(make_uint3(innerResolution),
-                                   make_double3(gridOrigin),
-                                   make_double3(gridWidth),
-                                   innerShellIsoVal,
-                                   gridSDF, innerFilename);
+                meshes.emplace_back(mc::marching_cubes(make_uint3(innerResolution),
+                                                       make_double3(gridOrigin),
+                                                       make_double3(gridWidth),
+                                                       innerShellIsoVal,
+                                                       gridSDF), "inner shell");
 #endif
                 utils::split();
             }
@@ -938,22 +941,24 @@ NAMESPACE_BEGIN(ITS)
                                    svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
                                    make_uint3(isoResolution), .0, isoFilename);
 #else
-                if (isoResolution != serializedRes){
+                if (isoResolution != serializedRes) {
                     startTimer(&timer);
                     determineGridSDF(isoResolution);
                     stopTimer(&timer);
-                    logger().info("[ITS] Compute B-Spline value of grid points spent {} s.", getElapsedTime(&timer) * 1e-3);
+                    logger().info("[ITS] Compute B-Spline value of grid points spent {} s.",
+                                  getElapsedTime(&timer) * 1e-3);
                 }
-                mc::marching_cubes(make_uint3(isoResolution),
-                                   make_double3(gridOrigin),
-                                   make_double3(gridWidth),
-                                   .0,
-                                   gridSDF, isoFilename);
+                meshes.emplace_back(mc::marching_cubes(make_uint3(isoResolution),
+                                                       make_double3(gridOrigin),
+                                                       make_double3(gridWidth),
+                                                       .0, gridSDF), "zero iso-surface");
 #endif
                 utils::split();
             }
 
             deleteTimer(&timer);
+
+            return meshes;
         }
 
         void ThinShells::textureVisualization(const string &filename) const {

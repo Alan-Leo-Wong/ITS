@@ -6,13 +6,14 @@
 cmake_minimum_required(VERSION 3.20)
 if (POLICY CMP0104)
     cmake_policy(SET CMP0104 NEW)
-endif()
+endif ()
 if (POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
-endif()
+endif ()
 
 ###########################################
 # Options
+option(ENABLE_IMGUI_VIEWER "Enable imgui visualization" ON)
 option(FCPW_TEST "FCPW test" ON)
 
 ###########################################

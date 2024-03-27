@@ -6,6 +6,12 @@
 
 #endif
 
+#ifdef ENABLE_MESH_VIEW
+
+#include "viewer/MeshViewer.hpp"
+
+#endif
+
 #include "core/ThinShells.hpp"
 #include "detail/Geometry.hpp"
 #include "utils/Timer.hpp"
@@ -219,18 +225,65 @@ int main(int argc, char **argv) {
         string outerShellFile = concatFilePath(args.mcOutDir, modelName, uniformDir,
                                                std::to_string(treeDepth),
                                                "mc_outerShell.obj");
-        string isosurfaceFile = concatFilePath(args.mcOutDir, modelName, uniformDir,
-                                               std::to_string(treeDepth),
-                                               "mc_isosurface.obj");
+        string zeroIsoSurfaceFile = concatFilePath(args.mcOutDir, modelName, uniformDir,
+                                                   std::to_string(treeDepth),
+                                                   "mc_isosurface.obj");
         startTimer(&timer);
-        thinShell.mcVisualization(
-                innerShellFile, Vector3i(args.mcRes, args.mcRes, args.mcRes),
-                outerShellFile, Vector3i(args.mcRes, args.mcRes, args.mcRes),
-                isosurfaceFile, Vector3i(args.mcRes, args.mcRes, args.mcRes)
-        );
+
+        const std::vector<std::pair<Mesh, string>> &meshes =
+                thinShell.mcVisualization(
+                        innerShellFile, Vector3i(args.mcRes, args.mcRes, args.mcRes),
+                        outerShellFile, Vector3i(args.mcRes, args.mcRes, args.mcRes),
+                        zeroIsoSurfaceFile, Vector3i(args.mcRes, args.mcRes, args.mcRes)
+                );
         stopTimer(&timer);
         double time = getElapsedTime(&timer) * 1e-3;
         logger().info("MarchingCubes spent {} s.", time);
+
+#ifdef ENABLE_MESH_VIEW
+        viewer::MeshViewer meshViewer;
+        std::map<int, Eigen::RowVector3d> colors;
+
+        int lastSelected = -1;
+        // Refresh selected mesh colors
+        meshViewer.callback_pre_draw =
+                [&](igl::opengl::glfw::Viewer &) {
+                    if (lastSelected != meshViewer.selected_data_index) {
+                        for (auto &data: meshViewer.data_list) {
+                            data.set_colors(colors[data.id]);
+                        }
+                        meshViewer.data_list[meshViewer.selected_data_index].set_colors(Eigen::RowVector3d(0.9, 0.1, 0.1));
+                        lastSelected = meshViewer.selected_data_index;
+                    }
+                    return false;
+                };
+#endif
+
+        int meshIdx = -1; // meshViewer.data() begin with by -1
+        for (const auto &mesh_name: meshes) {
+            const Mesh &mesh = mesh_name.first;
+            const std::string name = mesh_name.second;
+            if (name == "outer shell") {
+                logger().info("[MC] Writing \"{}\" to {}...", name, outerShellFile);
+                mesh.writeMesh(outerShellFile);
+            } else if (name == "inner shell") {
+                logger().info("[MC] Writing \"{}\" to {}...", name, innerShellFile);
+                mesh.writeMesh(innerShellFile);
+            } else {
+                logger().info("[MC] Writing \"{}\" to {}...", name, zeroIsoSurfaceFile);
+                mesh.writeMesh(zeroIsoSurfaceFile);
+            }
+
+#ifdef ENABLE_MESH_VIEW
+            colors.emplace(meshIdx++, 0.5 * Eigen::RowVector3d::Random().array() + 0.5);
+            meshViewer.data().set_mesh(mesh.getVertMat(), mesh.getFaceMat());
+            meshViewer.append_mesh();
+#endif
+        }
+
+#ifdef ENABLE_MESH_VIEW
+        meshViewer.launch();
+#endif
     }
 
     /*const string queryFile = concatFilePath((string)VIS_DIR, modelName, uniformDir, std::to_string(treeDepth), (string)"query_point.xyz");

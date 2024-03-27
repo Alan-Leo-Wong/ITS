@@ -8,6 +8,7 @@
 #include <utility>
 #include <spdlog/spdlog.h>
 #include <igl/writeOBJ.h>
+#include <igl/writeOFF.h>
 #include <igl/read_triangle_mesh.h>
 #include <igl/per_vertex_normals.h>
 #include <igl/point_mesh_squared_distance.h>
@@ -58,7 +59,7 @@ NAMESPACE_BEGIN(ITS)
             igl::per_vertex_normals(vertMat, faceMat, vertNormalMat);
             igl::per_face_normals_stable(vertMat, faceMat, faceNormalMat);
 
-            aabbTree.init(vertMat, faceMat);
+            // aabbTree.init(vertMat, faceMat);
         }
 
         void Mesh::setTriAttributes() {
@@ -307,12 +308,16 @@ NAMESPACE_BEGIN(ITS)
         }
 
         void Mesh::writeMesh(const std::string &filename) const {
-            if (getFileExtension(filename) != ".obj") {
+            if (getFileExtension(filename) != ".obj" &&
+                getFileExtension(filename) != ".off") {
                 logger().error("Unsupported file format \"{}\"!",
-                              getFileExtension(filename));
+                               getFileExtension(filename));
                 return;
             }
-            igl::writeOBJ(filename, vertMat, faceMat);
+            if (getFileExtension(filename) != ".obj")
+                igl::writeOBJ(filename, vertMat, faceMat);
+            if (getFileExtension(filename) != ".off")
+                igl::writeOFF(filename, vertMat, faceMat);
         }
 
         void Mesh::writeTexturedObjFile(const std::string &filename, const std::vector<PDD> &uvs) const {

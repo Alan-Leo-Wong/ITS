@@ -114,17 +114,19 @@ NAMESPACE_BEGIN(ITS)
 
         public:
             /**
+             *
              * [API]: Running marching-cubes algorithm for visualization.
              * @param innerFilename save file of inner shell
              * @param innerResolution mc resolution of inner shell
              * @param outerFilename save file of outer shell
              * @param outerResolution mc resolution of outer shell
              * @param isoFilename save file of zero iso-value surface
-             * @param isoResolution mc resolution of iso-value surface
+             * @return results of marching-cubes
              */
-            void mcVisualization(const string &innerFilename, const Vector3i &innerResolution,
-                                 const string &outerFilename, const Vector3i &outerResolution,
-                                 const string &isoFilename, const Vector3i &isoResolution);
+            const std::vector<std::pair<Mesh, string>> &
+            mcVisualization(const string &innerFilename, const Vector3i &innerResolution,
+                            const string &outerFilename, const Vector3i &outerResolution,
+                            const string &isoFilename, const Vector3i &isoResolution);
 
             /**
              * [API]: Texture mapping of the B-Spline value.
