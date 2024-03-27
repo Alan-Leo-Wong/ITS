@@ -14,6 +14,7 @@
 #include <cassert>
 #include <numeric>
 #include <Eigen/Sparse>
+#include <spdlog/spdlog.h>
 #include <igl/signed_distance.h>
 
 NAMESPACE_BEGIN(ITS)
@@ -41,7 +42,8 @@ NAMESPACE_BEGIN(ITS)
                                                                                               svo_gridSize(_grid),
                                                                                               modelOrigin(
                                                                                                       modelBoundingBox.boxOrigin),
-                                                                                              svo(_grid, modelBoundingBox) {
+                                                                                              svo(_grid,
+                                                                                                  modelBoundingBox) {
             svo.createOctree(nModelTris, trisVec);
             treeDepth = svo.treeDepth;
             voxelWidth = svo.svoNodeArray[0].width;
@@ -72,11 +74,14 @@ NAMESPACE_BEGIN(ITS)
             vector<V2i> modelEdges = extractEdges();
             uint nModelEdges = modelEdges.size();
 
-            const size_t &numFineNodes = svo.numFineNodes;
-            std::cout << "-- Number of level-0 nodes: " << numFineNodes << std::endl;;
+            size_t numFineNodes = svo.numFineNodes;
 
-            const vector<SVONode> &nodeArray = svo.svoNodeArray;
-            const vector<node_edge_type> &fineNodeEdges = svo.fineNodeEdgeArray;
+#ifndef NDEBUG
+            logger().debug("-- The number of level-0 nodes is {}.", numFineNodes);
+#endif // NDEBUG
+
+            vector<SVONode> nodeArray = svo.svoNodeArray;
+            vector<node_edge_type> fineNodeEdges = svo.fineNodeEdgeArray;
 
             // B-spline base is defined on the left/bottom/back corner of a node, 
             // so only intersections with these three faces need to be computed for each node.
@@ -179,9 +184,9 @@ NAMESPACE_BEGIN(ITS)
             test_time::test_allTime += time;
 
             std::cout << "-- The number of intersections between mesh EDGES and nodes is " << edgeInterPoints.size()
-                      << std::endl;
+                      << " .\n";
 
-            std::cout << "2. Computing the intersections between mesh FACES and node EDGES..." << std::endl;
+            std::cout << "2. Computing the intersections between mesh FACES and node EDGES...\n";
             resetTimer(&timer);
             startTimer(&timer);
 
@@ -411,9 +416,9 @@ NAMESPACE_BEGIN(ITS)
             time = getElapsedTime(&timer) * 1e-3;
             test_time::test_allTime += time;
 
-            std::cout << "-- The number of intersections between mesh FACES and node EDGES is "
-                      << faceInterPoints.size() << std::endl;
-            std::cout << "-- The number of all intersections is " << allInterPoints.size() << std::endl;
+            std::cout << "-- The number of intersections between mesh FACES and node EDGES is " <<
+                      faceInterPoints.size() << " .\n";
+            std::cout << "-- The number of all intersections is " << allInterPoints.size() << " .\n";
 
             deleteTimer(&timer);
 
@@ -541,10 +546,10 @@ NAMESPACE_BEGIN(ITS)
             time = getElapsedTime(&timer) * 1e-3;
             test_time::test_allTime += time;
 
-            printf("-- Solve equation elapsed time: %lf s.\n", time);
             deleteTimer(&timer);
 
-            std::cout << "-- Residual Error: " << (A * lambda - b).norm() << std::endl;
+            printf("-- Solve equation elapsed time: %lf s.\n", time);
+            printf("-- Residual Error: %lf.\n", (A * lambda - b).norm());
         }
 
         void ThinShells::cpLatentBSplineValue() {
@@ -651,47 +656,51 @@ NAMESPACE_BEGIN(ITS)
             TimerInterface *timer = nullptr;
             createTimer(&timer);
 
-            std::cout << "\nComputing intersection points of " << std::quoted(modelName)
-                      << "and level-0 nodes...\n=====================" << std::endl;
+            utils::split();
+            logger().info("Computing intersections of '{}' and level-0 nodes...", modelName);
             startTimer(&timer);
             cpIntersectionPoints();
             stopTimer(&timer);
             double time = getElapsedTime(&timer) * 1e-3;
             printf("-- Elapsed time: %lf s.\n", time);
-            std::cout << "=====================\n";
+            utils::split();
+
 #ifdef IO_SAVE
             saveIntersections("", "");
 #endif // IO_SAVE
 
-            std::cout << "\nComputing discrete SDF of tree nodes..." << std::endl;
+            logger().info("Computing discrete SDF of tree nodes...");
             startTimer(&timer);
             cpSDFOfTreeNodes();
             stopTimer(&timer);
             time = getElapsedTime(&timer) * 1e-3;
             printf("-- Elapsed time: %lf s.\n", time);
-            std::cout << "=====================\n";
+            utils::split();
+
 #ifdef IO_SAVE
             saveSDFValue("");
 #endif // IO_SAVE
 
-            std::cout << "\nComputing coefficients..." << std::endl;
+            logger().info("Computing coefficients...");
             startTimer(&timer);
             cpCoefficients();
             stopTimer(&timer);
             time = getElapsedTime(&timer) * 1e-3;
             printf("-- Elapsed time: %lf s.\n", time);
-            std::cout << "=====================\n";
+            utils::split();
+
 #ifdef IO_SAVE
             saveCoefficients("");
 #endif // IO_SAVE
 
-            std::cout << "\nComputing B-Spline value..." << std::endl;
+            logger().info("Computing B-Spline value...");
             startTimer(&timer);
             cpLatentBSplineValue();
             stopTimer(&timer);
             time = getElapsedTime(&timer) * 1e-3;
             printf("-- Elapsed time: %lf s.\n", time);
-            std::cout << "=====================\n";
+            utils::split();
+
 #ifdef IO_SAVE
             saveBSplineValue("");
 #endif // IO_SAVE
@@ -715,7 +724,7 @@ NAMESPACE_BEGIN(ITS)
             checkDir(filename);
             std::ofstream out(filename);
             if (!out) {
-                fprintf(stderr, "[I/O] Error: File %s could not be opened!", filename.c_str());
+                logger().error("[ITS] [I/O] File \"{}\" could not be opened!", filename);
                 return;
             }
 
@@ -729,27 +738,27 @@ NAMESPACE_BEGIN(ITS)
             if (filename_1.empty())
                 t_filename = concatFilePath(VIS_DIR, modelName, uniformDir, noiseDir,
                                             std::to_string(treeDepth), "edgeInter.xyz");
-            std::cout << "-- Save mesh EDGES and octree Nodes to " << std::quoted(t_filename) << std::endl;
+            logger().info("-- Save mesh EDGES and octree Nodes to \"{}\".", t_filename);
             saveIntersections(t_filename, edgeInterPoints);
 
             t_filename = filename_2;
             if (filename_2.empty())
                 t_filename = concatFilePath(VIS_DIR, modelName, uniformDir, noiseDir,
                                             std::to_string(treeDepth), "faceInter.xyz");
-            std::cout << "-- Save mesh FACES and octree node EDGES to " << std::quoted(t_filename) << std::endl;
+            logger().info("-- Save mesh FACES and octree node EDGES to \"{}\".", t_filename);
             saveIntersections(t_filename, faceInterPoints);
         }
 
         void ThinShells::saveSDFValue(const string &filename) const {
             string t_filename = filename;
             if (filename.empty())
-                t_filename = concatFilePath((string) OUT_DIR, modelName, uniformDir, noiseDir,
-                                            std::to_string(treeDepth), (string) "SDFValue.txt");
+                t_filename = concatFilePath(OUT_DIR, modelName, uniformDir, noiseDir,
+                                            std::to_string(treeDepth), "SDFValue.txt");
 
             checkDir(t_filename);
             std::ofstream out(t_filename);
             if (!out) {
-                fprintf(stderr, "[I/O] Error: File %s could not open!\n", filename.c_str());
+                logger().error("[ITS] [I/O] File \"{}\" could not be opened!", t_filename);
                 return;
             }
 
@@ -780,13 +789,13 @@ NAMESPACE_BEGIN(ITS)
         void ThinShells::saveLatentPoint(const string &filename) const {
             string t_filename = filename;
             if (filename.empty())
-                t_filename = concatFilePath((string) OUT_DIR, modelName, uniformDir, noiseDir,
-                                            std::to_string(treeDepth), (string) "latent_point.xyz");
+                t_filename = concatFilePath(OUT_DIR, modelName, uniformDir, noiseDir,
+                                            std::to_string(treeDepth), "latent_point.xyz");
 
             checkDir(t_filename);
             std::ofstream out(t_filename, std::ofstream::out | std::ofstream::trunc);
             if (!out) {
-                fprintf(stderr, "[I/O] Error: File %s could not open!\n", t_filename.c_str());
+                logger().error("[ITS] [I/O] File \"{}\" could not be opened!", t_filename);
                 return;
             }
 
@@ -808,11 +817,11 @@ NAMESPACE_BEGIN(ITS)
             checkDir(t_filename);
             std::ofstream out(t_filename);
             if (!out) {
-                fprintf(stderr, "[I/O] Error: File %s could not open!\n", t_filename.c_str());
+                logger().error("[ITS] [I/O] File \"{}\" could not be opened!", t_filename);
                 return;
             }
 
-            std::cout << "-- Save B-Spline value to " << std::quoted(t_filename) << std::endl;
+            logger().info("-- Save B-Spline value to \"{}\".", t_filename);
             out << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bSplineVal << std::endl;
             out.close();
         }
@@ -824,7 +833,8 @@ NAMESPACE_BEGIN(ITS)
                                          const string &outerFilename, const Vector3i &outerResolution,
                                          const string &isoFilename, const Vector3i &isoResolution) {
             if (svo.numNodeVerts == 0) {
-                printf("[MC] Warning: There is no valid Sparse Voxel Octree's node vertex, MarchingCubes is exited...\n");
+                logger().warn("[ITS] There is no valid Sparse Voxel Octree's node vertex, "
+                             "MarchingCubes is exited...");
                 return;
             }
             if (depthMorton2Nodes.empty() || depthVert2Idx.empty()) prepareTestDS();
@@ -841,11 +851,6 @@ NAMESPACE_BEGIN(ITS)
                 gridSDF.shrink_to_fit();
                 long long numVoxels = resolution.x() * resolution.y() * resolution.z();
                 gridSDF.resize(numVoxels * 8, 0);
-
-                if (svo.numNodeVerts == 0) {
-                    printf("[MC] Warning: There is no valid Sparse Voxel Octree's node vertex, MarchingCubes is exited...\n");
-                    return;
-                }
 
                 Vector3d voxelSize = Vector3d(gridWidth.x() / resolution.x(), gridWidth.y() / resolution.y(),
                                               gridWidth.z() / resolution.z());
@@ -877,33 +882,44 @@ NAMESPACE_BEGIN(ITS)
                 }
             };
 
+            TimerInterface* timer;
+            createTimer(&timer);
             if (!outerFilename.empty() && outerShellIsoVal != -DINF && outerResolution.minCoeff() > 0) {
-                std::cout << "\n[MC] Extract outer shell by MarchingCubes..." << std::endl;
+                logger().info("[ITS] Extract outer shell by using MarchingCubes...");
 #ifdef GPU_BSPLINEVAL
                 MC::marching_cubes(svo.nodeVertexArray, svo.numTreeNodes, nodeWidthArray,
                                    svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
                                    make_uint3(outerResolution), outerShellIsoVal, outerFilename);
 #else
                 serializedRes = outerResolution;
+
+                startTimer(&timer);
                 determineGridSDF(outerResolution);
+                stopTimer(&timer);
+                logger().info("[ITS] Compute B-Spline value of grid points spent {} s.", getElapsedTime(&timer) * 1e-3);
+
                 mc::marching_cubes(make_uint3(outerResolution),
                                    make_double3(gridOrigin),
                                    make_double3(gridWidth),
                                    outerShellIsoVal,
                                    gridSDF, outerFilename);
 #endif
-                std::cout << "=====================\n";
+                utils::split();
             }
 
             if (!innerFilename.empty() && innerShellIsoVal != -DINF && innerResolution.minCoeff() > 0) {
-                std::cout << "\n[MC] Extract inner shell by MarchingCubes..." << std::endl;
+                logger().info("[ITS] Extract inner shell by using MarchingCubes...");
 #ifdef GPU_BSPLINEVAL
                 MC::marching_cubes(svo.nodeVertexArray, svo.numTreeNodes, nodeWidthArray,
                                    svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
                                    make_uint3(innerResolution), innerShellIsoVal, innerFilename);
 #else
                 if (innerResolution != serializedRes) {
+                    startTimer(&timer);
                     determineGridSDF(innerResolution);
+                    stopTimer(&timer);
+                    logger().info("[ITS] Compute B-Spline value of grid points spent {} s.", getElapsedTime(&timer) * 1e-3);
+
                     serializedRes = outerResolution;
                 }
                 mc::marching_cubes(make_uint3(innerResolution),
@@ -912,26 +928,32 @@ NAMESPACE_BEGIN(ITS)
                                    innerShellIsoVal,
                                    gridSDF, innerFilename);
 #endif
-                std::cout << "=====================\n";
+                utils::split();
             }
 
             if (!isoFilename.empty() && isoResolution.minCoeff() > 0) {
-                std::cout << "\n[MC] Extract isosurface by MarchingCubes..." << std::endl;
+                logger().info("[ITS] Extract zero iso-surface by using MarchingCubes...");
 #ifdef GPU_BSPLINEVAL
                 MC::marching_cubes(svo.nodeVertexArray, svo.numTreeNodes, nodeWidthArray,
                                    svo.numNodeVerts, lambda, make_double3(gridOrigin), make_double3(gridWidth),
                                    make_uint3(isoResolution), .0, isoFilename);
 #else
-                if (isoResolution != serializedRes)
+                if (isoResolution != serializedRes){
+                    startTimer(&timer);
                     determineGridSDF(isoResolution);
+                    stopTimer(&timer);
+                    logger().info("[ITS] Compute B-Spline value of grid points spent {} s.", getElapsedTime(&timer) * 1e-3);
+                }
                 mc::marching_cubes(make_uint3(isoResolution),
                                    make_double3(gridOrigin),
                                    make_double3(gridWidth),
                                    .0,
                                    gridSDF, isoFilename);
 #endif
-                std::cout << "=====================\n";
+                utils::split();
             }
+
+            deleteTimer(&timer);
         }
 
         void ThinShells::textureVisualization(const string &filename) const {
@@ -984,8 +1006,8 @@ NAMESPACE_BEGIN(ITS)
         }
 
         void ThinShells::singlePointQuery(const std::string &out_file, const Vector3d &point) {
-            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
-                printf("Error: You must create shells first!");
+            if (innerShellIsoVal == -DINF || outerShellIsoVal == DINF) {
+                logger().error("[ITS] You must create shells first!");
                 return;
             }
             if (nodeWidthArray.empty()) {
@@ -1012,7 +1034,7 @@ NAMESPACE_BEGIN(ITS)
             checkDir(_out_file);
             std::ofstream out(_out_file);
             if (!out) {
-                fprintf(stderr, "[I/O] Error: File %s could not be opened!", _out_file.c_str());
+                logger().error("[ITS] [I/O] File \"{}\" could not be opened!", _out_file);
                 return;
             }
             std::cout << "-- Save query result to " << std::quoted(_out_file) <<
@@ -1022,8 +1044,8 @@ NAMESPACE_BEGIN(ITS)
         }
 
         void ThinShells::multiPointQuery(const std::string &out_file, const vector<Vector3d> &points) {
-            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
-                printf("Error: You must create shells first!");
+            if (innerShellIsoVal == -DINF || outerShellIsoVal == DINF) {
+                logger().error("[ITS] You must create shells first!");
                 return;
             }
             if (nodeWidthArray.empty()) {
@@ -1055,7 +1077,7 @@ NAMESPACE_BEGIN(ITS)
             checkDir(_out_file);
             std::ofstream out(_out_file);
             if (!out) {
-                fprintf(stderr, "[I/O] Error: File %s could not be opened!", _out_file.c_str());
+                logger().error("[ITS] [I/O] File \"{}\" could not be opened!", _out_file);
                 return;
             }
             std::cout << "-- Save query result to " << std::quoted(_out_file) <<
@@ -1065,8 +1087,8 @@ NAMESPACE_BEGIN(ITS)
         }
 
         void ThinShells::multiPointQuery(const std::string &out_file, const MatrixXd &pointsMat) {
-            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
-                printf("Error: You must create shells first!");
+            if (innerShellIsoVal == -DINF || outerShellIsoVal == DINF) {
+                logger().error("[ITS] You must create shells first!");
                 return;
             }
 
@@ -1084,8 +1106,8 @@ NAMESPACE_BEGIN(ITS)
 
             size_t numPoints = points.size();
             vector<int> result;
-            if (innerShellIsoVal == -DINF || outerShellIsoVal == -DINF) {
-                printf("Error: You must create shells first!\n");
+            if (innerShellIsoVal == -DINF || outerShellIsoVal == DINF) {
+                logger().error("[ITS] You must create shells first!");
                 return result;
             }
             vector<SVONode> svoNodeArray = svo.svoNodeArray;
@@ -1099,7 +1121,6 @@ NAMESPACE_BEGIN(ITS)
             Array3d minRange = boxOrigin - boxWidth;
             Array3d maxRange = boxEnd + boxWidth;
 
-            // 通过找范围求b样条值
             auto mt_cpuTest = [&]() {
 #pragma omp parallel
                 for (size_t i = 0; i < numPoints; ++i) {
@@ -1111,12 +1132,14 @@ NAMESPACE_BEGIN(ITS)
 
                     double sum = 0.0;
                     Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                    // 在所有格子(包括边缘格子和大格子)的影响范围内
+                    // Within the influence range of all cells
+                    // (including boundary cells and large cells).
                     int maxOffset = 0;
                     int searchDepth = 0;
                     double searchNodeWidth = voxelWidth;
                     for (int i = 0; i < 3; ++i) {
-                        // 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
+                        // Within the influence range of the boundary grid cells, set to 0 or svo_gridSize[i] - 1,
+                        // for subsequent Morton code calculation.
                         if (dis[i] <= -1) {
                             maxOffset = std::max(maxOffset, std::abs(dis[i]));
                             dis[i] = 0;
@@ -1139,7 +1162,7 @@ NAMESPACE_BEGIN(ITS)
                                                                      searchDepth, depthMorton2Nodes, depthVert2Idx);
                     const int nInDmPointsTraits = inDmPointsTraits.size();
 
-#pragma omp parallel for reduction(+ : sum) // for循环中的变量必须得是有符号整型
+#pragma omp parallel for reduction(+ : sum)
                     for (int j = 0; j < nInDmPointsTraits; ++j) {
                         const auto &inDmPointTrait = inDmPointsTraits[j];
                         sum += lambda[std::get<2>(inDmPointTrait)] *
@@ -1160,12 +1183,14 @@ NAMESPACE_BEGIN(ITS)
 
                     double sum = 0.0;
                     Vector3i dis = getPointOffset(point, boxOrigin, voxelWidth);
-                    // 在所有格子(包括边缘格子和大格子)的影响范围内
+                    // Within the influence range of all cells
+                    // (including boundary cells and large cells).
                     int maxOffset = 0;
                     int searchDepth = 0;
                     double searchNodeWidth = voxelWidth;
                     for (int i = 0; i < 3; ++i) {
-                        // 在边缘格子影响范围内, 置为0或者svo_gridSize[i] - 1，为了后面莫顿码的计算
+                        // Within the influence range of the boundary grid cells, set to 0 or svo_gridSize[i] - 1,
+                        // for subsequent Morton code calculation.
                         if (dis[i] <= -1) {
                             maxOffset = std::max(maxOffset, std::abs(dis[i]));
                             dis[i] = 0;

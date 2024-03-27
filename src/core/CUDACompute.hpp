@@ -11,8 +11,13 @@ NAMESPACE_BEGIN(ITS)
     namespace cuAcc {
         using namespace Eigen;
 
+        /**
+         * Setting triangles' normal and area of a mesh
+         * @param nTriangles
+         * @param modelTriangleArray
+         */
         void launch_modelTriAttributeKernel(size_t nTriangles,
-                                            std::vector<Triangle<Eigen::Vector3d>> &modelTriangleArray);
+                                            std::vector<Triangle<Vector3d>> &modelTriangleArray);
 
         /**
          * Matrix sum reduction of each row using cuBLAS.

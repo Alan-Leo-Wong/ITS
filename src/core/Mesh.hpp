@@ -65,7 +65,7 @@ NAMESPACE_BEGIN(ITS)
             void setUniformBoundingBox();
 
         public:
-            AABox<Vector3d> getBoundingBox() const { return modelBoundingBox; }
+            [[nodiscard]] AABBox<double, 3> getBoundingBox() const { return modelBoundingBox; }
 
         public:
             /**
@@ -160,7 +160,7 @@ NAMESPACE_BEGIN(ITS)
             std::string modelName;
             double unitScaleFactor; // record scale factor when calling 'model2UnitCube'
 
-            AABox<Eigen::Vector3d> modelBoundingBox;
+            AABBox<double, 3> modelBoundingBox;
             igl::AABB<MatrixXd, 3> aabbTree;
         };
 

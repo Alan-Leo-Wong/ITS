@@ -69,14 +69,14 @@ NAMESPACE_BEGIN(ITS)
             Vector3d minV = vertMat.colwise().minCoeff();
             Vector3d maxV = vertMat.colwise().maxCoeff();
 
-            modelBoundingBox = AABox<Vector3d>(minV, maxV);
+            modelBoundingBox = AABBox<double, 3>(minV, maxV);
         }
 
         void Mesh::setUniformBoundingBox() {
             Vector3d minV = vertMat.colwise().minCoeff();
             Vector3d maxV = vertMat.colwise().maxCoeff();
 
-            modelBoundingBox = AABox<Vector3d>(minV, maxV); // initialize answer
+            modelBoundingBox = AABBox<double, 3>(minV, maxV); // initialize answer
             Vector3d lengths = maxV - minV; // check length of given bbox in every direction
             float max_length = fmaxf(lengths.x(), fmaxf(lengths.y(), lengths.z())); // find max length
             for (unsigned int i = 0; i < 3; i++) { // for every direction (X,Y,Z)
@@ -132,7 +132,9 @@ NAMESPACE_BEGIN(ITS)
         }
 
         std::vector<Vector2i> Mesh::extractEdges() {
-            spdlog::info("Extracting edges from {}.", modelName);
+#ifndef NDEBUG
+            logger().debug("Extracting edges from {}.", modelName);
+#endif // NDEBUG
 
             std::vector<Vector2i> edges;
             std::set<PII> uset;
@@ -149,7 +151,9 @@ NAMESPACE_BEGIN(ITS)
             for (PII it: uset)
                 edges.emplace_back(Vector2i(it.first, it.second));
 
-            spdlog::info("The number of edges is {}.", edges.size());
+#ifndef NDEBUG
+            logger().debug("The number of edges is {}.", edges.size());
+#endif // NDEBUG
             return edges;
         }
 
@@ -262,15 +266,6 @@ NAMESPACE_BEGIN(ITS)
             updateInternalData();
         }
 
-        Eigen::MatrixXd
-        Mesh::generateGaussianRandomPoints(const size_t &numPoints, const float &_scaleFactor, const float &dis) {
-            Eigen::MatrixXd M;
-            const Eigen::RowVector3d min_area = modelBoundingBox.boxOrigin;
-            const Eigen::RowVector3d max_area = modelBoundingBox.boxEnd;
-            getGaussianRandomMatrix<double>(min_area, max_area, numPoints, _scaleFactor, dis, M);
-            return M;
-        }
-
         MatrixXd Mesh::getClosestPoint(const MatrixXd &queryPointMat) const {
             Eigen::VectorXd sqrD;
             Eigen::VectorXi I;
@@ -305,7 +300,7 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         void Mesh::readMesh(const std::string &filename) {
             if (!igl::read_triangle_mesh(filename, vertMat, faceMat)) {
-                spdlog::error("File \"{}\" could not be opened!", filename);
+                logger().error("[I/O] File \"{}\" could not be opened!", filename);
                 exit(EXIT_FAILURE);
             }
             modelName = getFileName(filename);
@@ -313,7 +308,7 @@ NAMESPACE_BEGIN(ITS)
 
         void Mesh::writeMesh(const std::string &filename) const {
             if (getFileExtension(filename) != ".obj") {
-                spdlog::error("Unsupported file format \"{}\"!",
+                logger().error("Unsupported file format \"{}\"!",
                               getFileExtension(filename));
                 return;
             }

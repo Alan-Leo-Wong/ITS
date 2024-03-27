@@ -41,10 +41,10 @@ NAMESPACE_BEGIN(ITS)
         public:
             SparseVoxelOctree() : treeDepth(0) {}
 
-            explicit SparseVoxelOctree(Eigen::Vector3i _gridSize, const AABox<Eigen::Vector3d> &_modelBBox) :
+            SparseVoxelOctree(Eigen::Vector3i _gridSize, const AABBox<double, 3> &_modelBBox) :
                     treeDepth(0), surfaceVoxelGridSize(std::move(_gridSize)), modelBoundingBox(_modelBBox) {}
 
-            explicit SparseVoxelOctree(int _grid, const AABox<Eigen::Vector3d> &_modelBBox) :
+            SparseVoxelOctree(int _grid, const AABBox<double, 3> &_modelBBox) :
                     treeDepth(0), surfaceVoxelGridSize(Eigen::Vector3i(_grid, _grid, _grid)),
                     modelBoundingBox(_modelBBox) {}
 
@@ -139,7 +139,7 @@ NAMESPACE_BEGIN(ITS)
              * @param base_filename
              * @param width
              */
-            void saveVoxel(const AABox<Eigen::Vector3d> &modelBBox, const std::vector<uint32_t> &voxelArray,
+            void saveVoxel(const AABBox<double, 3> &modelBBox, const std::vector<uint32_t> &voxelArray,
                            const std::string &base_filename, double width) const;
 
             /**
@@ -149,7 +149,7 @@ NAMESPACE_BEGIN(ITS)
             void saveSVO(const std::string &filename) const;
 
         public:
-            AABox<Eigen::Vector3d> modelBoundingBox;
+            AABBox<double, 3> modelBoundingBox;
 
             int treeDepth = 0;
             size_t numVoxels = 0; // the number of voxels

@@ -1,7 +1,12 @@
 #pragma once
 
+#ifndef FCPW_USE_ENOKI
 #define FCPW_USE_ENOKI
+#endif // FCPW_USE_ENOKI
+
+#ifndef FCPW_SIMD_WIDTH
 #define FCPW_SIMD_WIDTH 4
+#endif // FCPW_SIMD_WIDTH
 
 #include <fcpw/fcpw.h>
 #include <Eigen/Dense>
@@ -9,7 +14,8 @@
 namespace fcpw_helper {
     using namespace Eigen;
 
-    inline double getSignedDistance(const Vector3d &queryPoint, const fcpw::Scene<3> &scene) {
+    inline double
+    getSignedDistance(const Vector3d &queryPoint, const fcpw::Scene<3> &scene) {
         // perform a closest point query
         fcpw::Interaction<3> interaction;
         scene.findClosestPoint(queryPoint.cast<float>(), interaction);

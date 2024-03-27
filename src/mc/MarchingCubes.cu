@@ -365,7 +365,7 @@ NAMESPACE_BEGIN(ITS)
         cudaTextureObject_t nVertsTex;
 
         double3 *d_triPoints = nullptr; // output
-    } // namespace MC
+    } // namespace mc
 
     namespace mc {
         using namespace detail;
@@ -642,12 +642,12 @@ NAMESPACE_BEGIN(ITS)
             utils::file::checkDir(filename);
             std::ofstream out(filename);
             if (!out) {
-                spdlog::error("-- [MC] IO Error: File {} could not be opened!", filename.c_str());
+                logger().error("-- [MC] [I/O] File \"{}\" could not be opened!", filename.c_str());
                 return;
             }
 
-            spdlog::info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
-            spdlog::info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+            logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
+            logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
             for (int i = 0; i < allTriVertices; i += 3) {
                 const int faceIdx = i;
 
@@ -714,8 +714,8 @@ NAMESPACE_BEGIN(ITS)
 
             end = system_clock::now();
             duration<double> elapsed_seconds = end - start;
-            spdlog::info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
-            spdlog::info("-- [MC] Write to obj...");
+            logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
+            logger().info("-- [MC] Writing to {}...", filename);
 
             writeToOBJFile(filename);
 
@@ -756,8 +756,8 @@ NAMESPACE_BEGIN(ITS)
 
             end = system_clock::now();
             duration<double> elapsed_seconds = end - start;
-            spdlog::info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
-            spdlog::info("-- [MC] Write to obj...");
+            logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
+            logger().info("-- [MC] Writing to {}...", filename);
 
             writeToOBJFile(filename);
 

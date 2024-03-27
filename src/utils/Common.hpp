@@ -5,37 +5,44 @@
 #include <string>
 #include <random>
 #include <iostream>
+#include <spdlog/logger.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 NAMESPACE_BEGIN(ITS)
+
+    FORCE_INLINE spdlog::logger &logger() {
+        static auto default_logger = spdlog::stdout_color_mt("ITS");
+        default_logger->set_pattern("[%^%l%$] %v");
+        return *default_logger;
+    }
+
     namespace utils {
-        namespace tType {
-            const std::string NONE("0"), BOLD("1"), DIM("2"), UNDERLINE("4"), BLINK("5"),
-                    INVERSE("7"), HIDDEN("8");
-        }
-        namespace tColor {
-            const std::string BLACK("30"), RED("31"), GREEN("32"), YELLOW("33"), BLUE("34"),
-                    MAGENTA("35"), CYAN("36");
+
+        FORCE_INLINE
+        void split() {
+            std::cout << "=====================\n";
         }
 
         template<class T, T... inds, class F>
-        constexpr CUDA_GENERAL_CALL FORCE_INLINE void
-        loop(std::integer_sequence<T, inds...>, F &&f) {
+        constexpr CUDA_HOST_CALL FORCE_INLINE
+        void loop(std::integer_sequence<T, inds...>, F &&f) {
             (f(std::integral_constant<T, inds>{}), ...);
         }
 
         template<class T, T count, class F>
-        constexpr CUDA_GENERAL_CALL FORCE_INLINE void Loop(F &&f) {
+        constexpr CUDA_HOST_CALL FORCE_INLINE
+        void Loop(F &&f) {
             loop(std::make_integer_sequence<T, count>{}, std::forward<F>(f));
         }
 
         // used to check colums
         template<typename T>
-        inline int min_size(const std::vector<T> &V) {
+        CUDA_HOST_CALL inline
+        int min_size(const std::vector<T> &V) {
             int min_size = -1;
-            for (
-                    typename std::vector<T>::const_iterator iter = V.begin();
-                    iter != V.end();
-                    iter++) {
+            for (typename std::vector<T>::const_iterator iter = V.begin();
+                 iter != V.end();
+                 iter++) {
                 int size = (int) iter->size();
                 // have to handle base case
                 if (min_size == -1) {
@@ -48,12 +55,11 @@ NAMESPACE_BEGIN(ITS)
         }
 
         template<typename T>
-        inline int max_size(const std::vector<T> &V) {
+        CUDA_HOST_CALL inline int max_size(const std::vector<T> &V) {
             int max_size = -1;
-            for (
-                    typename std::vector<T>::const_iterator iter = V.begin();
-                    iter != V.end();
-                    iter++) {
+            for (typename std::vector<T>::const_iterator iter = V.begin();
+                 iter != V.end();
+                 iter++) {
                 int size = (int) iter->size();
                 max_size = (max_size > size ? max_size : size);
             }
@@ -61,12 +67,11 @@ NAMESPACE_BEGIN(ITS)
         }
 
         template<typename Scalar, int Size>
-        inline int min_size(const std::vector<Eigen::Matrix<Scalar, Size, 1>> &V) {
+        CUDA_HOST_CALL inline int min_size(const std::vector<Eigen::Matrix<Scalar, Size, 1>> &V) {
             int min_size = -1;
-            for (
-                    typename std::vector<Eigen::Matrix<Scalar, Size, 1>>::const_iterator iter = V.begin();
-                    iter != V.end();
-                    iter++) {
+            for (typename std::vector<Eigen::Matrix<Scalar, Size, 1>>::const_iterator iter = V.begin();
+                 iter != V.end();
+                 iter++) {
                 int size = (int) iter->rows();
                 // have to handle base case
                 if (min_size == -1) {
@@ -79,12 +84,11 @@ NAMESPACE_BEGIN(ITS)
         }
 
         template<typename Scalar, int Size>
-        inline int max_size(const std::vector<Eigen::Matrix<Scalar, Size, 1>> &V) {
+        CUDA_HOST_CALL inline int max_size(const std::vector<Eigen::Matrix<Scalar, Size, 1>> &V) {
             int max_size = -1;
-            for (
-                    typename std::vector<Eigen::Matrix<Scalar, Size, 1>>::const_iterator iter = V.begin();
-                    iter != V.end();
-                    iter++) {
+            for (typename std::vector<Eigen::Matrix<Scalar, Size, 1>>::const_iterator iter = V.begin();
+                 iter != V.end();
+                 iter++) {
                 int size = (int) iter->rows();
                 max_size = (max_size > size ? max_size : size);
             }
@@ -93,33 +97,34 @@ NAMESPACE_BEGIN(ITS)
 
         template<typename T>
         CUDA_GENERAL_CALL
-        inline bool isInRange(const double &l, const double &r, const T &query) {
+        inline bool isInRange(double l, double r, const T &query) {
             return l <= query && query <= r;
         }
 
         template<typename... T>
         CUDA_GENERAL_CALL
-        inline bool isInRange(const double &l, const double &r, const T &...query) {
+        inline bool isInRange(double l, double r, const T &...query) {
             return isInRange(query...);
         }
 
         CUDA_GENERAL_CALL
-        inline bool isEqualDouble(const double &l, const double &r, const double &eps) {
+        inline bool isEqualDouble(double l, double r, double eps) {
             return fabs(l - r) < eps;
         }
 
         CUDA_GENERAL_CALL
-        inline bool isLessDouble(const double &l, const double &r, const double &eps) {
+        inline bool isLessDouble(double l, double r, double eps) {
             return (!isEqualDouble(l, r, eps) && l < r);
         }
 
         CUDA_GENERAL_CALL
-        inline bool isLargeDouble(const double &l, const double &r, const double &eps) {
+        inline bool isLargeDouble(double l, double r, double eps) {
             return (!isEqualDouble(l, r, eps) && l > r);
         }
 
         template<typename T, typename Derived>
-        inline bool list2matrix(const std::vector<std::vector<T>> &V, Eigen::PlainObjectBase<Derived> &M) {
+        CUDA_HOST_CALL inline bool
+        list2matrix(const std::vector<std::vector<T>> &V, Eigen::PlainObjectBase<Derived> &M) {
             // number of rows
             int m = V.size();
             if (m == 0) {
@@ -139,6 +144,7 @@ NAMESPACE_BEGIN(ITS)
             M.resize(m, n);
 
             // Loop over rows
+#pragma omp parallel for
             for (int i = 0; i < m; i++) {
                 // Loop over cols
                 for (int j = 0; j < n; j++) {
@@ -149,7 +155,7 @@ NAMESPACE_BEGIN(ITS)
         }
 
         template<typename Derived, typename Scalar, int Size>
-        inline bool
+        CUDA_HOST_CALL inline bool
         list2Matrix(const std::vector<Eigen::Matrix<Scalar, Size, 1>> &V, Eigen::PlainObjectBase<Derived> &M) {
             // number of rows
             int m = V.size();
@@ -171,8 +177,28 @@ NAMESPACE_BEGIN(ITS)
             M.resize(m, n);
 
             // Loop over rows
+#pragma omp parallel for
             for (int i = 0; i < m; i++)
                 M.row(i) = V[i];
+            return true;
+        }
+
+        template<typename Derived, typename Scalar, int Size>
+        CUDA_HOST_CALL inline bool
+        matrix2List(const Eigen::PlainObjectBase<Derived> &M, std::vector<Eigen::Matrix<Scalar, Size, 1>> &V) {
+            // number of rows
+            int m = M.rows();
+            if (m == 0) {
+                return false;
+            }
+
+            // Resize output
+            V.resize(m);
+
+            // Loop over rows
+#pragma omp parallel for
+            for (int i = 0; i < m; i++)
+                V[i] = M.row(i);
             return true;
         }
 

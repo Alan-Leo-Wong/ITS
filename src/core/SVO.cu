@@ -407,9 +407,9 @@ NAMESPACE_BEGIN(ITS)
 
                     // COMPUTE TRIANGLE BBOX IN GRID
                     // Triangle bounding box in world coordinates is min(v0,v1,v2) and max(v0,v1,v2)
-                    AABox<Eigen::Vector3d> t_bbox_world(fminf(v0, fminf(v1, v2)), fmaxf(v0, fmaxf(v1, v2)));
+                    AABBox<double, 3> t_bbox_world(fminf(v0, fminf(v1, v2)), fmaxf(v0, fmaxf(v1, v2)));
                     // Triangle bounding box in voxel grid coordinates is the world bounding box divided by the grid unit vector
-                    AABox<Eigen::Vector3i> t_bbox_grid;
+                    AABBox<int, 3> t_bbox_grid;
                     t_bbox_grid.boxOrigin = clamp(
                             Eigen::Vector3i((t_bbox_world.boxOrigin.x() / unitVoxelSize.x()),
                                             (t_bbox_world.boxOrigin.y() / unitVoxelSize.y()),
@@ -678,6 +678,9 @@ NAMESPACE_BEGIN(ITS)
                 }
             }
 
+            namespace {
+                __device__ size_t d_topNodeIdx;
+            }
             template<bool topFlag>
             __global__ void findNeighbors(size_t nNodes,
                                           size_t preESumTreeNodes,
@@ -824,9 +827,9 @@ NAMESPACE_BEGIN(ITS)
             }
             double *d_triangleData = (double *) thrust::raw_pointer_cast(&(d_triangleThrustVec[0]));
             getOccupancyMaxPotentialBlockSize(nModelTris, minGridSize, blockSize, gridSize, surfaceVoxelize, 0, 0);
-            surfaceVoxelize <<<gridSize, blockSize >>>(nModelTris, d_surfaceVoxelGridSize,
-                                                       d_gridOrigin, d_unitVoxelSize, d_triangleData,
-                                                       d_CNodeMortonArray.data().get());
+            surfaceVoxelize<<<gridSize, blockSize >>>(nModelTris, d_surfaceVoxelGridSize,
+                                                      d_gridOrigin, d_unitVoxelSize, d_triangleData,
+                                                      d_CNodeMortonArray.data().get());
             getLastCudaError("Kernel 'surfaceVoxelize' launch failed!\n");
             //cudaDeviceSynchronize();
         }
@@ -855,7 +858,8 @@ NAMESPACE_BEGIN(ITS)
                                cudaMemcpyHostToDevice));
             Eigen::Vector3d *d_gridOrigin;
             CUDA_CHECK(cudaMalloc((void **) &d_gridOrigin, sizeof(Eigen::Vector3d)));
-            CUDA_CHECK(cudaMemcpy(d_gridOrigin, &modelBoundingBox.boxOrigin, sizeof(Eigen::Vector3d), cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(d_gridOrigin, &modelBoundingBox.boxOrigin, sizeof(Eigen::Vector3d),
+                                  cudaMemcpyHostToDevice));
             Eigen::Vector3d *d_unitVoxelSize;
             CUDA_CHECK(cudaMalloc((void **) &d_unitVoxelSize, sizeof(Eigen::Vector3d)));
             CUDA_CHECK(cudaMemcpy(d_unitVoxelSize, &unitVoxelSize, sizeof(Eigen::Vector3d), cudaMemcpyHostToDevice));
@@ -891,7 +895,7 @@ NAMESPACE_BEGIN(ITS)
                                        0); // 必须加init
                 size_t numCNodes = *(d_esumCNodesArray.rbegin()) + *(d_isValidCNodeArray.rbegin());
                 if (!numCNodes) {
-                    printf("\n-- Sparse Voxel Octree depth: %d\n", treeDepth);
+                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
                     break;
                 }
 
@@ -980,11 +984,11 @@ NAMESPACE_BEGIN(ITS)
                     gridCNodeSize = numParentCNodes;
                     gridTreeNodeSize = gridCNodeSize % 8 ? gridCNodeSize + 8 - (gridCNodeSize % 8) : gridCNodeSize;
                     if (numNodes / 8 == 0) {
-                        printf("\n-- Sparse Voxel Octree depth: %d\n", treeDepth);
+                        logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
                         break;
                     }
                 } else {
-                    printf("\n-- Sparse Voxel Octree depth: %d\n", treeDepth);
+                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
                     break;
                 }
             }
@@ -1033,10 +1037,6 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////////
         // Construct attributes //
         //////////////////////////
-        namespace {
-            __device__ size_t d_topNodeIdx;
-        }
-
         void SparseVoxelOctree::constructNodeNeighbors(const thrust::device_vector<size_t> &d_esumTreeNodesArray,
                                                        thrust::device_vector<SVONode> &d_SVONodeArray) {
             dim3 gridSize, blockSize;
@@ -1106,7 +1106,6 @@ NAMESPACE_BEGIN(ITS)
                 }
             };
         }
-
 
         void SparseVoxelOctree::constructNodeVertexAndEdge(const thrust::device_vector<size_t> &d_esumTreeNodesArray,
                                                            thrust::device_vector<SVONode> &d_SVONodeArray) {
@@ -1281,23 +1280,23 @@ NAMESPACE_BEGIN(ITS)
         //   I/O: Save Data   //
         ////////////////////////
         void
-        SparseVoxelOctree::saveVoxel(const AABox<Eigen::Vector3d> &modelBBox, const std::vector<uint32_t> &voxelArray,
+        SparseVoxelOctree::saveVoxel(const AABBox<double, 3> &modelBBox, const std::vector<uint32_t> &voxelArray,
                                      const std::string &base_filename, double width) const {
             std::string filename_output = base_filename + std::string("_voxel.obj");
             utils::file::checkDir(filename_output);
             std::ofstream output(filename_output.c_str(), std::ios::out);
             if (!output) {
-                spdlog::error("File \"{}\" could not be opened!", filename_output);
+                logger().error("[SVO] [I/O] File \"{}\" could not be opened!", filename_output);
                 return;
             }
 
 #ifndef SVO_IO_SILENT
-            std::cout << "[I/O] Writing data in obj voxels format to file " << std::quoted(filename_output.c_str())
+            std::cout << "[SVO] [I/O] Writing data in obj voxels format to file " << std::quoted(filename_output.c_str())
                       << std::endl;
             // Write stats
             size_t voxels_seen = 0;
             size_t write_stats_25 = voxelArray.size() / 4.0f;
-            fprintf(stdout, "[I/O] Writing to file: 0%%...");
+            fprintf(stdout, "[SVO] [I/O] Writing to file: 0%%...");
 #endif
 
             size_t faceBegIdx = 0;
@@ -1331,7 +1330,7 @@ NAMESPACE_BEGIN(ITS)
                 utils::file::checkDir(d_filename);
                 std::ofstream output(d_filename.c_str(), std::ios::out);
                 if (!output) {
-                    spdlog::error("File \"{}\" could not be opened!", d_filename);
+                    logger().error("[SVO] [I/O] File \"{}\" could not be opened!", d_filename);
                     return;
                 }
 
