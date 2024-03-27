@@ -7,16 +7,17 @@
 #include <iostream>
 
 NAMESPACE_BEGIN(ITS)
-    namespace utils {
-        namespace tType {
-            const std::string NONE("0"), BOLD("1"), DIM("2"), UNDERLINE("4"), BLINK("5"),
-                    INVERSE("7"), HIDDEN("8");
-        }
-        namespace tColor {
-            const std::string BLACK("30"), RED("31"), GREEN("32"), YELLOW("33"), BLUE("34"),
-                    MAGENTA("35"), CYAN("36");
-        }
 
+    namespace tType {
+        const std::string NONE("0"), BOLD("1"), DIM("2"), UNDERLINE("4"), BLINK("5"),
+                INVERSE("7"), HIDDEN("8");
+    }
+    namespace tColor {
+        const std::string BLACK("30"), RED("31"), GREEN("32"), YELLOW("33"), BLUE("34"),
+                MAGENTA("35"), CYAN("36");
+    }
+
+    namespace donut {
         template<class T, T... inds, class F>
         constexpr CUDA_GENERAL_CALL FORCE_INLINE void
         loop(std::integer_sequence<T, inds...>, F &&f) {
