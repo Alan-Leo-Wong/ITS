@@ -26,6 +26,7 @@ target_sources(ITS_SVO
 target_link_libraries(ITS_SVO
         PUBLIC
         ITS::GPU_COMPUTE
+#        spdlog::spdlog
 )
 
 ###########################################
@@ -40,6 +41,7 @@ target_link_libraries(ITS_BASE_MODEL
         PUBLIC
         igl::core
         ITS::GPU_COMPUTE
+#        spdlog::spdlog
 )
 
 if (MSVC)
@@ -64,4 +66,5 @@ target_sources(ITS_MODEL
 target_link_libraries(ITS_MODEL
         PUBLIC
         ITS::BASE_MODEL
+#        spdlog::spdlog
 )

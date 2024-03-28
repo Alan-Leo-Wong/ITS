@@ -1,6 +1,7 @@
 ﻿#include "MarchingCubes.hpp"
 #include "MarchingCubesLUT.hpp"
 #include "utils/File.hpp"
+#include "utils/Common.hpp"
 #include "utils/cuda/CUDAUtil.cuh"
 #include "utils/cuda/DeviceQuery.cuh"
 #include "core/BSpline.hpp"
@@ -14,6 +15,7 @@
 #include <texture_types.h>
 #include <vector_functions.h>
 #include <vector_types.h>
+#include <spdlog/spdlog.h>
 #include <thrust/scan.h>
 #include <thrust/device_vector.h>
 
@@ -638,8 +640,10 @@ NAMESPACE_BEGIN(ITS)
         }
 
         std::shared_ptr<core::Mesh> writeToMesh() {
-            logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
-            logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+//            logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
+            spdlog::info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
+//            logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+            spdlog::info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
 
             Eigen::MatrixXd meshVertMat(allTriVertices, 3);
             Eigen::MatrixXi meshfaceMat(allTriVertices / 3, 3);
@@ -662,12 +666,15 @@ NAMESPACE_BEGIN(ITS)
             utils::file::checkDir(filename);
             std::ofstream out(filename);
             if (!out) {
-                logger().error("-- [MC] [I/O] File \"{}\" could not be opened!", filename.c_str());
+//                logger().error("-- [MC] [I/O] File \"{}\" could not be opened!", filename);
+                spdlog::error("-- [MC] [I/O] File \"{}\" could not be opened!", filename);
                 return;
             }
 
-            logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
-            logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+//            logger().info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
+            spdlog::info("-- [MC] The number of mesh's vertices is {}.", allTriVertices);
+//            logger().info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
+            spdlog::info("-- [MC] The number of mesh's faces is {}.", allTriVertices / 3);
 
             for (int i = 0; i < allTriVertices; i += 3) {
                 int faceIdx = i;
@@ -701,7 +708,8 @@ NAMESPACE_BEGIN(ITS)
                             double3 gridWidth,
                             uint3 resolution, double isoVal, const std::string &filename) {
             if (numSVONodeVerts == 0) {
-                logger().warn("-- There is no valid Sparse Voxel Octree's node vertex, MarchingCubes is exited...");
+//                logger().warn("-- There is no valid Sparse Voxel Octree's node vertex, MarchingCubes is exited...");
+                spdlog::warn("-- There is no valid Sparse Voxel Octree's node vertex, MarchingCubes is exited...");
                 return;
             }
             uint nVoxels = resolution.x * resolution.y * resolution.z;
@@ -725,7 +733,8 @@ NAMESPACE_BEGIN(ITS)
 
             launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
             if (allTriVertices == 0) {
-                logger().warn("-- [MC] There is no valid vertices...");
+//                logger().warn("-- [MC] There is no valid vertices...");
+                spdlog::warn("-- [MC] There is no valid vertices...");
                 return;
             }
 
@@ -735,8 +744,10 @@ NAMESPACE_BEGIN(ITS)
 
             end = system_clock::now();
             duration<double> elapsed_seconds = end - start;
-            logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
-            logger().info("-- [MC] Writing to {}...", filename);
+//            logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
+            spdlog::info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
+//            logger().info("-- [MC] Writing to {}...", filename);
+            spdlog::info("-- [MC] Writing to {}...", filename);
 
             writeToOBJFile(filename);
 
@@ -776,7 +787,8 @@ NAMESPACE_BEGIN(ITS)
 
             launch_determineVoxelKernel(nVoxels, isoVal, maxVerts);
             if (allTriVertices == 0) {
-                logger().warn("-- [MC] There is no valid vertices...");
+//                logger().warn("-- [MC] There is no valid vertices...");
+                spdlog::warn("-- [MC] There is no valid vertices...");
                 return {};
             }
 
@@ -786,7 +798,8 @@ NAMESPACE_BEGIN(ITS)
 
             end = system_clock::now();
             duration<double> elapsed_seconds = end - start;
-            logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
+//            logger().info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
+            spdlog::info("-- [MC] MarchingCubes spent {} s.", elapsed_seconds.count());
 
             std::shared_ptr<core::Mesh> M = writeToMesh();
             freeCommonResources();

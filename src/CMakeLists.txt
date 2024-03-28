@@ -19,7 +19,7 @@
 
 ###########################################
 # detail folder
-add_subdirectory(detail)
+#add_subdirectory(detail)
 #link_libraries(ITS::DETAIL)
 
 ###########################################
@@ -40,11 +40,19 @@ endif ()
 # Organize linkings
 target_link_libraries(ITS_GPU_MC
         PRIVATE
-        igl::core
-        ITS::SVO
+#        igl::core
+#        ITS::SVO
+        ITS::BASE_MODEL
 )
 
 target_link_libraries(ITS_MODEL
         PRIVATE
         ITS::GPU_MC
 )
+
+#add_executable(TEST_SPDLOG TestSpdlog.cu)
+#
+#target_link_libraries(TEST_SPDLOG
+#        PRIVATE
+#        spdlog::spdlog
+#)

@@ -4,6 +4,7 @@
 #include "detail/cuda/CUDAMath.cuh"
 #include "detail/cuda/CUDACheck.cuh"
 #include "utils/Timer.hpp"
+#include "utils/Common.hpp"
 #include "utils/cuda/CUDAUtil.cuh"
 #include "utils/File.hpp"
 #include <spdlog/spdlog.h>
@@ -895,7 +896,8 @@ NAMESPACE_BEGIN(ITS)
                                        0); // 必须加init
                 size_t numCNodes = *(d_esumCNodesArray.rbegin()) + *(d_isValidCNodeArray.rbegin());
                 if (!numCNodes) {
-                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+//                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+                    spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
                     break;
                 }
 
@@ -984,11 +986,13 @@ NAMESPACE_BEGIN(ITS)
                     gridCNodeSize = numParentCNodes;
                     gridTreeNodeSize = gridCNodeSize % 8 ? gridCNodeSize + 8 - (gridCNodeSize % 8) : gridCNodeSize;
                     if (numNodes / 8 == 0) {
-                        logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+//                        logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+                        spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
                         break;
                     }
                 } else {
-                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+//                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+                    spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
                     break;
                 }
             }
@@ -1286,7 +1290,8 @@ NAMESPACE_BEGIN(ITS)
             utils::file::checkDir(filename_output);
             std::ofstream output(filename_output.c_str(), std::ios::out);
             if (!output) {
-                logger().error("[SVO] [I/O] File \"{}\" could not be opened!", filename_output);
+//                logger().error("[SVO] [I/O] File \"{}\" could not be opened!", filename_output);
+                spdlog::error("[SVO] [I/O] File \"{}\" could not be opened!", filename_output);
                 return;
             }
 
@@ -1330,7 +1335,8 @@ NAMESPACE_BEGIN(ITS)
                 utils::file::checkDir(d_filename);
                 std::ofstream output(d_filename.c_str(), std::ios::out);
                 if (!output) {
-                    logger().error("[SVO] [I/O] File \"{}\" could not be opened!", d_filename);
+//                    logger().error("[SVO] [I/O] File \"{}\" could not be opened!", d_filename);
+                    spdlog::error("[SVO] [I/O] File \"{}\" could not be opened!", d_filename);
                     return;
                 }
 
