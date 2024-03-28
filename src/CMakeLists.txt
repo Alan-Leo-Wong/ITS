@@ -40,13 +40,14 @@ endif ()
 # Organize linkings
 target_link_libraries(ITS_GPU_MC
         PRIVATE
-#        igl::core
+        igl::core
+#        ITS::GPU_COMPUTE
 #        ITS::SVO
-        ITS::BASE_MODEL
+#        ITS::BASE_MODEL
 )
 
 target_link_libraries(ITS_MODEL
-        PRIVATE
+        PUBLIC
         ITS::GPU_MC
 )
 

@@ -657,7 +657,7 @@ NAMESPACE_BEGIN(ITS)
                 meshVertMat.row(i + 2) = Eigen::RowVector3d(h_triPoints[i + 2].x,
                                                             h_triPoints[i + 2].y,
                                                             h_triPoints[i + 2].z);
-                meshfaceMat.row(i) = Eigen::RowVector3i(i + 1, i + 2, i + 3);
+                meshfaceMat.row(i / 3) = Eigen::RowVector3i(i, i + 1, i + 2);
             }
             return std::make_shared<core::Mesh>(meshVertMat, meshfaceMat);
         }
@@ -765,10 +765,10 @@ NAMESPACE_BEGIN(ITS)
          * @return
          */
         std::shared_ptr<core::Mesh> marching_cubes(uint3 resolution,
-                                         double3 gridOrigin,
-                                         double3 gridWidth,
-                                         double isoVal,
-                                         const thrust::host_vector<double> &gridSDF) {
+                                                   double3 gridOrigin,
+                                                   double3 gridWidth,
+                                                   double isoVal,
+                                                   const thrust::host_vector<double> &gridSDF) {
             uint nVoxels = resolution.x * resolution.y * resolution.z;
 
             uint maxVerts = nVoxels * 18;

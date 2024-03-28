@@ -65,6 +65,7 @@ target_sources(ITS_MODEL
 )
 target_link_libraries(ITS_MODEL
         PUBLIC
+        ITS::SVO
         ITS::BASE_MODEL
 #        spdlog::spdlog
 )

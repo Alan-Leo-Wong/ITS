@@ -89,6 +89,8 @@ function(add_cuda_lib module_name)
     # Folder for IDE
     set_target_properties(${module_name} PROPERTIES FOLDER "ITSLibs")
 
+    set_target_properties(${module_name} PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
 endfunction()
 
 function(add_dir_libs directories library_list)

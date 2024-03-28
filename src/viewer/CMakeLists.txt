@@ -11,4 +11,5 @@ target_link_libraries(ITS_VIEWER
         igl::core
         igl::glfw
         igl::imgui
+        Eigen3::Eigen
 )

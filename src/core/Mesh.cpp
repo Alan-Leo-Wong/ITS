@@ -314,9 +314,9 @@ NAMESPACE_BEGIN(ITS)
                                getFileExtension(filename));
                 return;
             }
-            if (getFileExtension(filename) != ".obj")
+            if (getFileExtension(filename) == ".obj")
                 igl::writeOBJ(filename, vertMat, faceMat);
-            if (getFileExtension(filename) != ".off")
+            if (getFileExtension(filename) == ".off")
                 igl::writeOFF(filename, vertMat, faceMat);
         }
 

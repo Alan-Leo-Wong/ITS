@@ -245,6 +245,17 @@ int main(int argc, char **argv) {
         std::map<int, Eigen::RowVector3d> colors;
 
         int lastSelected = -1;
+        int numMesh = 0;
+        meshViewer.callback_key_down =
+                [&](igl::opengl::glfw::Viewer &, unsigned int key, int mod) {
+                    if (key == GLFW_KEY_N && numMesh > 1) {
+                        int old_id = meshViewer.selected_data_index;
+                        meshViewer.data(old_id).set_visible(false);
+                        meshViewer.data((old_id + 1) % numMesh).set_visible(true);
+                        return true;
+                    }
+                    return false;
+                };
         // Refresh selected mesh colors
         meshViewer.callback_pre_draw =
                 [&](igl::opengl::glfw::Viewer &) {
@@ -252,7 +263,8 @@ int main(int argc, char **argv) {
                         for (auto &data: meshViewer.data_list) {
                             data.set_colors(colors[data.id]);
                         }
-                        meshViewer.data_list[meshViewer.selected_data_index].set_colors(Eigen::RowVector3d(0.9, 0.1, 0.1));
+                        meshViewer.data_list[meshViewer.selected_data_index].set_colors(
+                                Eigen::RowVector3d(0.9, 0.1, 0.1));
                         lastSelected = meshViewer.selected_data_index;
                     }
                     return false;
@@ -261,8 +273,9 @@ int main(int argc, char **argv) {
 
         int meshIdx = -1; // meshViewer.data() begin with by -1
         for (const auto &mesh_name: meshes) {
+            ++numMesh;
             const Mesh &mesh = mesh_name.first;
-            const std::string name = mesh_name.second;
+            const std::string &name = mesh_name.second;
             if (name == "outer shell") {
                 logger().info("[MC] Writing \"{}\" to {}...", name, outerShellFile);
                 mesh.writeMesh(outerShellFile);
@@ -275,9 +288,10 @@ int main(int argc, char **argv) {
             }
 
 #ifdef ENABLE_MESH_VIEW
-            colors.emplace(meshIdx++, 0.5 * Eigen::RowVector3d::Random().array() + 0.5);
+            colors.emplace(meshIdx++, 0.25 * Eigen::RowVector3d::Random().array() + 0.25);
             meshViewer.data().set_mesh(mesh.getVertMat(), mesh.getFaceMat());
             meshViewer.append_mesh();
+            if (meshIdx >= 1) meshViewer.data(meshIdx - 1).set_visible(false);
 #endif
         }
 
