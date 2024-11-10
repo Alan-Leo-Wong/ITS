@@ -1,5 +1,7 @@
 # ITS: Implicit 3D Thin Shell
 
+![teaser](assets/teaser.jpg)
+
 ITS introduces a novel approach to representing the "sandwich-walled" space of input surfaces using a tri-variate tensor-product B-spline. This method transforms complex geometric calculations into manageable operations, enhancing both the accuracy and efficiency of geometric processing tasks.
 
 ## Key Features
@@ -54,3 +56,9 @@ To run ITS, use the following command-line interface (CLI) to configure your pro
 - `-M, --mc`: Enable marching-cubes visualization.
 - `-R, --mc_res <resolution>`: Specifies the resolution for marching-cubes. Requires `-M` flag and the resolution must be greater than zero.
 - `-O, --mc_dir <directory>`: Specifies the output directory for marching-cubes visualization shells. Requires `-M` flag.
+
+
+
+**We provide a bunny model to enable quick startup of our programs. Below are the displayed results when the code is installed correctly.**
+
+![bunny-example](assets/bunny-example.png)
