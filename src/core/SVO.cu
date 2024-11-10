@@ -7,7 +7,7 @@
 #include "utils/Common.hpp"
 #include "utils/cuda/CUDAUtil.cuh"
 #include "utils/File.hpp"
-#include <spdlog/spdlog.h>
+//#include <spdlog/spdlog.h>
 #include <thrust/scan.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
@@ -682,6 +682,7 @@ NAMESPACE_BEGIN(ITS)
             namespace {
                 __device__ size_t d_topNodeIdx;
             }
+
             template<bool topFlag>
             __global__ void findNeighbors(size_t nNodes,
                                           size_t preESumTreeNodes,
@@ -897,7 +898,8 @@ NAMESPACE_BEGIN(ITS)
                 size_t numCNodes = *(d_esumCNodesArray.rbegin()) + *(d_isValidCNodeArray.rbegin());
                 if (!numCNodes) {
 //                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
-                    spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+//                    spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+                    std::cout << "[SVO] Sparse Voxel Octree depth: " << treeDepth << std::endl;
                     break;
                 }
 
@@ -987,12 +989,12 @@ NAMESPACE_BEGIN(ITS)
                     gridTreeNodeSize = gridCNodeSize % 8 ? gridCNodeSize + 8 - (gridCNodeSize % 8) : gridCNodeSize;
                     if (numNodes / 8 == 0) {
 //                        logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
-                        spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+                        std::cout << "[SVO] Sparse Voxel Octree depth: " << treeDepth << std::endl;
                         break;
                     }
                 } else {
 //                    logger().info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
-                    spdlog::info("[SVO] Sparse Voxel Octree depth: {}", treeDepth);
+                    std::cout << "[SVO] Sparse Voxel Octree depth: " << treeDepth << std::endl;
                     break;
                 }
             }
@@ -1291,12 +1293,13 @@ NAMESPACE_BEGIN(ITS)
             std::ofstream output(filename_output.c_str(), std::ios::out);
             if (!output) {
 //                logger().error("[SVO] [I/O] File \"{}\" could not be opened!", filename_output);
-                spdlog::error("[SVO] [I/O] File \"{}\" could not be opened!", filename_output);
+                std::cerr << "[SVO] [I/O] File " << filename_output << " could not be opened!\n";
                 return;
             }
 
 #ifndef SVO_IO_SILENT
-            std::cout << "[SVO] [I/O] Writing data in obj voxels format to file " << std::quoted(filename_output.c_str())
+            std::cout << "[SVO] [I/O] Writing data in obj voxels format to file "
+                      << std::quoted(filename_output.c_str())
                       << std::endl;
             // Write stats
             size_t voxels_seen = 0;
@@ -1325,7 +1328,6 @@ NAMESPACE_BEGIN(ITS)
             output.close();
         }
 
-
         void SparseVoxelOctree::saveSVO(const std::string &filename) const {
             for (int i = 0; i < treeDepth; ++i) {
                 size_t faceBegIdx = 0;
@@ -1336,7 +1338,7 @@ NAMESPACE_BEGIN(ITS)
                 std::ofstream output(d_filename.c_str(), std::ios::out);
                 if (!output) {
 //                    logger().error("[SVO] [I/O] File \"{}\" could not be opened!", d_filename);
-                    spdlog::error("[SVO] [I/O] File \"{}\" could not be opened!", d_filename);
+                    std::cerr << "[SVO] [I/O] File " << d_filename << " could not be opened!\n";
                     return;
                 }
 

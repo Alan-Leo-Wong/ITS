@@ -16,6 +16,7 @@
 #include "detail/Geometry.hpp"
 #include "utils/Timer.hpp"
 #include "utils/File.hpp"
+#include "utils/Logger.hpp"
 #include "utils/Common.hpp"
 #include <spdlog/spdlog.h>
 #include <CLI/CLI.hpp>
@@ -288,6 +289,7 @@ int main(int argc, char **argv) {
             }
 
 #ifdef ENABLE_MESH_VIEW
+            logger().info("[igl] Visualizing {}", name);
             colors.emplace(meshIdx++, 0.25 * Eigen::RowVector3d::Random().array() + 0.25);
             meshViewer.data().set_mesh(mesh.getVertMat(), mesh.getFaceMat());
             meshViewer.append_mesh();

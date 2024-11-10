@@ -369,11 +369,11 @@ MigrationBackup/
 FodyWeavers.xsd
 
 include/
-
 vis/
-
 output/
-
 model/
+deprecated/
 
+*.sln
+*.vcxproj
 !model/bunny.off

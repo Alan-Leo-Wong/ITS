@@ -40,7 +40,7 @@ namespace fcpw_helper {
 
         // specify the triangle indices
         for (int i = 0; i < nTriangles; i++)
-            scene.setObjectTriangle(modelFaces[i].data(), i, 0);
+            scene.setObjectTriangle(modelFaces[i], i, 0);
 
         scene.computeObjectNormals(0);
 

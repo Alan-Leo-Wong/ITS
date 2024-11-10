@@ -7,6 +7,7 @@
 #include "utils/Timer.hpp"
 #include "utils/Common.hpp"
 #include "utils/File.hpp"
+#include "utils/Logger.hpp"
 #include "mc/MarchingCubes.hpp"
 #include <omp.h>
 #include <queue>

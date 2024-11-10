@@ -1,6 +1,7 @@
 ﻿#include "Mesh.hpp"
 #include "detail/Geometry.hpp"
 #include "utils/Common.hpp"
+#include "utils/Logger.hpp"
 #include "utils/File.hpp"
 #include "CUDACompute.hpp"
 #include <sstream>
@@ -301,17 +302,18 @@ NAMESPACE_BEGIN(ITS)
         //////////////////////
         void Mesh::readMesh(const std::string &filename) {
             if (!igl::read_triangle_mesh(filename, vertMat, faceMat)) {
-                logger().error("[I/O] File \"{}\" could not be opened!", filename);
+                utils::logger().error("[I/O] File \"{}\" could not be opened!", filename);
                 exit(EXIT_FAILURE);
             }
             modelName = getFileName(filename);
         }
 
         void Mesh::writeMesh(const std::string &filename) const {
+            utils::file::checkDir(filename);
             if (getFileExtension(filename) != ".obj" &&
                 getFileExtension(filename) != ".off") {
-                logger().error("Unsupported file format \"{}\"!",
-                               getFileExtension(filename));
+                utils::logger().error("Unsupported file format \"{}\"!",
+                                      getFileExtension(filename));
                 return;
             }
             if (getFileExtension(filename) == ".obj")

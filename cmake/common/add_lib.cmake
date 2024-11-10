@@ -91,6 +91,8 @@ function(add_cuda_lib module_name)
 
     set_target_properties(${module_name} PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
+    set_target_properties(${module_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 endfunction()
 
 function(add_dir_libs directories library_list)

@@ -13,7 +13,7 @@ endif ()
 
 ###########################################
 # Options
-option(ENABLE_IMGUI_VIEWER "Enable imgui visualization" ON)
+option(ENABLE_IMGUI_VIEWER "Enable ImGUI visualization" ON)
 option(FCPW_TEST "FCPW test" ON)
 
 ###########################################

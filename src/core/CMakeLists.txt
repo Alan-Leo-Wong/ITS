@@ -9,10 +9,14 @@ target_sources(ITS_GPU_COMPUTE
 target_link_libraries(ITS_GPU_COMPUTE
         PUBLIC
         #        ITS::CONFIG
-        spdlog::spdlog
+#        spdlog::spdlog
         Eigen3::Eigen
         CUDA::cublas
 )
+target_compile_options(ITS_GPU_COMPUTE PRIVATE -diag-suppress=177 -diag-suppress=20012 -diag-suppress=20015 -diag-suppress=20013)
+if(MSVC)
+    target_compile_options(ITS_GPU_COMPUTE PRIVATE -Xcompiler /wd4068)
+endif ()
 
 ###########################################
 # GPU SVO
@@ -37,11 +41,12 @@ target_sources(ITS_BASE_MODEL
         Mesh.hpp
         Mesh.cpp
 )
+target_compile_options(ITS_BASE_MODEL PUBLIC /wd4068 /wd4384)
 target_link_libraries(ITS_BASE_MODEL
         PUBLIC
         igl::core
         ITS::GPU_COMPUTE
-#        spdlog::spdlog
+        spdlog::spdlog
 )
 
 if (MSVC)
