@@ -7,7 +7,7 @@ ITS introduces a novel approach to representing the "sandwich-walled" space of i
 - **Novel Representation**: Utilizes a tri-variate tensor-product B-spline to express the implicit function of input surfaces, enabling precise manipulations and analyses.
 - **Optimized Extreme Value Calculation**: Converts the challenge of identifying extreme function values across infinite points into a tractable problem of finding extremes within a finite set of candidates, ensuring rigorous wrapping of the input surface.
 - **Acceleration Strategies**: Implements several optimization strategies that significantly reduce computation times for inside-outside tests, enhancing the overall efficiency.
-- **Mesh Simplification Integration**: Adapts the approach to work seamlessly with the established Quadric Error Metrics (QEM) technique for mesh simplification, enabling precise control over global errors.
+- **Advanced Visualization Tools**: Features robust visualization capabilities implemented using [libigl](https://github.com/libigl/libigl), allowing for real-time viewing and analysis of geometric data.
 
 ## Prerequisites
 
