@@ -15,7 +15,7 @@ Before installing and running ITS, ensure your system meets the following requir
 
 - **NVIDIA GPU**: An NVIDIA GPU with CUDA Compute Capability 6.0 or higher.
 - **CUDA Toolkit**: NVIDIA CUDA Toolkit version 11.6 or higher. Make sure it is properly installed and configured in your system environment.
-- **C++ Compiler**: A compatible C++ compiler that supports at least C++17. This is necessary for compiling the project.
+- **C++ Compiler**: A compatible C++ compiler that supports at least C++20. This is necessary for compiling the project.
 - **CMake**: Version 3.20 or higher for building the project.
 
 ## Installation
